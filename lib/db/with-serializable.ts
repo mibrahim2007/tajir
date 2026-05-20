@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/nextjs'
 import { db } from '@/db'
 import type { ActionResult } from '@/lib/types'
 
@@ -21,6 +22,7 @@ export async function withSerializable<T>(
         await new Promise((r) => setTimeout(r, attempt * 50))
         continue
       }
+      Sentry.captureException(err)
       throw err
     }
   }
