@@ -1,0 +1,140 @@
+import { and, eq, ilike, count } from 'drizzle-orm'
+import { Suspense } from 'react'
+import { requireAuth } from '@/lib/auth/require-auth'
+import { db } from '@/db'
+import { inventoryLots } from '@/db/schema'
+import { CreateLotForm } from './create-lot-form'
+import { InventoryFilters } from './inventory-filters'
+import { DeleteButton } from '@/components/delete-button'
+import { RoleGate } from '@/components/role-gate'
+import { deleteInventoryLotAction } from '@/app/actions/delete-inventory-lot'
+
+const PAGE_SIZE = 50
+
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
+
+export default async function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
+  const { tenantId, role } = await requireAuth()
+  const params = await searchParams
+
+  const filterCount = typeof params.count === 'string' ? params.count : undefined
+  const filterType = typeof params.type === 'string' ? params.type : undefined
+  const filterFiber = typeof params.fiber === 'string' ? params.fiber : undefined
+  const filterLot = typeof params.lot === 'string' ? params.lot : undefined
+  const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
+
+  const conditions = [
+    eq(inventoryLots.tenantId, tenantId),
+    ...(filterCount ? [ilike(inventoryLots.count, `%${filterCount}%`)] : []),
+    ...(filterType ? [eq(inventoryLots.type, filterType)] : []),
+    ...(filterFiber ? [ilike(inventoryLots.fiber, `%${filterFiber}%`)] : []),
+    ...(filterLot ? [ilike(inventoryLots.lot, `%${filterLot}%`)] : []),
+  ]
+
+  const where = and(...conditions)
+
+  const [lots, [{ total }]] = await Promise.all([
+    db
+      .select()
+      .from(inventoryLots)
+      .where(where)
+      .limit(PAGE_SIZE)
+      .offset((page - 1) * PAGE_SIZE),
+    db.select({ total: count() }).from(inventoryLots).where(where),
+  ])
+
+  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const hasFilters = filterCount || filterType || filterFiber || filterLot
+
+  return (
+    <div className="p-6 max-w-5xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Inventory</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {total} stock item{total !== 1 ? 's' : ''}
+            {hasFilters ? ' (filtered)' : ''}
+          </p>
+        </div>
+        <CreateLotForm />
+      </div>
+
+      <Suspense>
+        <InventoryFilters />
+      </Suspense>
+
+      {lots.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-12 text-center">
+          <p className="text-muted-foreground text-sm">
+            {hasFilters
+              ? 'No stock items match your filters'
+              : 'No stock items yet. Add your first lot to get started.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="rounded-lg border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/50 border-b">
+                  <tr>
+                    <th className="text-left px-4 py-3 font-medium">Name</th>
+                    <th className="text-left px-4 py-3 font-medium">Code</th>
+                    <th className="text-left px-4 py-3 font-medium">Count</th>
+                    <th className="text-left px-4 py-3 font-medium">Type</th>
+                    <th className="text-left px-4 py-3 font-medium">Fiber</th>
+                    <th className="text-left px-4 py-3 font-medium">Lot</th>
+                    <th className="text-right px-4 py-3 font-medium">Qty</th>
+                    <th className="px-4 py-3 w-16" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {lots.map((lot) => (
+                    <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-medium">{lot.name}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
+                      <td className="px-4 py-3">{lot.count}</td>
+                      <td className="px-4 py-3">{lot.type ?? '—'}</td>
+                      <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
+                      <td className="px-4 py-3">{lot.lot ?? '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{lot.currentQuantity}</td>
+                      <td className="px-4 py-3">
+                        <RoleGate allowedRoles={['owner']}>
+                          <DeleteButton
+                            description={`Delete stock item "${lot.name}"? This cannot be undone.`}
+                            onDelete={() => deleteInventoryLotAction({ id: lot.id })}
+                          />
+                        </RoleGate>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Sticky summary row */}
+          <div className="mt-2 px-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                  <a
+                    key={p}
+                    href={`?page=${p}${filterCount ? `&count=${filterCount}` : ''}${filterType ? `&type=${filterType}` : ''}${filterFiber ? `&fiber=${filterFiber}` : ''}${filterLot ? `&lot=${filterLot}` : ''}`}
+                    className={`px-2 py-1 rounded min-h-[44px] flex items-center ${p === page ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}
+                  >
+                    {p}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+    </div>
+  )
+}

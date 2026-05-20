@@ -47,15 +47,42 @@ export async function updateSession(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const user = data?.claims;
 
-  if (
-    request.nextUrl.pathname !== "/" &&
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
-    // no user, potentially respond by redirecting the user to the login page
+  const pathname = request.nextUrl.pathname;
+  const isAuthRoute = pathname.startsWith("/auth");
+  const isPublicRoute = pathname === "/";
+
+  if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isAuthRoute) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  // Assistant RBAC — block owner-only routes server-side
+  const role = (user as { app_metadata?: { role?: string } } | undefined)
+    ?.app_metadata?.role;
+
+  const ownerOnlyPrefixes = [
+    "/suppliers",
+    "/customers",
+    "/pricing",
+    "/reports",
+    "/audit",
+    "/settings",
+  ];
+
+  if (
+    user &&
+    role === "assistant" &&
+    ownerOnlyPrefixes.some((p) => pathname.startsWith(p))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
