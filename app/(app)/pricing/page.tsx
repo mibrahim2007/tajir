@@ -1,9 +1,12 @@
 import { eq } from 'drizzle-orm'
+import Link from 'next/link'
+import { History } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { db } from '@/db'
 import { customerPriceLists, tajirCustomers, inventoryLots } from '@/db/schema'
 import { SetPriceForm } from './set-price-form'
 import { DeleteButton } from '@/components/delete-button'
+import { Button } from '@/components/ui/button'
 import { deletePricingRuleAction } from '@/app/actions/delete-pricing-rule'
 import { formatPKR } from '@/lib/utils/currency'
 
@@ -47,6 +50,7 @@ export default async function PricingPage() {
                 <th className="text-left px-4 py-3 font-medium">Stock Item</th>
                 <th className="text-right px-4 py-3 font-medium">Rate (PKR)</th>
                 <th className="text-right px-4 py-3 font-medium">Since</th>
+                <th className="px-4 py-3 w-24" />
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -59,12 +63,19 @@ export default async function PricingPage() {
                     {rule.effectiveFrom.toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td className="px-4 py-3">
-                    {role === 'owner' && (
-                      <DeleteButton
-                        description="Delete this pricing rule? The customer will revert to manual rate entry."
-                        onDelete={() => deletePricingRuleAction({ id: rule.id })}
-                      />
-                    )}
+                    <div className="flex items-center gap-1">
+                      <Button asChild variant="ghost" size="sm" className="min-h-[44px]">
+                        <Link href={`/pricing/${rule.customerId}/${rule.stockItemId}/history`}>
+                          <History className="h-4 w-4" />
+                        </Link>
+                      </Button>
+                      {role === 'owner' && (
+                        <DeleteButton
+                          description="Delete this pricing rule? The customer will revert to manual rate entry."
+                          onDelete={() => deletePricingRuleAction({ id: rule.id })}
+                        />
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

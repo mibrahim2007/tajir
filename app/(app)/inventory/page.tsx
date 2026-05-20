@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { db } from '@/db'
 import { inventoryLots } from '@/db/schema'
 import { CreateLotForm } from './create-lot-form'
+import { EditInventoryLotForm } from './edit-inventory-lot-form'
 import { InventoryFilters } from './inventory-filters'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
@@ -100,10 +101,13 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                       <td className="px-4 py-3 text-right tabular-nums">{lot.currentQuantity}</td>
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
-                          <DeleteButton
-                            description={`Delete stock item "${lot.name}"? This cannot be undone.`}
-                            onDelete={() => deleteInventoryLotAction({ id: lot.id })}
-                          />
+                          <div className="flex items-center gap-1">
+                            <EditInventoryLotForm lot={lot} />
+                            <DeleteButton
+                              description={`Delete stock item "${lot.name}"? This cannot be undone.`}
+                              onDelete={() => deleteInventoryLotAction({ id: lot.id })}
+                            />
+                          </div>
                         </RoleGate>
                       </td>
                     </tr>

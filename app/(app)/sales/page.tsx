@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { db } from '@/db'
 import { salesOrders, tajirCustomers, inventoryLots } from '@/db/schema'
 import { Button } from '@/components/ui/button'
+import { EditSaleForm } from './edit-sale-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteSaleAction } from '@/app/actions/delete-sale'
@@ -56,7 +57,7 @@ export default async function SalesPage() {
                   <th className="text-right px-4 py-3 font-medium">Rate</th>
                   <th className="text-right px-4 py-3 font-medium">Amount (PKR)</th>
                   <th className="text-right px-4 py-3 font-medium">Due</th>
-                  <th className="px-4 py-3 w-16" />
+                  <th className="px-4 py-3 w-24" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -76,10 +77,17 @@ export default async function SalesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
-                          <DeleteButton
-                            description="Delete this sale order? Stock quantity will be restored."
-                            onDelete={() => deleteSaleAction({ id: o.id })}
-                          />
+                          <div className="flex items-center gap-1">
+                            <EditSaleForm
+                              sale={o}
+                              customers={customers}
+                              lots={lots}
+                            />
+                            <DeleteButton
+                              description="Delete this sale order? Stock quantity will be restored."
+                              onDelete={() => deleteSaleAction({ id: o.id })}
+                            />
+                          </div>
                         </RoleGate>
                       </td>
                     </tr>

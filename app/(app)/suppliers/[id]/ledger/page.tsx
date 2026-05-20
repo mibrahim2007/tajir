@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { db } from '@/db'
 import { suppliers, purchaseOrders, apPayments, inventoryLots } from '@/db/schema'
 import { RecordPaymentForm } from '@/app/(app)/suppliers/record-payment-form'
+import { EditApPaymentForm } from '@/app/(app)/suppliers/edit-ap-payment-form'
 import { ExportButton } from '@/components/export-button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
@@ -48,6 +49,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     debit: number
     credit: number
     balance: number
+    rawPayment?: typeof payments[0]
   }
 
   const rows: LedgerRow[] = []
@@ -77,7 +79,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     } else {
       const paid = parseFloat(item.entry.pkrEquivalent)
       runningBalance -= paid
-      rows.push({ id: item.entry.id, kind: 'payment', date: item.date, description: `Payment${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: paid, balance: runningBalance })
+      rows.push({ id: item.entry.id, kind: 'payment', date: item.date, description: `Payment${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: paid, balance: runningBalance, rawPayment: item.entry })
     }
   }
 
@@ -132,10 +134,15 @@ export default async function SupplierLedgerPage({ params }: Props) {
                     <td className="px-4 py-3">
                       {row.kind !== 'opening' && (
                         <RoleGate allowedRoles={['owner']}>
-                          <DeleteButton
-                            description={row.kind === 'purchase' ? 'Delete this purchase? Stock will be reversed.' : 'Delete this payment?'}
-                            onDelete={() => row.kind === 'purchase' ? deletePurchaseAction({ id: row.id }) : deleteApPaymentAction({ id: row.id })}
-                          />
+                          <div className="flex items-center gap-1">
+                            {row.kind === 'payment' && row.rawPayment && (
+                              <EditApPaymentForm payment={row.rawPayment} />
+                            )}
+                            <DeleteButton
+                              description={row.kind === 'purchase' ? 'Delete this purchase? Stock will be reversed.' : 'Delete this payment?'}
+                              onDelete={() => row.kind === 'purchase' ? deletePurchaseAction({ id: row.id }) : deleteApPaymentAction({ id: row.id })}
+                            />
+                          </div>
                         </RoleGate>
                       )}
                     </td>

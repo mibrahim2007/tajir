@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { db } from '@/db'
 import { tajirCustomers, salesOrders, arReceipts, inventoryLots } from '@/db/schema'
 import { RecordReceiptForm } from '@/app/(app)/customers/record-receipt-form'
+import { EditArReceiptForm } from '@/app/(app)/customers/edit-ar-receipt-form'
 import { ExportButton } from '@/components/export-button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
@@ -48,6 +49,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
     debit: number
     credit: number
     balance: number
+    rawReceipt?: typeof receipts[0]
   }
 
   const rows: LedgerRow[] = []
@@ -77,7 +79,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
     } else {
       const amount = parseFloat(item.entry.pkrEquivalent)
       runningBalance -= amount
-      rows.push({ id: item.entry.id, kind: 'receipt', date: item.date, description: `Receipt${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: amount, balance: runningBalance })
+      rows.push({ id: item.entry.id, kind: 'receipt', date: item.date, description: `Receipt${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: amount, balance: runningBalance, rawReceipt: item.entry })
     }
   }
 
@@ -132,10 +134,15 @@ export default async function CustomerLedgerPage({ params }: Props) {
                     <td className="px-4 py-3">
                       {row.kind !== 'opening' && (
                         <RoleGate allowedRoles={['owner']}>
-                          <DeleteButton
-                            description={row.kind === 'sale' ? 'Delete this sale? Stock will be restored.' : 'Delete this receipt?'}
-                            onDelete={() => row.kind === 'sale' ? deleteSaleAction({ id: row.id }) : deleteArReceiptAction({ id: row.id })}
-                          />
+                          <div className="flex items-center gap-1">
+                            {row.kind === 'receipt' && row.rawReceipt && (
+                              <EditArReceiptForm receipt={row.rawReceipt} />
+                            )}
+                            <DeleteButton
+                              description={row.kind === 'sale' ? 'Delete this sale? Stock will be restored.' : 'Delete this receipt?'}
+                              onDelete={() => row.kind === 'sale' ? deleteSaleAction({ id: row.id }) : deleteArReceiptAction({ id: row.id })}
+                            />
+                          </div>
                         </RoleGate>
                       )}
                     </td>
