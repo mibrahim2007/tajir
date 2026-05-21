@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
+import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createPurchaseAction } from '@/app/actions/create-purchase'
 
 const schema = z.object({
@@ -40,15 +41,16 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const [supplierSearch, setSupplierSearch] = useState('')
-  const [lotSearch, setLotSearch] = useState('')
 
   const filteredSuppliers = suppliers.filter((s) =>
     s.name.toLowerCase().includes(supplierSearch.toLowerCase())
   )
-  const filteredLots = lots.filter((l) =>
-    l.name.toLowerCase().includes(lotSearch.toLowerCase()) ||
-    l.count.toLowerCase().includes(lotSearch.toLowerCase())
-  )
+
+  const lotPickerItems = lots.map((l) => ({
+    id: l.id,
+    name: l.name,
+    badge: l.count,
+  }))
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -74,125 +76,109 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
       <CardContent className="pt-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-              <FormField control={form.control} name="supplierId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}
-                    onOpenChange={(open) => { if (!open) setSupplierSearch('') }}>
-                    <FormControl>
-                      <SelectTrigger className="w-full min-h-[44px]">
-                        <SelectValue placeholder="Select supplier…" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <div className="flex items-center gap-2 px-2 py-1.5 border-b">
-                        <Search className="size-3.5 text-muted-foreground shrink-0" />
-                        <input
-                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                          placeholder="Search suppliers…"
-                          value={supplierSearch}
-                          onChange={(e) => setSupplierSearch(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredSuppliers.length === 0 && (
-                        <p className="py-4 text-center text-sm text-muted-foreground">No suppliers found</p>
-                      )}
-                      {filteredSuppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
 
-              <FormField control={form.control} name="stockItemId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}
-                    onOpenChange={(open) => { if (!open) setLotSearch('') }}>
-                    <FormControl>
-                      <SelectTrigger className="w-full min-h-[44px]">
-                        <SelectValue placeholder="Select stock item…" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <div className="flex items-center gap-2 px-2 py-1.5 border-b">
-                        <Search className="size-3.5 text-muted-foreground shrink-0" />
-                        <input
-                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                          placeholder="Search stock items…"
-                          value={lotSearch}
-                          onChange={(e) => setLotSearch(e.target.value)}
-                          onKeyDown={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      {filteredLots.length === 0 && (
-                        <p className="py-4 text-center text-sm text-muted-foreground">No items found</p>
-                      )}
-                      {filteredLots.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          <span>{l.name}</span>
-                          <span className="ml-1.5 text-xs text-muted-foreground">({l.count})</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            {/* Supplier — searchable dropdown */}
+            <FormField control={form.control} name="supplierId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}
+                  onOpenChange={(open) => { if (!open) setSupplierSearch('') }}>
+                  <FormControl>
+                    <SelectTrigger className="w-full min-h-[44px]">
+                      <SelectValue placeholder="Select supplier…" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <div className="flex items-center gap-2 px-2 py-1.5 border-b">
+                      <Search className="size-3.5 text-muted-foreground shrink-0" />
+                      <input
+                        className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                        placeholder="Search suppliers…"
+                        value={supplierSearch}
+                        onChange={(e) => setSupplierSearch(e.target.value)}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                    {filteredSuppliers.length === 0 && (
+                      <p className="py-4 text-center text-sm text-muted-foreground">No suppliers found</p>
+                    )}
+                    {filteredSuppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-              <FormField control={form.control} name="quantity" render={() => (
-                <FormItem>
-                  <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="number" step="0.001" min="0" {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            {/* Stock Item — popup dialog picker */}
+            <FormField control={form.control} name="stockItemId" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
+                <FormControl>
+                  <ItemPickerDialog
+                    items={lotPickerItems}
+                    value={field.value}
+                    onSelect={field.onChange}
+                    placeholder="Select stock item…"
+                    title="Select Stock Item"
+                    disabled={lots.length === 0}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-              <CurrencyInput
-                amountName="rate"
-                currencyName="currencyCode"
-                exchangeRateName="exchangeRate"
-                label="Rate per Unit"
-                required
-              />
+            <FormField control={form.control} name="quantity" render={() => (
+              <FormItem>
+                <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input type="number" step="0.001" min="0" {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-              <FormField control={form.control} name="advancePaid" render={() => (
-                <FormItem>
-                  <FormLabel>Advance Paid (PKR)</FormLabel>
-                  <FormControl><Input type="number" step="0.01" min="0" placeholder="0" {...form.register('advancePaid', { valueAsNumber: true })} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            <CurrencyInput
+              amountName="rate"
+              currencyName="currencyCode"
+              exchangeRateName="exchangeRate"
+              label="Rate per Unit"
+              required
+            />
 
-              <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+            <FormField control={form.control} name="advancePaid" render={() => (
+              <FormItem>
+                <FormLabel>Advance Paid (PKR)</FormLabel>
+                <FormControl><Input type="number" step="0.01" min="0" placeholder="0" {...form.register('advancePaid', { valueAsNumber: true })} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-              {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+            <FormField control={form.control} name="date" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
-                  Cancel
-                </Button>
-                <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending || suppliers.length === 0 || lots.length === 0}>
-                  {isPending ? 'Saving…' : 'Confirm Purchase'}
-                </Button>
-              </div>
+            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
-              {(suppliers.length === 0 || lots.length === 0) && (
-                <p className="text-xs text-muted-foreground text-center">
-                  {suppliers.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
-                </p>
-              )}
-            </form>
-          </Form>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending || suppliers.length === 0 || lots.length === 0}>
+                {isPending ? 'Saving…' : 'Confirm Purchase'}
+              </Button>
+            </div>
+
+            {(suppliers.length === 0 || lots.length === 0) && (
+              <p className="text-xs text-muted-foreground text-center">
+                {suppliers.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
+              </p>
+            )}
+          </form>
+        </Form>
       </CardContent>
     </Card>
   )

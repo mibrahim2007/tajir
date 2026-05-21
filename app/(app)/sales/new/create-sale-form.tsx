@@ -13,8 +13,9 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { CurrencyInput } from '@/components/currency-input'
+import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createSaleOrderAction } from '@/app/actions/create-sale-order'
-import { formatPKR } from '@/lib/utils/currency'
+
 
 type Customer = { id: string; name: string }
 type StockItem = { id: string; name: string; currentQuantity: string }
@@ -51,14 +52,16 @@ export function CreateSaleForm({
   const [serverError, setServerError] = useState<string | null>(null)
   const [oversellPending, setOversellPending] = useState<OversellPending | null>(null)
   const [customerSearch, setCustomerSearch] = useState('')
-  const [itemSearch, setItemSearch] = useState('')
 
   const filteredCustomers = customers.filter((c) =>
     c.name.toLowerCase().includes(customerSearch.toLowerCase())
   )
-  const filteredItems = stockItems.filter((s) =>
-    s.name.toLowerCase().includes(itemSearch.toLowerCase())
-  )
+
+  const stockPickerItems = stockItems.map((s) => ({
+    id: s.id,
+    name: s.name,
+    meta: `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
+  }))
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -156,36 +159,16 @@ export function CreateSaleForm({
           <FormField control={form.control} name="stockItemId" render={({ field }) => (
             <FormItem>
               <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
-              <Select
-                onValueChange={(v) => { field.onChange(v); autoPopulateRate(watchedCustomer, v) }}
-                value={field.value}
-                onOpenChange={(open) => { if (!open) setItemSearch('') }}
-              >
-                <FormControl>
-                  <SelectTrigger className="w-full min-h-[44px]"><SelectValue placeholder="Select item" /></SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  <div className="flex items-center gap-2 px-2 py-1.5 border-b">
-                    <Search className="size-3.5 text-muted-foreground shrink-0" />
-                    <input
-                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                      placeholder="Search stock items…"
-                      value={itemSearch}
-                      onChange={(e) => setItemSearch(e.target.value)}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  {filteredItems.length === 0 && (
-                    <p className="py-4 text-center text-sm text-muted-foreground">No items found</p>
-                  )}
-                  {filteredItems.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <span>{s.name}</span>
-                      <span className="ml-1.5 text-xs text-muted-foreground">({parseFloat(s.currentQuantity).toLocaleString()} avail.)</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <ItemPickerDialog
+                  items={stockPickerItems}
+                  value={field.value}
+                  onSelect={(v) => { field.onChange(v); autoPopulateRate(watchedCustomer, v) }}
+                  placeholder="Select stock item…"
+                  title="Select Stock Item"
+                  disabled={stockItems.length === 0}
+                />
+              </FormControl>
               {available !== null && (
                 <p className="text-xs text-muted-foreground mt-1">Available: {available.toLocaleString()} units</p>
               )}
