@@ -1,11 +1,8 @@
 'use server'
 
-import { eq } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { db } from '@/db'
-import { tenantUsers } from '@/db/schema'
 
 export async function loginAction(formData: FormData) {
   const username = (formData.get('username') as string | null)?.trim().toLowerCase()
@@ -15,20 +12,20 @@ export async function loginAction(formData: FormData) {
     return { success: false, error: 'Invalid username or password' }
   }
 
-  // Look up the user_id for this username
-  const [record] = await db
-    .select({ userId: tenantUsers.userId, isActive: tenantUsers.isActive })
-    .from(tenantUsers)
-    .where(eq(tenantUsers.username, username))
-    .limit(1)
+  // Look up user_id via Supabase REST (no direct DB connection needed)
+  const admin = createAdminClient()
+  const { data: record, error: lookupError } = await admin
+    .from('tenant_users')
+    .select('user_id, is_active')
+    .eq('username', username)
+    .single()
 
-  if (!record || !record.isActive) {
+  if (lookupError || !record || !record.is_active) {
     return { success: false, error: 'Invalid username or password' }
   }
 
-  // Retrieve the email from Supabase Auth via admin client
-  const admin = createAdminClient()
-  const { data: { user }, error: adminError } = await admin.auth.admin.getUserById(record.userId)
+  // Retrieve the email from Supabase Auth
+  const { data: { user }, error: adminError } = await admin.auth.admin.getUserById(record.user_id)
 
   if (adminError || !user?.email) {
     return { success: false, error: 'Invalid username or password' }
