@@ -12,7 +12,7 @@ export default async function NewPurchasePage() {
   ])
 
   const supplierList = rawSuppliers ?? []
-  const lotList = rawLots ?? []
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
 
   return (
     <div className="p-6 max-w-lg mx-auto">

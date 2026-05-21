@@ -96,7 +96,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex items-center gap-1">
-                            <EditInventoryLotForm lot={{ id: lot.id, name: lot.name, code: lot.code, count: lot.count, type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
+                            <EditInventoryLotForm lot={{ id: lot.id, name: lot.name, code: lot.code, count: String(lot.count ?? ''), type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
                             <DeleteButton
                               description={`Delete stock item "${lot.name}"? This cannot be undone.`}
                               onDelete={() => deleteInventoryLotAction({ id: lot.id })}

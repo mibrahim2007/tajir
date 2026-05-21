@@ -25,7 +25,7 @@ export default async function PurchasesPage() {
 
   const orders = rawOrders ?? []
   const supplierList = rawSuppliers ?? []
-  const lotList = rawLots ?? []
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
 
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
