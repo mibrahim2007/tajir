@@ -5,12 +5,10 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createPurchaseAction } from '@/app/actions/create-purchase'
@@ -40,11 +38,8 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
-  const [supplierSearch, setSupplierSearch] = useState('')
 
-  const filteredSuppliers = suppliers.filter((s) =>
-    s.name.toLowerCase().includes(supplierSearch.toLowerCase())
-  )
+  const supplierPickerItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
 
   const lotPickerItems = lots.map((l) => ({
     id: l.id,
@@ -77,36 +72,20 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
 
-            {/* Supplier — searchable dropdown */}
+            {/* Supplier — popup dialog picker */}
             <FormField control={form.control} name="supplierId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}
-                  onOpenChange={(open) => { if (!open) setSupplierSearch('') }}>
-                  <FormControl>
-                    <SelectTrigger className="w-full min-h-[44px]">
-                      <SelectValue placeholder="Select supplier…" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <div className="flex items-center gap-2 px-2 py-1.5 border-b">
-                      <Search className="size-3.5 text-muted-foreground shrink-0" />
-                      <input
-                        className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                        placeholder="Search suppliers…"
-                        value={supplierSearch}
-                        onChange={(e) => setSupplierSearch(e.target.value)}
-                        onKeyDown={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                    {filteredSuppliers.length === 0 && (
-                      <p className="py-4 text-center text-sm text-muted-foreground">No suppliers found</p>
-                    )}
-                    {filteredSuppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ItemPickerDialog
+                    items={supplierPickerItems}
+                    value={field.value}
+                    onSelect={field.onChange}
+                    placeholder="Select supplier…"
+                    title="Select Supplier"
+                    disabled={suppliers.length === 0}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />

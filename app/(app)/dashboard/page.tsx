@@ -15,32 +15,32 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-2 gap-4">
         <a
           href="/inventory"
-          className="block rounded-lg border p-4 hover:bg-accent transition-colors min-h-[44px]"
+          className="block rounded-xl border border-blue-200 bg-blue-50 p-4 hover:bg-blue-100 transition-colors min-h-[44px]"
         >
-          <p className="font-medium">Inventory</p>
-          <p className="text-sm text-muted-foreground">View stock levels</p>
+          <p className="font-semibold text-blue-900">Inventory</p>
+          <p className="text-sm text-blue-600">View stock levels</p>
         </a>
         <a
           href="/purchases/new"
-          className="block rounded-lg border p-4 hover:bg-accent transition-colors min-h-[44px]"
+          className="block rounded-xl border border-orange-200 bg-orange-50 p-4 hover:bg-orange-100 transition-colors min-h-[44px]"
         >
-          <p className="font-medium">New Purchase</p>
-          <p className="text-sm text-muted-foreground">Record a purchase</p>
+          <p className="font-semibold text-orange-900">New Purchase</p>
+          <p className="text-sm text-orange-600">Record a purchase</p>
         </a>
         <a
           href="/sales/new"
-          className="block rounded-lg border p-4 hover:bg-accent transition-colors min-h-[44px]"
+          className="block rounded-xl border border-green-200 bg-green-50 p-4 hover:bg-green-100 transition-colors min-h-[44px]"
         >
-          <p className="font-medium">New Sale</p>
-          <p className="text-sm text-muted-foreground">Create a sale order</p>
+          <p className="font-semibold text-green-900">New Sale</p>
+          <p className="text-sm text-green-600">Create a sale order</p>
         </a>
         {role === 'owner' && (
           <a
             href="/reports"
-            className="block rounded-lg border p-4 hover:bg-accent transition-colors min-h-[44px]"
+            className="block rounded-xl border border-purple-200 bg-purple-50 p-4 hover:bg-purple-100 transition-colors min-h-[44px]"
           >
-            <p className="font-medium">Reports</p>
-            <p className="text-sm text-muted-foreground">Aging & ledgers</p>
+            <p className="font-semibold text-purple-900">Reports</p>
+            <p className="text-sm text-purple-600">Aging &amp; ledgers</p>
           </a>
         )}
       </div>

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { setPricingRuleAction } from '@/app/actions/set-pricing-rule'
 
 type Customer = { id: string; name: string }
@@ -29,6 +29,9 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+
+  const customerPickerItems = customers.map((c) => ({ id: c.id, name: c.name }))
+  const stockPickerItems = stockItems.map((s) => ({ id: s.id, name: s.name }))
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -61,14 +64,16 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
             <FormField control={form.control} name="customerId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select customer" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ItemPickerDialog
+                    items={customerPickerItems}
+                    value={field.value}
+                    onSelect={field.onChange}
+                    placeholder="Select customer…"
+                    title="Select Customer"
+                    disabled={customers.length === 0}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
@@ -76,14 +81,16 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
             <FormField control={form.control} name="stockItemId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select item" /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {stockItems.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <FormControl>
+                  <ItemPickerDialog
+                    items={stockPickerItems}
+                    value={field.value}
+                    onSelect={field.onChange}
+                    placeholder="Select stock item…"
+                    title="Select Stock Item"
+                    disabled={stockItems.length === 0}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
