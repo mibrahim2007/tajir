@@ -82,7 +82,7 @@ export default async function CustomersPage() {
                           <EditCustomerForm id={c.id} currentName={c.name} />
                           <DeleteButton
                             description={`Delete customer "${c.name}"? All associated sales and receipts will also be deleted.`}
-                            onDelete={() => deleteCustomerAction({ id: c.id })}
+                            onDelete={deleteCustomerAction.bind(null, { id: c.id })}
                           />
                         </div>
                       </RoleGate>

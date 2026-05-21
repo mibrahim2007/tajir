@@ -1,8 +1,8 @@
 import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { CreateLotForm } from './create-lot-form'
-import { EditInventoryLotForm } from './edit-inventory-lot-form'
+import { CreateLotFormWrapper } from './form-wrappers'
+import { EditInventoryLotFormWrapper } from './form-wrappers'
 import { InventoryFilters } from './inventory-filters'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
@@ -13,7 +13,6 @@ const PAGE_SIZE = 50
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export default async function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
-  try {
   const { tenantId, role } = await requireAuth()
   const params = await searchParams
 
@@ -59,7 +58,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             {hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
-        <CreateLotForm />
+        <CreateLotFormWrapper />
       </div>
 
       <Suspense>
@@ -104,10 +103,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex items-center gap-1">
-                            <EditInventoryLotForm lot={{ id: lot.id, name: lot.name, code: lot.code, count: String(lot.count ?? ''), type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
+                            <EditInventoryLotFormWrapper lot={{ id: lot.id, name: lot.name, code: lot.code, count: String(lot.count ?? ''), type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
                             <DeleteButton
                               description={`Delete stock item "${lot.name}"? This cannot be undone.`}
-                              onDelete={() => deleteInventoryLotAction({ id: lot.id })}
+                              onDelete={deleteInventoryLotAction.bind(null, { id: lot.id })}
                             />
                           </div>
                         </RoleGate>
@@ -141,8 +140,4 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
       )}
     </div>
   )
-  } catch (err) {
-    console.error('INVENTORY_PAGE_ERROR', err instanceof Error ? err.message : String(err), err instanceof Error ? err.stack : '')
-    throw err
-  }
 }

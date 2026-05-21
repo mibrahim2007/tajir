@@ -161,7 +161,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
                             )}
                             <DeleteButton
                               description={row.kind === 'purchase' ? 'Delete this purchase? Stock will be reversed.' : 'Delete this payment?'}
-                              onDelete={() => row.kind === 'purchase' ? deletePurchaseAction({ id: row.id }) : deleteApPaymentAction({ id: row.id })}
+                              onDelete={row.kind === 'purchase' ? deletePurchaseAction.bind(null, { id: row.id }) : deleteApPaymentAction.bind(null, { id: row.id })}
                             />
                           </div>
                         </RoleGate>

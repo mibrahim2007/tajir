@@ -87,7 +87,7 @@ export default async function SalesPage() {
                             />
                             <DeleteButton
                               description="Delete this sale order? Stock quantity will be restored."
-                              onDelete={() => deleteSaleAction({ id: o.id })}
+                              onDelete={deleteSaleAction.bind(null, { id: o.id })}
                             />
                           </div>
                         </RoleGate>

@@ -1,24 +1,13 @@
 'use server'
 
-import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
+import { createLotSchema, type CreateLotInput } from './inventory-lot-schema'
 
-export const createLotSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  code: z.string().optional(),
-  count: z.string().min(1, 'Count is required'),
-  type: z.enum(['Combed', 'Carded']).optional(),
-  fiber: z.string().optional(),
-  lot: z.string().optional(),
-  defaultSupplierId: z.string().uuid().optional(),
-  confirmDuplicateLot: z.boolean().optional(),
-})
-
-export type CreateLotInput = z.infer<typeof createLotSchema>
+export { createLotSchema, type CreateLotInput }
 
 export async function createInventoryLotAction(
   input: CreateLotInput,

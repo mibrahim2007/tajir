@@ -38,7 +38,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { createInventoryLotAction, createLotSchema, type CreateLotInput } from '@/app/actions/create-inventory-lot'
+import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
+import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
 
 export function CreateLotForm() {
   const router = useRouter()

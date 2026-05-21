@@ -82,7 +82,7 @@ export default async function SuppliersPage() {
                           <EditSupplierForm id={s.id} currentName={s.name} />
                           <DeleteButton
                             description={`Delete supplier "${s.name}"? This cannot be undone.`}
-                            onDelete={() => deleteSupplierAction({ id: s.id })}
+                            onDelete={deleteSupplierAction.bind(null, { id: s.id })}
                           />
                         </div>
                       </RoleGate>

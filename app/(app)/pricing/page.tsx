@@ -74,7 +74,7 @@ export default async function PricingPage() {
                       {role === 'owner' && (
                         <DeleteButton
                           description="Delete this pricing rule? The customer will revert to manual rate entry."
-                          onDelete={() => deletePricingRuleAction({ id: rule.id })}
+                          onDelete={deletePricingRuleAction.bind(null, { id: rule.id })}
                         />
                       )}
                     </div>

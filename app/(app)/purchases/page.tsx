@@ -80,7 +80,7 @@ export default async function PurchasesPage() {
                           />
                           <DeleteButton
                             description="Delete this purchase? Stock quantity will be reversed."
-                            onDelete={() => deletePurchaseAction({ id: o.id })}
+                            onDelete={deletePurchaseAction.bind(null, { id: o.id })}
                           />
                         </div>
                       </RoleGate>

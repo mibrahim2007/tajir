@@ -161,7 +161,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
                             )}
                             <DeleteButton
                               description={row.kind === 'sale' ? 'Delete this sale? Stock will be restored.' : 'Delete this receipt?'}
-                              onDelete={() => row.kind === 'sale' ? deleteSaleAction({ id: row.id }) : deleteArReceiptAction({ id: row.id })}
+                              onDelete={row.kind === 'sale' ? deleteSaleAction.bind(null, { id: row.id }) : deleteArReceiptAction.bind(null, { id: row.id })}
                             />
                           </div>
                         </RoleGate>
