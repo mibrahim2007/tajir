@@ -66,3 +66,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+@media print {
+  header, [data-print-hide] {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .rounded-lg {
+    border-radius: 0 !important;
+  }
+}
