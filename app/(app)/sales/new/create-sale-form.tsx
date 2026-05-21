@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -48,6 +50,15 @@ export function CreateSaleForm({
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const [oversellPending, setOversellPending] = useState<OversellPending | null>(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [itemSearch, setItemSearch] = useState('')
+
+  const filteredCustomers = customers.filter((c) =>
+    c.name.toLowerCase().includes(customerSearch.toLowerCase())
+  )
+  const filteredItems = stockItems.filter((s) =>
+    s.name.toLowerCase().includes(itemSearch.toLowerCase())
+  )
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -104,20 +115,38 @@ export function CreateSaleForm({
 
   return (
     <>
+      <Card>
+        <CardContent className="pt-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
           <FormField control={form.control} name="customerId" render={({ field }) => (
             <FormItem>
               <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
               <Select
                 onValueChange={(v) => { field.onChange(v); autoPopulateRate(v, watchedItem) }}
                 value={field.value}
+                onOpenChange={(open) => { if (!open) setCustomerSearch('') }}
               >
                 <FormControl>
-                  <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectTrigger className="w-full min-h-[44px]"><SelectValue placeholder="Select customer" /></SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  <div className="flex items-center gap-2 px-2 py-1.5 border-b">
+                    <Search className="size-3.5 text-muted-foreground shrink-0" />
+                    <input
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                      placeholder="Search customers…"
+                      value={customerSearch}
+                      onChange={(e) => setCustomerSearch(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filteredCustomers.length === 0 && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">No customers found</p>
+                  )}
+                  {filteredCustomers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <FormMessage />
@@ -130,14 +159,29 @@ export function CreateSaleForm({
               <Select
                 onValueChange={(v) => { field.onChange(v); autoPopulateRate(watchedCustomer, v) }}
                 value={field.value}
+                onOpenChange={(open) => { if (!open) setItemSearch('') }}
               >
                 <FormControl>
-                  <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select item" /></SelectTrigger>
+                  <SelectTrigger className="w-full min-h-[44px]"><SelectValue placeholder="Select item" /></SelectTrigger>
                 </FormControl>
                 <SelectContent>
-                  {stockItems.map((s) => (
+                  <div className="flex items-center gap-2 px-2 py-1.5 border-b">
+                    <Search className="size-3.5 text-muted-foreground shrink-0" />
+                    <input
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                      placeholder="Search stock items…"
+                      value={itemSearch}
+                      onChange={(e) => setItemSearch(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  {filteredItems.length === 0 && (
+                    <p className="py-4 text-center text-sm text-muted-foreground">No items found</p>
+                  )}
+                  {filteredItems.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
-                      {s.name} <span className="text-muted-foreground ml-1">({parseFloat(s.currentQuantity).toLocaleString()} avail.)</span>
+                      <span>{s.name}</span>
+                      <span className="ml-1.5 text-xs text-muted-foreground">({parseFloat(s.currentQuantity).toLocaleString()} avail.)</span>
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -191,11 +235,18 @@ export function CreateSaleForm({
 
           {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
-          <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-            {isPending ? 'Creating…' : 'Create Sale'}
-          </Button>
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending}>
+              {isPending ? 'Creating…' : 'Confirm Sale'}
+            </Button>
+          </div>
         </form>
       </Form>
+        </CardContent>
+      </Card>
 
       {/* Oversell confirmation — owner only */}
       {isOwner && (

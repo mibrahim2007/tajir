@@ -1,5 +1,3 @@
-import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSaleForm } from './create-sale-form'
@@ -28,11 +26,8 @@ export default async function NewSalePage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <Link href="/sales" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ChevronLeft className="h-4 w-4" />
-        Back to Sales
-      </Link>
-      <h1 className="text-2xl font-semibold mb-6">New Sale</h1>
+      <h1 className="text-2xl font-semibold mb-1">New Sale</h1>
+      <p className="text-sm text-muted-foreground mb-6">Record a sale to a customer.</p>
       <CreateSaleForm
         customers={customers}
         stockItems={stockItems}
