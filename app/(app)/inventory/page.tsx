@@ -13,6 +13,7 @@ const PAGE_SIZE = 50
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export default async function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
+  try {
   const { tenantId, role } = await requireAuth()
   const params = await searchParams
 
@@ -140,4 +141,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
       )}
     </div>
   )
+  } catch (err) {
+    console.error('INVENTORY_PAGE_ERROR', err instanceof Error ? err.message : String(err), err instanceof Error ? err.stack : '')
+    throw err
+  }
 }
