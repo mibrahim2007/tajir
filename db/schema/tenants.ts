@@ -23,6 +23,7 @@ export const tenantUsers = pgTable('tenant_users', {
     .notNull()
     .references(() => tenants.id),
   userId: uuid('user_id').notNull(),
+  username: text('username').unique(),
   role: text('role').$type<Role>().notNull(),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

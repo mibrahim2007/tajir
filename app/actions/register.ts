@@ -11,6 +11,7 @@ import type { ActionResult } from '@/lib/types'
 
 const registerSchema = z.object({
   businessName: z.string().min(1, 'Business name is required'),
+  username: z.string().min(3, 'Username must be at least 3 characters').regex(/^[a-z0-9_]+$/, 'Username may only contain lowercase letters, numbers, and underscores'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
@@ -18,6 +19,7 @@ const registerSchema = z.object({
 export async function registerAction(formData: FormData): Promise<ActionResult<{ redirectTo: string }>> {
   const parsed = registerSchema.safeParse({
     businessName: formData.get('businessName'),
+    username: (formData.get('username') as string | null)?.trim().toLowerCase(),
     email: formData.get('email'),
     password: formData.get('password'),
   })
@@ -27,7 +29,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
     return { success: false, error: firstError?.message ?? 'Invalid input', code: 'INVALID_INPUT' }
   }
 
-  const { businessName, email, password } = parsed.data
+  const { businessName, username, email, password } = parsed.data
 
   const supabase = await createClient()
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
@@ -47,7 +49,7 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
 
     const [tenantUser] = await db
       .insert(tenantUsers)
-      .values({ tenantId: tenant.id, userId: authUserId, role: 'owner' })
+      .values({ tenantId: tenant.id, userId: authUserId, username, role: 'owner' })
       .returning()
 
     const admin = createAdminClient()

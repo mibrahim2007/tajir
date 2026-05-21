@@ -3,50 +3,39 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { loginAction } from '@/app/actions/login'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 
 const schema = z.object({
-  email: z.string().email('Invalid email address'),
+  username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required'),
 })
 
 type FormValues = z.infer<typeof schema>
 
 export function LoginForm() {
-  const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { email: '', password: '' },
+    defaultValues: { username: '', password: '' },
   })
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null)
-    const supabase = createClient()
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values.email,
-      password: values.password,
-    })
+    const fd = new FormData()
+    fd.set('username', values.username)
+    fd.set('password', values.password)
 
-    if (error) {
-      if (error.message.toLowerCase().includes('ban')) {
-        setServerError('Your account has been deactivated. Contact your account owner.')
-      } else {
-        setServerError('Invalid email or password')
-      }
-      return
+    const result = await loginAction(fd)
+    if (result && !result.success) {
+      setServerError(result.error)
     }
-
-    router.push('/dashboard')
-    router.refresh()
   }
 
   return (
@@ -60,12 +49,12 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <FormField
               control={form.control}
-              name="email"
+              name="username"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email</FormLabel>
+                  <FormLabel>Username</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="you@example.com" {...field} />
+                    <Input placeholder="your username" autoComplete="username" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -15,6 +15,7 @@ import { registerAction } from '@/app/actions/register'
 const schema = z
   .object({
     businessName: z.string().min(1, 'Business name is required'),
+    username: z.string().min(3, 'Username must be at least 3 characters').regex(/^[a-z0-9_]+$/, 'Lowercase letters, numbers, and underscores only'),
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
@@ -32,13 +33,14 @@ export function SignUpForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { businessName: '', email: '', password: '', confirmPassword: '' },
+    defaultValues: { businessName: '', username: '', email: '', password: '', confirmPassword: '' },
   })
 
   const onSubmit = async (values: FormValues) => {
     setServerError(null)
     const fd = new FormData()
     fd.set('businessName', values.businessName)
+    fd.set('username', values.username)
     fd.set('email', values.email)
     fd.set('password', values.password)
 
@@ -67,6 +69,19 @@ export function SignUpForm() {
                   <FormLabel>Business Name</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Tariq Yarn Trading" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="username"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Username</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. tariq_trader" autoComplete="username" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
