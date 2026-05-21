@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -38,6 +39,16 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [supplierSearch, setSupplierSearch] = useState('')
+  const [lotSearch, setLotSearch] = useState('')
+
+  const filteredSuppliers = suppliers.filter((s) =>
+    s.name.toLowerCase().includes(supplierSearch.toLowerCase())
+  )
+  const filteredLots = lots.filter((l) =>
+    l.name.toLowerCase().includes(lotSearch.toLowerCase()) ||
+    l.count.toLowerCase().includes(lotSearch.toLowerCase())
+  )
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -63,34 +74,71 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
       <CardContent className="pt-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
-              <FormField control={form.control} name="supplierId" render={() => (
+              <FormField control={form.control} name="supplierId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <select
-                      {...form.register('supplierId')}
-                      className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="">Select supplier…</option>
-                      {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}
+                    onOpenChange={(open) => { if (!open) setSupplierSearch('') }}>
+                    <FormControl>
+                      <SelectTrigger className="w-full min-h-[44px]">
+                        <SelectValue placeholder="Select supplier…" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <div className="flex items-center gap-2 px-2 py-1.5 border-b">
+                        <Search className="size-3.5 text-muted-foreground shrink-0" />
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                          placeholder="Search suppliers…"
+                          value={supplierSearch}
+                          onChange={(e) => setSupplierSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      {filteredSuppliers.length === 0 && (
+                        <p className="py-4 text-center text-sm text-muted-foreground">No suppliers found</p>
+                      )}
+                      {filteredSuppliers.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="stockItemId" render={() => (
+              <FormField control={form.control} name="stockItemId" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <select
-                      {...form.register('stockItemId')}
-                      className="flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <option value="">Select stock item…</option>
-                      {lots.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.count})</option>)}
-                    </select>
-                  </FormControl>
+                  <Select onValueChange={field.onChange} value={field.value}
+                    onOpenChange={(open) => { if (!open) setLotSearch('') }}>
+                    <FormControl>
+                      <SelectTrigger className="w-full min-h-[44px]">
+                        <SelectValue placeholder="Select stock item…" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <div className="flex items-center gap-2 px-2 py-1.5 border-b">
+                        <Search className="size-3.5 text-muted-foreground shrink-0" />
+                        <input
+                          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                          placeholder="Search stock items…"
+                          value={lotSearch}
+                          onChange={(e) => setLotSearch(e.target.value)}
+                          onKeyDown={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                      {filteredLots.length === 0 && (
+                        <p className="py-4 text-center text-sm text-muted-foreground">No items found</p>
+                      )}
+                      {filteredLots.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          <span>{l.name}</span>
+                          <span className="ml-1.5 text-xs text-muted-foreground">({l.count})</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />
