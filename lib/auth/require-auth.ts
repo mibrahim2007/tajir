@@ -13,14 +13,14 @@ export async function requireAuth(): Promise<AuthContext> {
   const { data: { user }, error } = await supabase.auth.getUser()
 
   if (error || !user) {
-    redirect('/sign-in')
+    redirect('/auth/login')
   }
 
   const role = user.app_metadata?.role as Role | undefined
   const tenantId = user.app_metadata?.tenant_id as string | undefined
 
   if (!role || !tenantId) {
-    redirect('/sign-in')
+    redirect('/auth/login')
   }
 
   return {
