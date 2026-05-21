@@ -23,21 +23,28 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
   const admin = createAdminClient()
-  let query = admin
+
+  let dataQuery = admin
     .from('inventory_lots')
-    .select('id, name, code, count, type, fiber, lot, current_quantity', { count: 'exact' })
+    .select('id, name, code, count, type, fiber, lot, current_quantity')
     .eq('tenant_id', tenantId)
 
-  if (filterCount) query = query.ilike('count', `%${filterCount}%`)
-  if (filterType) query = query.eq('type', filterType)
-  if (filterFiber) query = query.ilike('fiber', `%${filterFiber}%`)
-  if (filterLot) query = query.ilike('lot', `%${filterLot}%`)
+  let countQuery = admin
+    .from('inventory_lots')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
 
-  const { data: lots, count: total } = await query
-    .order('created_at', { ascending: false })
-    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  if (filterCount) { dataQuery = dataQuery.ilike('count', `%${filterCount}%`); countQuery = countQuery.ilike('count', `%${filterCount}%`) }
+  if (filterType) { dataQuery = dataQuery.eq('type', filterType); countQuery = countQuery.eq('type', filterType) }
+  if (filterFiber) { dataQuery = dataQuery.ilike('fiber', `%${filterFiber}%`); countQuery = countQuery.ilike('fiber', `%${filterFiber}%`) }
+  if (filterLot) { dataQuery = dataQuery.ilike('lot', `%${filterLot}%`); countQuery = countQuery.ilike('lot', `%${filterLot}%`) }
 
-  const totalCount = total ?? 0
+  const [{ data: lots }, { count: totalRaw }] = await Promise.all([
+    dataQuery.order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
+    countQuery,
+  ])
+
+  const totalCount = totalRaw ?? 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
 
