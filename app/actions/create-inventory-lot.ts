@@ -7,8 +7,6 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 import { createLotSchema, type CreateLotInput } from './inventory-lot-schema'
 
-export { createLotSchema, type CreateLotInput }
-
 export async function createInventoryLotAction(
   input: CreateLotInput,
 ): Promise<ActionResult<{ id: string }>> {
