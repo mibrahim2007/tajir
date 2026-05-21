@@ -1,18 +1,16 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { customerPriceLists } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
-  customerId:   z.string().uuid('Invalid customer'),
-  stockItemId:  z.string().uuid('Invalid stock item'),
-  rate:         z.coerce.number().positive('Rate must be positive'),
+  customerId:  z.string().uuid('Invalid customer'),
+  stockItemId: z.string().uuid('Invalid stock item'),
+  rate:        z.coerce.number().positive('Rate must be positive'),
 })
 
 export async function setPricingRuleAction(input: unknown): Promise<ActionResult<void>> {
@@ -31,40 +29,49 @@ export async function setPricingRuleAction(input: unknown): Promise<ActionResult
 
   const { customerId, stockItemId, rate } = parsed.data
 
-  await db.transaction(async (tx) => {
-    // Supersede any existing active rule for this customer+item pair
-    const existing = await tx
-      .select({ id: customerPriceLists.id, rate: customerPriceLists.rate })
-      .from(customerPriceLists)
-      .where(and(
-        eq(customerPriceLists.tenantId, tenantId),
-        eq(customerPriceLists.customerId, customerId),
-        eq(customerPriceLists.stockItemId, stockItemId),
-        eq(customerPriceLists.isActive, true),
-      ))
-      .limit(1)
-      .then((rows) => rows[0] ?? null)
+  const admin = createAdminClient()
 
-    if (existing) {
-      await tx.update(customerPriceLists)
-        .set({ isActive: false, supersededAt: new Date() })
-        .where(eq(customerPriceLists.id, existing.id))
-    }
+  // Supersede any existing active rule
+  const { data: existing } = await admin
+    .from('customer_price_lists')
+    .select('id, rate')
+    .eq('tenant_id', tenantId)
+    .eq('customer_id', customerId)
+    .eq('stock_item_id', stockItemId)
+    .eq('is_active', true)
+    .single()
 
-    const [newRule] = await tx.insert(customerPriceLists).values({
-      tenantId, customerId, stockItemId,
+  if (existing) {
+    await admin
+      .from('customer_price_lists')
+      .update({ is_active: false, superseded_at: new Date().toISOString() })
+      .eq('id', existing.id)
+  }
+
+  const { data: newRule, error } = await admin
+    .from('customer_price_lists')
+    .insert({
+      tenant_id: tenantId,
+      customer_id: customerId,
+      stock_item_id: stockItemId,
       rate: String(rate),
-      isActive: true,
-    }).returning()
-
-    await createAuditEntry({
-      tenantId, userId: user.id,
-      action: existing ? 'update' : 'create',
-      entity: 'customer_price_lists',
-      entityId: newRule.id,
-      before: existing ? { rate: existing.rate } : undefined,
-      after: { customerId, stockItemId, rate },
+      is_active: true,
     })
+    .select('id')
+    .single()
+
+  if (error || !newRule) {
+    return { success: false, error: 'Failed to set pricing rule', code: 'INTERNAL_ERROR' }
+  }
+
+  await createAuditEntry({
+    tenantId,
+    userId: user.id,
+    action: existing ? 'update' : 'create',
+    entity: 'customer_price_lists',
+    entityId: newRule.id,
+    before: existing ? { rate: existing.rate } : undefined,
+    after: { customerId, stockItemId, rate },
   })
 
   return { success: true, data: undefined }

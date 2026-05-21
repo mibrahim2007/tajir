@@ -1,7 +1,5 @@
-import { and, eq, asc } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { suppliers, purchaseOrders, apPayments } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
 import { ExportButton } from '@/components/export-button'
 
@@ -25,44 +23,41 @@ type AgingRow = {
 
 export default async function PayablesAgingPage() {
   const { tenantId } = await requireAuth()
+  const admin = createAdminClient()
 
-  const [allSuppliers, allPurchases, allPayments] = await Promise.all([
-    db.select().from(suppliers).where(eq(suppliers.tenantId, tenantId)),
-    db.select().from(purchaseOrders)
-      .where(eq(purchaseOrders.tenantId, tenantId))
-      .orderBy(asc(purchaseOrders.date)),
-    db.select({ supplierId: apPayments.supplierId, pkrEquivalent: apPayments.pkrEquivalent })
-      .from(apPayments).where(eq(apPayments.tenantId, tenantId)),
+  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }] = await Promise.all([
+    admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
+    admin.from('purchase_orders').select('id, supplier_id, pkr_equivalent, advance_paid, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
+
+  const allSuppliers = rawSuppliers ?? []
+  const allPurchases = rawPurchases ?? []
+  const allPayments = rawPayments ?? []
 
   const rows: AgingRow[] = []
 
   for (const s of allSuppliers) {
     const sPurchases = allPurchases
-      .filter((p) => p.supplierId === s.id)
+      .filter((p) => p.supplier_id === s.id)
       .map((p) => ({
         date: p.date,
-        net: parseFloat(p.pkrEquivalent) - parseFloat(p.advancePaid),
+        net: parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid),
       }))
       .filter((p) => p.net > 0)
 
     const totalPaid = allPayments
-      .filter((p) => p.supplierId === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkrEquivalent), 0)
+      .filter((p) => p.supplier_id === s.id)
+      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
 
-    // FIFO payment allocation
-    let remainingPayment = totalPaid + parseFloat(s.openingBalancePkrEquivalent) > 0
-      ? totalPaid
-      : totalPaid
-
-    // Opening balance is already a "payable" — treat as aged from supplier creation (oldest)
     const lineItems: { date: string; amount: number }[] = [
-      ...(parseFloat(s.openingBalancePkrEquivalent) > 0
-        ? [{ date: s.createdAt.toISOString().split('T')[0], amount: parseFloat(s.openingBalancePkrEquivalent) }]
+      ...(parseFloat(s.opening_balance_pkr_equivalent) > 0
+        ? [{ date: s.created_at.split('T')[0], amount: parseFloat(s.opening_balance_pkr_equivalent) }]
         : []),
       ...sPurchases.map((p) => ({ date: p.date, amount: p.net })),
     ].sort((a, b) => a.date.localeCompare(b.date))
 
+    let remainingPayment = totalPaid
     let totalOutstanding = 0
     let bucket0_30 = 0, bucket31_60 = 0, bucket61_90 = 0, bucket90plus = 0
     let oldestDate: string | null = null

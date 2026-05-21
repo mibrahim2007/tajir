@@ -1,12 +1,10 @@
 'use server'
 
-import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { purchaseOrders, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { withSerializable } from '@/lib/db/with-serializable'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -34,29 +32,43 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
   const { id, supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, advancePaid, date } = parsed.data
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
-  return withSerializable(async (tx) => {
-    const existing = await tx.select().from(purchaseOrders)
-      .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
-    if (!existing) return { success: false, error: 'Purchase not found', code: 'NOT_FOUND' }
+  const admin = createAdminClient()
 
-    const oldQty = parseFloat(existing.quantity)
-    const qtyDelta = quantity - oldQty
+  const { data: existing } = await admin
+    .from('purchase_orders')
+    .select('quantity, rate, pkr_equivalent, date, stock_item_id')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
 
-    await tx.update(purchaseOrders).set({
-      supplierId, stockItemId,
-      quantity: String(quantity), rate: String(rate), currencyCode,
-      exchangeRate: String(exchangeRate), pkrEquivalent: String(pkrEquivalent),
-      advancePaid: String(advancePaid), date,
-    }).where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)))
+  if (!existing) return { success: false, error: 'Purchase not found', code: 'NOT_FOUND' }
 
-    if (qtyDelta !== 0) {
-      await tx.update(inventoryLots)
-        .set({ currentQuantity: sql`current_quantity + ${qtyDelta}` })
-        .where(eq(inventoryLots.id, stockItemId))
-    }
+  const oldQty = parseFloat(existing.quantity)
+  const qtyDelta = quantity - oldQty
 
-    await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'purchase_orders', entityId: id, before: { quantity: existing.quantity, rate: existing.rate, pkrEquivalent: existing.pkrEquivalent, date: existing.date }, after: { quantity, rate, pkrEquivalent, date } })
+  const { error } = await admin
+    .from('purchase_orders')
+    .update({
+      supplier_id: supplierId,
+      stock_item_id: stockItemId,
+      quantity: String(quantity),
+      rate: String(rate),
+      currency_code: currencyCode,
+      exchange_rate: String(exchangeRate),
+      pkr_equivalent: String(pkrEquivalent),
+      advance_paid: String(advancePaid),
+      date,
+    })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-    return { success: true, data: undefined }
-  })
+  if (error) return { success: false, error: 'Failed to update purchase', code: 'INTERNAL_ERROR' }
+
+  if (qtyDelta !== 0) {
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: qtyDelta })
+  }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'purchase_orders', entityId: id, before: { quantity: existing.quantity, rate: existing.rate, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { quantity, rate, pkrEquivalent, date } })
+
+  return { success: true, data: undefined }
 }

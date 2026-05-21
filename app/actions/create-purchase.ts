@@ -1,15 +1,11 @@
 'use server'
 
-import { eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { purchaseOrders, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { withSerializable } from '@/lib/db/with-serializable'
 import type { ActionResult } from '@/lib/types'
-import type { PurchaseOrder } from '@/db/schema'
 
 const schema = z.object({
   supplierId:   z.string().uuid('Invalid supplier'),
@@ -27,9 +23,7 @@ const schema = z.object({
 
 export type CreatePurchaseInput = z.infer<typeof schema>
 
-export async function createPurchaseAction(
-  input: unknown,
-): Promise<ActionResult<PurchaseOrder>> {
+export async function createPurchaseAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = schema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
@@ -42,44 +36,44 @@ export async function createPurchaseAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, advancePaid } =
-    parsed.data
-
+  const { supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, advancePaid } = parsed.data
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
-  return withSerializable(async (tx) => {
-    const [order] = await tx
-      .insert(purchaseOrders)
-      .values({
-        tenantId,
-        supplierId,
-        stockItemId,
-        quantity: String(quantity),
-        rate: String(rate),
-        currencyCode,
-        exchangeRate: String(exchangeRate),
-        pkrEquivalent: String(pkrEquivalent),
-        advancePaid: String(advancePaid),
-        date,
-        confirmedAt: new Date(),
-      })
-      .returning()
+  const admin = createAdminClient()
 
-    // Increment inventory — negative check enforced by DB constraint
-    await tx
-      .update(inventoryLots)
-      .set({ currentQuantity: sql`current_quantity + ${quantity}` })
-      .where(eq(inventoryLots.id, stockItemId))
-
-    await createAuditEntry({
-      tenantId,
-      userId: user.id,
-      action: 'create',
-      entity: 'purchase_orders',
-      entityId: order.id,
-      after: { supplierId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date },
+  const { data: order, error: insertError } = await admin
+    .from('purchase_orders')
+    .insert({
+      tenant_id: tenantId,
+      supplier_id: supplierId,
+      stock_item_id: stockItemId,
+      quantity: String(quantity),
+      rate: String(rate),
+      currency_code: currencyCode,
+      exchange_rate: String(exchangeRate),
+      pkr_equivalent: String(pkrEquivalent),
+      advance_paid: String(advancePaid),
+      date,
+      confirmed_at: new Date().toISOString(),
     })
+    .select('id')
+    .single()
 
-    return { success: true, data: order }
+  if (insertError || !order) {
+    return { success: false, error: 'Failed to create purchase', code: 'INTERNAL_ERROR' }
+  }
+
+  // Increment inventory quantity
+  await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
+
+  await createAuditEntry({
+    tenantId,
+    userId: user.id,
+    action: 'create',
+    entity: 'purchase_orders',
+    entityId: order.id,
+    after: { supplierId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date },
   })
+
+  return { success: true, data: order }
 }

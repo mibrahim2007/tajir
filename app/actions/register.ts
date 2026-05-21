@@ -1,11 +1,8 @@
 'use server'
 
 import { z } from 'zod'
-import { eq } from 'drizzle-orm'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { db } from '@/db'
-import { tenants, tenantUsers } from '@/db/schema'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -43,23 +40,37 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
   }
 
   const authUserId = signUpData.user.id
+  const admin = createAdminClient()
 
   try {
-    const [tenant] = await db.insert(tenants).values({ name: businessName }).returning()
+    // Insert tenant
+    const { data: tenant, error: tenantError } = await admin
+      .from('tenants')
+      .insert({ name: businessName })
+      .select('id')
+      .single()
 
-    const [tenantUser] = await db
-      .insert(tenantUsers)
-      .values({ tenantId: tenant.id, userId: authUserId, username, role: 'owner' })
-      .returning()
+    if (tenantError || !tenant) throw new Error('Failed to create tenant')
 
-    const admin = createAdminClient()
+    // Insert tenant user
+    const { data: tenantUser, error: userError } = await admin
+      .from('tenant_users')
+      .insert({ tenant_id: tenant.id, user_id: authUserId, username, role: 'owner' })
+      .select('id')
+      .single()
+
+    if (userError || !tenantUser) {
+      await admin.from('tenants').delete().eq('id', tenant.id)
+      throw new Error('Failed to create tenant user')
+    }
+
     const { error: metaError } = await admin.auth.admin.updateUserById(authUserId, {
       app_metadata: { role: 'owner', tenant_id: tenant.id },
     })
 
     if (metaError) {
-      await db.delete(tenantUsers).where(eq(tenantUsers.id, tenantUser.id))
-      await db.delete(tenants).where(eq(tenants.id, tenant.id))
+      await admin.from('tenant_users').delete().eq('id', tenantUser.id)
+      await admin.from('tenants').delete().eq('id', tenant.id)
       return {
         success: false,
         error: 'Failed to configure account. Please contact support.',

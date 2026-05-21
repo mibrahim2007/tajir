@@ -1,25 +1,30 @@
-import { eq } from 'drizzle-orm'
 import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { tajirCustomers, inventoryLots, customerPriceLists } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSaleForm } from './create-sale-form'
 
 export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
+  const admin = createAdminClient()
 
-  const [customers, stockItems, pricingRules] = await Promise.all([
-    db.select({ id: tajirCustomers.id, name: tajirCustomers.name }).from(tajirCustomers)
-      .where(eq(tajirCustomers.tenantId, tenantId)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name, currentQuantity: inventoryLots.currentQuantity })
-      .from(inventoryLots).where(eq(inventoryLots.tenantId, tenantId)),
-    db.select({ customerId: customerPriceLists.customerId, stockItemId: customerPriceLists.stockItemId, rate: customerPriceLists.rate })
-      .from(customerPriceLists)
-      .where(eq(customerPriceLists.tenantId, tenantId)),
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, current_quantity').eq('tenant_id', tenantId),
+    admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
   ])
 
-  const activePricingRules = pricingRules
+  const customers = rawCustomers ?? []
+  const stockItems = (rawItems ?? []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    currentQuantity: l.current_quantity,
+  }))
+  const pricingRules = (rawRules ?? []).map((r) => ({
+    customerId: r.customer_id,
+    stockItemId: r.stock_item_id,
+    rate: r.rate,
+  }))
 
   return (
     <div className="p-6 max-w-lg mx-auto">
@@ -31,7 +36,7 @@ export default async function NewSalePage() {
       <CreateSaleForm
         customers={customers}
         stockItems={stockItems}
-        pricingRules={activePricingRules}
+        pricingRules={pricingRules}
         isOwner={role === 'owner'}
       />
     </div>

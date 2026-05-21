@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { customerPriceLists } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -23,12 +21,26 @@ export async function deletePricingRuleAction(input: unknown): Promise<ActionRes
 
   const { id } = parsed.data
 
-  const rule = await db.select().from(customerPriceLists).where(and(eq(customerPriceLists.id, id), eq(customerPriceLists.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: rule } = await admin
+    .from('customer_price_lists')
+    .select('customer_id, stock_item_id, rate, is_active')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!rule) return { success: false, error: 'Pricing rule not found', code: 'NOT_FOUND' }
 
-  await db.delete(customerPriceLists).where(and(eq(customerPriceLists.id, id), eq(customerPriceLists.tenantId, tenantId)))
+  const { error } = await admin
+    .from('customer_price_lists')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'customer_price_lists', entityId: id, before: { customerId: rule.customerId, stockItemId: rule.stockItemId, rate: rule.rate, isActive: rule.isActive } })
+  if (error) return { success: false, error: 'Failed to delete pricing rule', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'customer_price_lists', entityId: id, before: { customerId: rule.customer_id, stockItemId: rule.stock_item_id, rate: rule.rate, isActive: rule.is_active } })
 
   return { success: true, data: undefined }
 }

@@ -1,8 +1,6 @@
-import { and, eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { suppliers, purchaseOrders, apPayments, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { RecordPaymentForm } from '@/app/(app)/suppliers/record-payment-form'
 import { EditApPaymentForm } from '@/app/(app)/suppliers/edit-ap-payment-form'
 import { ExportButton } from '@/components/export-button'
@@ -19,27 +17,34 @@ export default async function SupplierLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
 
-  const supplier = await db
-    .select()
-    .from(suppliers)
-    .where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId)))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+  const admin = createAdminClient()
 
-  if (!supplier) notFound()
+  const { data: supplierRow } = await admin
+    .from('suppliers')
+    .select('id, name, opening_balance_pkr_equivalent, created_at')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
 
-  const [purchases, payments, lots] = await Promise.all([
-    db.select().from(purchaseOrders)
-      .where(and(eq(purchaseOrders.supplierId, id), eq(purchaseOrders.tenantId, tenantId)))
-      .orderBy(asc(purchaseOrders.date)),
-    db.select().from(apPayments)
-      .where(and(eq(apPayments.supplierId, id), eq(apPayments.tenantId, tenantId)))
-      .orderBy(asc(apPayments.date)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name }).from(inventoryLots)
-      .where(eq(inventoryLots.tenantId, tenantId)),
+  if (!supplierRow) notFound()
+
+  const [{ data: rawPurchases }, { data: rawPayments }, { data: rawLots }] = await Promise.all([
+    admin.from('purchase_orders')
+      .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid')
+      .eq('supplier_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
+    admin.from('ap_payments')
+      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note')
+      .eq('supplier_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
-  const lotMap = new Map(lots.map((l) => [l.id, l.name]))
+  const purchases = rawPurchases ?? []
+  const payments = rawPayments ?? []
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   type LedgerRow = {
     id: string
@@ -49,16 +54,16 @@ export default async function SupplierLedgerPage({ params }: Props) {
     debit: number
     credit: number
     balance: number
-    rawPayment?: typeof payments[0]
+    rawPayment?: { id: string; amount: string; currencyCode: string; pkrEquivalent: string; date: string; paymentMethodNote: string | null }
   }
 
   const rows: LedgerRow[] = []
   let runningBalance = 0
 
-  const ob = parseFloat(supplier.openingBalancePkrEquivalent)
+  const ob = parseFloat(supplierRow.opening_balance_pkr_equivalent)
   if (ob !== 0) {
     runningBalance += ob
-    rows.push({ id: 'ob', kind: 'opening', date: supplier.createdAt.toISOString().split('T')[0], description: 'Opening Balance', debit: ob, credit: 0, balance: runningBalance })
+    rows.push({ id: 'ob', kind: 'opening', date: supplierRow.created_at.split('T')[0], description: 'Opening Balance', debit: ob, credit: 0, balance: runningBalance })
   }
 
   type RawEntry =
@@ -72,14 +77,30 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   for (const item of entries) {
     if (item.kind === 'purchase') {
-      const net = parseFloat(item.entry.pkrEquivalent) - parseFloat(item.entry.advancePaid)
+      const net = parseFloat(item.entry.pkr_equivalent) - parseFloat(item.entry.advance_paid)
       runningBalance += net
-      const itemName = lotMap.get(item.entry.stockItemId) ?? 'Unknown item'
-      rows.push({ id: item.entry.id, kind: 'purchase', date: item.date, description: `Purchase — ${itemName} (${item.entry.quantity} units @ ${item.entry.currencyCode} ${item.entry.rate})`, debit: net, credit: 0, balance: runningBalance })
+      const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
+      rows.push({ id: item.entry.id, kind: 'purchase', date: item.date, description: `Purchase — ${itemName} (${item.entry.quantity} units @ ${item.entry.currency_code} ${item.entry.rate})`, debit: net, credit: 0, balance: runningBalance })
     } else {
-      const paid = parseFloat(item.entry.pkrEquivalent)
+      const paid = parseFloat(item.entry.pkr_equivalent)
       runningBalance -= paid
-      rows.push({ id: item.entry.id, kind: 'payment', date: item.date, description: `Payment${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: paid, balance: runningBalance, rawPayment: item.entry })
+      rows.push({
+        id: item.entry.id,
+        kind: 'payment',
+        date: item.date,
+        description: `Payment${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
+        debit: 0,
+        credit: paid,
+        balance: runningBalance,
+        rawPayment: {
+          id: item.entry.id,
+          amount: item.entry.amount,
+          currencyCode: item.entry.currency_code,
+          pkrEquivalent: item.entry.pkr_equivalent,
+          date: item.entry.date,
+          paymentMethodNote: item.entry.payment_method_note,
+        },
+      })
     }
   }
 
@@ -87,7 +108,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-semibold">{supplier.name}</h1>
+          <h1 className="text-2xl font-semibold">{supplierRow.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Supplier Ledger</p>
         </div>
         <div className="flex gap-2">

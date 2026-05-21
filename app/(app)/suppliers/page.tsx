@@ -1,8 +1,6 @@
-import { eq, desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { suppliers, purchaseOrders, apPayments } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSupplierForm } from './create-supplier-form'
 import { EditSupplierForm } from './edit-supplier-form'
 import { DeleteButton } from '@/components/delete-button'
@@ -12,29 +10,27 @@ import { formatPKR } from '@/lib/utils/currency'
 
 export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
+  const admin = createAdminClient()
 
-  const allSuppliers = await db
-    .select()
-    .from(suppliers)
-    .where(eq(suppliers.tenantId, tenantId))
-    .orderBy(desc(suppliers.createdAt))
-
-  const [allPurchases, allPayments] = await Promise.all([
-    db.select({ supplierId: purchaseOrders.supplierId, pkrEquivalent: purchaseOrders.pkrEquivalent, advancePaid: purchaseOrders.advancePaid })
-      .from(purchaseOrders).where(eq(purchaseOrders.tenantId, tenantId)),
-    db.select({ supplierId: apPayments.supplierId, pkrEquivalent: apPayments.pkrEquivalent })
-      .from(apPayments).where(eq(apPayments.tenantId, tenantId)),
+  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }] = await Promise.all([
+    admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+    admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
+    admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
+  const suppliers = allSuppliers ?? []
+  const purchases = allPurchases ?? []
+  const payments = allPayments ?? []
+
   const outstandingBySupplier = new Map<string, number>()
-  for (const s of allSuppliers) {
-    const openingBalance = parseFloat(s.openingBalancePkrEquivalent)
-    const purchased = allPurchases
-      .filter((p) => p.supplierId === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkrEquivalent) - parseFloat(p.advancePaid), 0)
-    const paid = allPayments
-      .filter((p) => p.supplierId === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkrEquivalent), 0)
+  for (const s of suppliers) {
+    const openingBalance = parseFloat(s.opening_balance_pkr_equivalent ?? '0')
+    const purchased = purchases
+      .filter((p) => p.supplier_id === s.id)
+      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid), 0)
+    const paid = payments
+      .filter((p) => p.supplier_id === s.id)
+      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
     outstandingBySupplier.set(s.id, openingBalance + purchased - paid)
   }
 
@@ -43,12 +39,12 @@ export default async function SuppliersPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Suppliers</h1>
-          <p className="text-sm text-muted-foreground mt-1">{allSuppliers.length} supplier{allSuppliers.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-1">{suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''}</p>
         </div>
         <CreateSupplierForm />
       </div>
 
-      {allSuppliers.length === 0 ? (
+      {suppliers.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <p className="text-muted-foreground text-sm">No suppliers yet. Add your first supplier to start tracking payables.</p>
         </div>
@@ -64,7 +60,7 @@ export default async function SuppliersPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {allSuppliers.map((s) => {
+              {suppliers.map((s) => {
                 const outstanding = outstandingBySupplier.get(s.id) ?? 0
                 return (
                   <tr key={s.id} className="hover:bg-muted/30 transition-colors">

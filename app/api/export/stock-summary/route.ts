@@ -1,10 +1,8 @@
 export const runtime = 'nodejs'
 
-import { and, eq, ilike } from 'drizzle-orm'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
-import { db } from '@/db'
-import { inventoryLots, suppliers } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(req: Request) {
   const auth = await requireAuthRoute()
@@ -18,20 +16,24 @@ export async function GET(req: Request) {
   const filterFiber = url.searchParams.get('fiber') ?? undefined
   const filterLot = url.searchParams.get('lot') ?? undefined
 
-  const conditions = [
-    eq(inventoryLots.tenantId, tenantId),
-    ...(filterCount ? [ilike(inventoryLots.count, `%${filterCount}%`)] : []),
-    ...(filterType ? [eq(inventoryLots.type, filterType)] : []),
-    ...(filterFiber ? [ilike(inventoryLots.fiber, `%${filterFiber}%`)] : []),
-    ...(filterLot ? [ilike(inventoryLots.lot, `%${filterLot}%`)] : []),
-  ]
+  const admin = createAdminClient()
 
-  const [lots, allSuppliers] = await Promise.all([
-    db.select().from(inventoryLots).where(and(...conditions)),
-    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.tenantId, tenantId)),
+  let query = admin
+    .from('inventory_lots')
+    .select('id, name, code, count, type, fiber, lot, current_quantity, default_supplier_id')
+    .eq('tenant_id', tenantId)
+
+  if (filterCount) query = query.ilike('count', `%${filterCount}%`)
+  if (filterType) query = query.eq('type', filterType)
+  if (filterFiber) query = query.ilike('fiber', `%${filterFiber}%`)
+  if (filterLot) query = query.ilike('lot', `%${filterLot}%`)
+
+  const [{ data: lots }, { data: rawSuppliers }] = await Promise.all([
+    query.order('created_at', { ascending: false }),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
   ])
 
-  const supplierMap = new Map(allSuppliers.map((s) => [s.id, s.name]))
+  const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
 
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet('Stock Summary')
@@ -47,7 +49,7 @@ export async function GET(req: Request) {
   ]
   sheet.getRow(1).font = { bold: true }
 
-  for (const lot of lots) {
+  for (const lot of lots ?? []) {
     sheet.addRow({
       name: lot.name,
       code: lot.code ?? '',
@@ -55,8 +57,8 @@ export async function GET(req: Request) {
       type: lot.type ?? '',
       fiber: lot.fiber ?? '',
       lot: lot.lot ?? '',
-      supplier: lot.defaultSupplierId ? (supplierMap.get(lot.defaultSupplierId) ?? '') : '',
-      qty: parseFloat(lot.currentQuantity),
+      supplier: lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '') : '',
+      qty: parseFloat(lot.current_quantity),
     })
   }
 

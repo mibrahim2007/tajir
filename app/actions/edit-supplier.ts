@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { suppliers } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -26,10 +24,24 @@ export async function editSupplierAction(input: unknown): Promise<ActionResult<v
 
   const { id, name } = parsed.data
 
-  const existing = await db.select().from(suppliers).where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: existing } = await admin
+    .from('suppliers')
+    .select('name')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!existing) return { success: false, error: 'Supplier not found', code: 'NOT_FOUND' }
 
-  await db.update(suppliers).set({ name }).where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId)))
+  const { error } = await admin
+    .from('suppliers')
+    .update({ name })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+
+  if (error) return { success: false, error: 'Failed to update supplier', code: 'INTERNAL_ERROR' }
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'suppliers', entityId: id, before: { name: existing.name }, after: { name } })
 

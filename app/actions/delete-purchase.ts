@@ -1,12 +1,10 @@
 'use server'
 
-import { and, eq, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { purchaseOrders, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { withSerializable } from '@/lib/db/with-serializable'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -23,19 +21,29 @@ export async function deletePurchaseAction(input: unknown): Promise<ActionResult
 
   const { id } = parsed.data
 
-  return withSerializable(async (tx) => {
-    const purchase = await tx.select().from(purchaseOrders)
-      .where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
-    if (!purchase) return { success: false, error: 'Purchase not found', code: 'NOT_FOUND' }
+  const admin = createAdminClient()
 
-    await tx.delete(purchaseOrders).where(and(eq(purchaseOrders.id, id), eq(purchaseOrders.tenantId, tenantId)))
+  const { data: purchase } = await admin
+    .from('purchase_orders')
+    .select('supplier_id, stock_item_id, quantity, rate, pkr_equivalent, date')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
 
-    await tx.update(inventoryLots)
-      .set({ currentQuantity: sql`current_quantity - ${parseFloat(purchase.quantity)}` })
-      .where(eq(inventoryLots.id, purchase.stockItemId))
+  if (!purchase) return { success: false, error: 'Purchase not found', code: 'NOT_FOUND' }
 
-    await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'purchase_orders', entityId: id, before: { supplierId: purchase.supplierId, stockItemId: purchase.stockItemId, quantity: purchase.quantity, rate: purchase.rate, pkrEquivalent: purchase.pkrEquivalent, date: purchase.date } })
+  const { error } = await admin
+    .from('purchase_orders')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-    return { success: true, data: undefined }
-  })
+  if (error) return { success: false, error: 'Failed to delete purchase', code: 'INTERNAL_ERROR' }
+
+  // Reverse the inventory increment
+  await admin.rpc('adjust_inventory_quantity', { p_lot_id: purchase.stock_item_id, p_delta: -parseFloat(purchase.quantity) })
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'purchase_orders', entityId: id, before: { supplierId: purchase.supplier_id, stockItemId: purchase.stock_item_id, quantity: purchase.quantity, rate: purchase.rate, pkrEquivalent: purchase.pkr_equivalent, date: purchase.date } })
+
+  return { success: true, data: undefined }
 }

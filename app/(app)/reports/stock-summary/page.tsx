@@ -1,8 +1,6 @@
-import { and, eq, ilike, count } from 'drizzle-orm'
 import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { inventoryLots, suppliers } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { InventoryFilters } from '@/app/(app)/inventory/inventory-filters'
 import { ExportButton } from '@/components/export-button'
 
@@ -20,24 +18,27 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
   const filterLot = typeof params.lot === 'string' ? params.lot : undefined
   const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
-  const conditions = [
-    eq(inventoryLots.tenantId, tenantId),
-    ...(filterCount ? [ilike(inventoryLots.count, `%${filterCount}%`)] : []),
-    ...(filterType ? [eq(inventoryLots.type, filterType)] : []),
-    ...(filterFiber ? [ilike(inventoryLots.fiber, `%${filterFiber}%`)] : []),
-    ...(filterLot ? [ilike(inventoryLots.lot, `%${filterLot}%`)] : []),
-  ]
+  const admin = createAdminClient()
 
-  const where = and(...conditions)
+  let query = admin
+    .from('inventory_lots')
+    .select('id, name, code, count, type, fiber, lot, current_quantity, default_supplier_id', { count: 'exact' })
+    .eq('tenant_id', tenantId)
 
-  const [lots, [{ total }], allSuppliers] = await Promise.all([
-    db.select().from(inventoryLots).where(where).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE),
-    db.select({ total: count() }).from(inventoryLots).where(where),
-    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.tenantId, tenantId)),
+  if (filterCount) query = query.ilike('count', `%${filterCount}%`)
+  if (filterType) query = query.eq('type', filterType)
+  if (filterFiber) query = query.ilike('fiber', `%${filterFiber}%`)
+  if (filterLot) query = query.ilike('lot', `%${filterLot}%`)
+
+  const [{ data: rawLots, count: total }, { data: rawSuppliers }] = await Promise.all([
+    query.order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
   ])
 
-  const supplierMap = new Map(allSuppliers.map((s) => [s.id, s.name]))
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const lots = rawLots ?? []
+  const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
+  const totalCount = total ?? 0
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
 
   const exportParams = new URLSearchParams()
@@ -53,7 +54,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
         <div>
           <h1 className="text-2xl font-semibold">Stock Summary</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {total} item{total !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''}
+            {totalCount} item{totalCount !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
         <ExportButton href={exportHref} />
@@ -95,8 +96,8 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
                       <td className="px-4 py-3">{lot.type ?? '—'}</td>
                       <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
                       <td className="px-4 py-3">{lot.lot ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lot.defaultSupplierId ? (supplierMap.get(lot.defaultSupplierId) ?? '—') : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{parseFloat(lot.currentQuantity).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '—') : '—'}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{parseFloat(lot.current_quantity).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -105,7 +106,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
           </div>
 
           <div className="mt-2 px-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}</span>
+            <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount}</span>
             {totalPages > 1 && (
               <div className="flex gap-1">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (

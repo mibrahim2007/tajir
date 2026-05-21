@@ -1,8 +1,6 @@
-import { eq, desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { tajirCustomers, salesOrders, arReceipts } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateCustomerForm } from './create-customer-form'
 import { EditCustomerForm } from './edit-customer-form'
 import { DeleteButton } from '@/components/delete-button'
@@ -12,29 +10,27 @@ import { formatPKR } from '@/lib/utils/currency'
 
 export default async function CustomersPage() {
   const { tenantId } = await requireAuth()
+  const admin = createAdminClient()
 
-  const allCustomers = await db
-    .select()
-    .from(tajirCustomers)
-    .where(eq(tajirCustomers.tenantId, tenantId))
-    .orderBy(desc(tajirCustomers.createdAt))
-
-  const [allSales, allReceipts] = await Promise.all([
-    db.select({ customerId: salesOrders.customerId, pkrEquivalent: salesOrders.pkrEquivalent })
-      .from(salesOrders).where(eq(salesOrders.tenantId, tenantId)),
-    db.select({ customerId: arReceipts.customerId, pkrEquivalent: arReceipts.pkrEquivalent })
-      .from(arReceipts).where(eq(arReceipts.tenantId, tenantId)),
+  const [{ data: allCustomers }, { data: allSales }, { data: allReceipts }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+    admin.from('sales_orders').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
+  const customers = allCustomers ?? []
+  const sales = allSales ?? []
+  const receipts = allReceipts ?? []
+
   const outstandingByCustomer = new Map<string, number>()
-  for (const c of allCustomers) {
-    const openingBalance = parseFloat(c.openingBalancePkrEquivalent)
-    const billed = allSales
-      .filter((s) => s.customerId === c.id)
-      .reduce((sum, s) => sum + parseFloat(s.pkrEquivalent), 0)
-    const received = allReceipts
-      .filter((r) => r.customerId === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkrEquivalent), 0)
+  for (const c of customers) {
+    const openingBalance = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
+    const billed = sales
+      .filter((s) => s.customer_id === c.id)
+      .reduce((sum, s) => sum + parseFloat(s.pkr_equivalent), 0)
+    const received = receipts
+      .filter((r) => r.customer_id === c.id)
+      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
     outstandingByCustomer.set(c.id, openingBalance + billed - received)
   }
 
@@ -43,12 +39,12 @@ export default async function CustomersPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-semibold">Customers</h1>
-          <p className="text-sm text-muted-foreground mt-1">{allCustomers.length} customer{allCustomers.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-1">{customers.length} customer{customers.length !== 1 ? 's' : ''}</p>
         </div>
         <CreateCustomerForm />
       </div>
 
-      {allCustomers.length === 0 ? (
+      {customers.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <p className="text-muted-foreground text-sm">No customers yet. Add your first customer to start tracking receivables.</p>
         </div>
@@ -64,7 +60,7 @@ export default async function CustomersPage() {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {allCustomers.map((c) => {
+              {customers.map((c) => {
                 const outstanding = outstandingByCustomer.get(c.id) ?? 0
                 return (
                   <tr key={c.id} className="hover:bg-muted/30 transition-colors">

@@ -1,7 +1,5 @@
-import { eq } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { inventoryLots, tajirCustomers, suppliers } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { StockBalanceTable } from './stock-balance-table'
 import { CustomerBalanceTable } from './customer-balance-table'
 import { SupplierBalanceTable } from './supplier-balance-table'
@@ -13,14 +11,35 @@ export default async function OpeningBalancesPage() {
     return <div className="p-6"><p className="text-muted-foreground">Access denied.</p></div>
   }
 
-  const [lots, customers, allSuppliers] = await Promise.all([
-    db.select({ id: inventoryLots.id, name: inventoryLots.name, currentQuantity: inventoryLots.currentQuantity })
-      .from(inventoryLots).where(eq(inventoryLots.tenantId, tenantId)),
-    db.select({ id: tajirCustomers.id, name: tajirCustomers.name, openingBalance: tajirCustomers.openingBalance, openingBalanceCurrency: tajirCustomers.openingBalanceCurrency, openingBalancePkrEquivalent: tajirCustomers.openingBalancePkrEquivalent })
-      .from(tajirCustomers).where(eq(tajirCustomers.tenantId, tenantId)),
-    db.select({ id: suppliers.id, name: suppliers.name, openingBalance: suppliers.openingBalance, openingBalanceCurrency: suppliers.openingBalanceCurrency, openingBalancePkrEquivalent: suppliers.openingBalancePkrEquivalent })
-      .from(suppliers).where(eq(suppliers.tenantId, tenantId)),
+  const admin = createAdminClient()
+
+  const [{ data: rawLots }, { data: rawCustomers }, { data: rawSuppliers }] = await Promise.all([
+    admin.from('inventory_lots').select('id, name, current_quantity').eq('tenant_id', tenantId),
+    admin.from('tajir_customers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
   ])
+
+  const lots = (rawLots ?? []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    currentQuantity: l.current_quantity,
+  }))
+
+  const customers = (rawCustomers ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    openingBalance: c.opening_balance,
+    openingBalanceCurrency: c.opening_balance_currency,
+    openingBalancePkrEquivalent: c.opening_balance_pkr_equivalent,
+  }))
+
+  const allSuppliers = (rawSuppliers ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    openingBalance: s.opening_balance,
+    openingBalanceCurrency: s.opening_balance_currency,
+    openingBalancePkrEquivalent: s.opening_balance_pkr_equivalent,
+  }))
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-10">

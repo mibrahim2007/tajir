@@ -1,9 +1,7 @@
-import { and, eq, desc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { customerPriceLists, tajirCustomers, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { Button } from '@/components/ui/button'
@@ -16,23 +14,30 @@ export default async function PricingHistoryPage({ params }: Props) {
 
   const { customerId, stockItemId } = await params
 
-  const [rules, customer, item] = await Promise.all([
-    db.select().from(customerPriceLists)
-      .where(and(
-        eq(customerPriceLists.tenantId, tenantId),
-        eq(customerPriceLists.customerId, customerId),
-        eq(customerPriceLists.stockItemId, stockItemId),
-      ))
-      .orderBy(desc(customerPriceLists.effectiveFrom)),
-    db.select({ name: tajirCustomers.name }).from(tajirCustomers)
-      .where(and(eq(tajirCustomers.id, customerId), eq(tajirCustomers.tenantId, tenantId)))
-      .limit(1).then((r) => r[0] ?? null),
-    db.select({ name: inventoryLots.name }).from(inventoryLots)
-      .where(and(eq(inventoryLots.id, stockItemId), eq(inventoryLots.tenantId, tenantId)))
-      .limit(1).then((r) => r[0] ?? null),
+  const admin = createAdminClient()
+
+  const [{ data: rawRules }, { data: rawCustomer }, { data: rawItem }] = await Promise.all([
+    admin.from('customer_price_lists')
+      .select('id, rate, is_active, effective_from, superseded_at')
+      .eq('tenant_id', tenantId)
+      .eq('customer_id', customerId)
+      .eq('stock_item_id', stockItemId)
+      .order('effective_from', { ascending: false }),
+    admin.from('tajir_customers')
+      .select('name')
+      .eq('id', customerId)
+      .eq('tenant_id', tenantId)
+      .single(),
+    admin.from('inventory_lots')
+      .select('name')
+      .eq('id', stockItemId)
+      .eq('tenant_id', tenantId)
+      .single(),
   ])
 
-  if (!customer || !item) notFound()
+  if (!rawCustomer || !rawItem) notFound()
+
+  const rules = rawRules ?? []
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -40,7 +45,7 @@ export default async function PricingHistoryPage({ params }: Props) {
         <div>
           <h1 className="text-2xl font-semibold">Pricing History</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {customer.name} — {item.name}
+            {rawCustomer.name} — {rawItem.name}
           </p>
         </div>
         <Button asChild variant="outline" className="min-h-[44px]">
@@ -67,12 +72,12 @@ export default async function PricingHistoryPage({ params }: Props) {
               {rules.map((rule) => (
                 <tr key={rule.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 text-right tabular-nums font-medium">{formatPKR(parseFloat(rule.rate))}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(rule.effectiveFrom))}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(rule.effective_from))}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                    {rule.supersededAt ? formatPKTDate(new Date(rule.supersededAt)) : '—'}
+                    {rule.superseded_at ? formatPKTDate(new Date(rule.superseded_at)) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {rule.isActive ? (
+                    {rule.is_active ? (
                       <span className="inline-flex items-center rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-xs font-medium text-green-700 dark:text-green-400">Active</span>
                     ) : (
                       <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">Superseded</span>

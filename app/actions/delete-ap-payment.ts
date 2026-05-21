@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { apPayments } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -23,12 +21,26 @@ export async function deleteApPaymentAction(input: unknown): Promise<ActionResul
 
   const { id } = parsed.data
 
-  const payment = await db.select().from(apPayments).where(and(eq(apPayments.id, id), eq(apPayments.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: payment } = await admin
+    .from('ap_payments')
+    .select('supplier_id, amount, pkr_equivalent, date')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!payment) return { success: false, error: 'Payment not found', code: 'NOT_FOUND' }
 
-  await db.delete(apPayments).where(and(eq(apPayments.id, id), eq(apPayments.tenantId, tenantId)))
+  const { error } = await admin
+    .from('ap_payments')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'ap_payments', entityId: id, before: { supplierId: payment.supplierId, amount: payment.amount, pkrEquivalent: payment.pkrEquivalent, date: payment.date } })
+  if (error) return { success: false, error: 'Failed to delete payment', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'ap_payments', entityId: id, before: { supplierId: payment.supplier_id, amount: payment.amount, pkrEquivalent: payment.pkr_equivalent, date: payment.date } })
 
   return { success: true, data: undefined }
 }

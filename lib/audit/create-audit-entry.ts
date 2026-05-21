@@ -1,5 +1,4 @@
-import { db } from '@/db'
-import { auditLog } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 type CreateAuditEntryParams = {
   tenantId: string
@@ -12,12 +11,13 @@ type CreateAuditEntryParams = {
 }
 
 export async function createAuditEntry(params: CreateAuditEntryParams): Promise<void> {
-  await db.insert(auditLog).values({
-    tenantId: params.tenantId,
-    userId: params.userId,
+  const admin = createAdminClient()
+  await admin.from('audit_log').insert({
+    tenant_id: params.tenantId,
+    user_id: params.userId,
     action: params.action,
     entity: params.entity,
-    entityId: params.entityId,
+    entity_id: params.entityId,
     before: params.before ?? null,
     after: params.after ?? null,
   })

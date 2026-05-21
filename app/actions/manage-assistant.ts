@@ -1,11 +1,8 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { db } from '@/db'
-import { tenantUsers } from '@/db/schema'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -16,23 +13,18 @@ function generateTempPassword(): string {
   return Array.from(array, (b) => chars[b % chars.length]).join('')
 }
 
-async function getActiveAssistant(tenantId: string) {
-  return db
-    .select()
-    .from(tenantUsers)
-    .where(
-      and(
-        eq(tenantUsers.tenantId, tenantId),
-        eq(tenantUsers.role, 'assistant'),
-      ),
-    )
+async function getActiveAssistant(tenantId: string, admin: ReturnType<typeof createAdminClient>) {
+  const { data } = await admin
+    .from('tenant_users')
+    .select('id, user_id')
+    .eq('tenant_id', tenantId)
+    .eq('role', 'assistant')
     .limit(1)
-    .then((rows) => rows[0] ?? null)
+    .single()
+  return data ?? null
 }
 
-export async function resetAssistantPasswordAction(): Promise<
-  ActionResult<{ tempPassword: string }>
-> {
+export async function resetAssistantPasswordAction(): Promise<ActionResult<{ tempPassword: string }>> {
   const { user, role, tenantId } = await requireAuth()
   if (role !== 'owner') return { success: false, error: 'Permission denied', code: 'UNAUTHORIZED' }
 
@@ -40,13 +32,13 @@ export async function resetAssistantPasswordAction(): Promise<
   if (tenant.subscriptionStatus === 'locked')
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const assistant = await getActiveAssistant(tenantId)
+  const admin = createAdminClient()
+  const assistant = await getActiveAssistant(tenantId, admin)
   if (!assistant) return { success: false, error: 'No assistant found', code: 'NOT_FOUND' }
 
   const tempPassword = generateTempPassword()
-  const admin = createAdminClient()
 
-  const { error } = await admin.auth.admin.updateUserById(assistant.userId, {
+  const { error } = await admin.auth.admin.updateUserById(assistant.user_id, {
     password: tempPassword,
   })
 
@@ -57,7 +49,7 @@ export async function resetAssistantPasswordAction(): Promise<
     userId: user.id,
     action: 'reset_assistant_password',
     entity: 'tenant_users',
-    entityId: assistant.userId,
+    entityId: assistant.user_id,
   })
 
   return { success: true, data: { tempPassword } }
@@ -67,28 +59,26 @@ export async function deactivateAssistantAction(): Promise<ActionResult> {
   const { user, role, tenantId } = await requireAuth()
   if (role !== 'owner') return { success: false, error: 'Permission denied', code: 'UNAUTHORIZED' }
 
-  const assistant = await getActiveAssistant(tenantId)
+  const admin = createAdminClient()
+  const assistant = await getActiveAssistant(tenantId, admin)
   if (!assistant) return { success: false, error: 'No assistant found', code: 'NOT_FOUND' }
 
-  const admin = createAdminClient()
-
-  // Ban in Supabase Auth (prevents login immediately)
-  const { error: banError } = await admin.auth.admin.updateUserById(assistant.userId, {
-    ban_duration: '876600h', // 100 years — effectively permanent until reactivated
+  const { error: banError } = await admin.auth.admin.updateUserById(assistant.user_id, {
+    ban_duration: '876600h',
   })
   if (banError) return { success: false, error: banError.message, code: 'BAN_ERROR' }
 
-  await db
-    .update(tenantUsers)
-    .set({ isActive: false })
-    .where(eq(tenantUsers.id, assistant.id))
+  await admin
+    .from('tenant_users')
+    .update({ is_active: false })
+    .eq('id', assistant.id)
 
   await createAuditEntry({
     tenantId,
     userId: user.id,
     action: 'deactivate_assistant',
     entity: 'tenant_users',
-    entityId: assistant.userId,
+    entityId: assistant.user_id,
     before: { isActive: true },
     after: { isActive: false },
   })
@@ -100,27 +90,26 @@ export async function reactivateAssistantAction(): Promise<ActionResult> {
   const { user, role, tenantId } = await requireAuth()
   if (role !== 'owner') return { success: false, error: 'Permission denied', code: 'UNAUTHORIZED' }
 
-  const assistant = await getActiveAssistant(tenantId)
+  const admin = createAdminClient()
+  const assistant = await getActiveAssistant(tenantId, admin)
   if (!assistant) return { success: false, error: 'No assistant found', code: 'NOT_FOUND' }
 
-  const admin = createAdminClient()
-
-  const { error: unbanError } = await admin.auth.admin.updateUserById(assistant.userId, {
+  const { error: unbanError } = await admin.auth.admin.updateUserById(assistant.user_id, {
     ban_duration: 'none',
   })
   if (unbanError) return { success: false, error: unbanError.message, code: 'UNBAN_ERROR' }
 
-  await db
-    .update(tenantUsers)
-    .set({ isActive: true })
-    .where(eq(tenantUsers.id, assistant.id))
+  await admin
+    .from('tenant_users')
+    .update({ is_active: true })
+    .eq('id', assistant.id)
 
   await createAuditEntry({
     tenantId,
     userId: user.id,
     action: 'reactivate_assistant',
     entity: 'tenant_users',
-    entityId: assistant.userId,
+    entityId: assistant.user_id,
     before: { isActive: false },
     after: { isActive: true },
   })

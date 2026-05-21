@@ -1,10 +1,8 @@
 export const runtime = 'nodejs'
 
-import { eq, asc } from 'drizzle-orm'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
-import { db } from '@/db'
-import { tajirCustomers, salesOrders, arReceipts } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function ageDays(dateStr: string): number {
   const today = new Date()
@@ -19,11 +17,12 @@ export async function GET() {
   const { tenantId, role } = auth
   if (role !== 'owner') return new Response('Forbidden', { status: 403 })
 
-  const [allCustomers, allSales, allReceiptsData] = await Promise.all([
-    db.select().from(tajirCustomers).where(eq(tajirCustomers.tenantId, tenantId)),
-    db.select().from(salesOrders).where(eq(salesOrders.tenantId, tenantId)).orderBy(asc(salesOrders.date)),
-    db.select({ customerId: arReceipts.customerId, pkrEquivalent: arReceipts.pkrEquivalent })
-      .from(arReceipts).where(eq(arReceipts.tenantId, tenantId)),
+  const admin = createAdminClient()
+
+  const [{ data: allCustomers }, { data: allSales }, { data: allReceiptsData }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
+    admin.from('sales_orders').select('customer_id, pkr_equivalent, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const workbook = new ExcelJS.Workbook()
@@ -43,12 +42,12 @@ export async function GET() {
 
   let grandTotal = 0, grandB0 = 0, grandB31 = 0, grandB61 = 0, grandB90plus = 0
 
-  for (const c of allCustomers) {
-    const cSales = allSales.filter((s) => s.customerId === c.id).map((s) => ({ date: s.date, amount: parseFloat(s.pkrEquivalent) }))
-    const totalReceived = allReceiptsData.filter((r) => r.customerId === c.id).reduce((sum, r) => sum + parseFloat(r.pkrEquivalent), 0)
+  for (const c of allCustomers ?? []) {
+    const cSales = (allSales ?? []).filter((s) => s.customer_id === c.id).map((s) => ({ date: s.date, amount: parseFloat(s.pkr_equivalent) }))
+    const totalReceived = (allReceiptsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
 
     const lineItems = [
-      ...(parseFloat(c.openingBalancePkrEquivalent) > 0 ? [{ date: c.createdAt.toISOString().split('T')[0], amount: parseFloat(c.openingBalancePkrEquivalent) }] : []),
+      ...(parseFloat(c.opening_balance_pkr_equivalent) > 0 ? [{ date: c.created_at.split('T')[0], amount: parseFloat(c.opening_balance_pkr_equivalent) }] : []),
       ...cSales,
     ].sort((a, b) => a.date.localeCompare(b.date))
 

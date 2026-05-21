@@ -3,22 +3,20 @@
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { arReceipts } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
-import type { ArReceipt } from '@/db/schema'
 
 const schema = z.object({
-  customerId: z.string().uuid('Invalid customer'),
-  amount: z.coerce.number().positive('Amount must be positive'),
-  currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
-  exchangeRate: z.coerce.number().positive().default(1),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  customerId:        z.string().uuid('Invalid customer'),
+  amount:            z.coerce.number().positive('Amount must be positive'),
+  currencyCode:      z.enum(['PKR', 'USD']).default('PKR'),
+  exchangeRate:      z.coerce.number().positive().default(1),
+  date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
 })
 
-export async function createArReceiptAction(input: unknown): Promise<ActionResult<ArReceipt>> {
+export async function createArReceiptAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = schema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
@@ -35,14 +33,24 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   const { customerId, amount, currencyCode, exchangeRate, date, paymentMethodNote } = parsed.data
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
-  const [receipt] = await db.insert(arReceipts).values({
-    tenantId, customerId,
-    amount: String(amount),
-    currencyCode,
-    pkrEquivalent: String(pkrEquivalent),
-    paymentMethodNote: paymentMethodNote || null,
-    date,
-  }).returning()
+  const admin = createAdminClient()
+  const { data: receipt, error } = await admin
+    .from('ar_receipts')
+    .insert({
+      tenant_id: tenantId,
+      customer_id: customerId,
+      amount: String(amount),
+      currency_code: currencyCode,
+      pkr_equivalent: String(pkrEquivalent),
+      payment_method_note: paymentMethodNote || null,
+      date,
+    })
+    .select('id')
+    .single()
+
+  if (error || !receipt) {
+    return { success: false, error: 'Failed to record receipt', code: 'INTERNAL_ERROR' }
+  }
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'ar_receipts', entityId: receipt.id, after: { customerId, amount, currencyCode, pkrEquivalent, date } })
 

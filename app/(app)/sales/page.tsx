@@ -1,9 +1,7 @@
-import { eq, desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { salesOrders, tajirCustomers, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { EditSaleForm } from './edit-sale-form'
 import { DeleteButton } from '@/components/delete-button'
@@ -14,16 +12,20 @@ import { formatPKTDate } from '@/lib/utils/dates'
 
 export default async function SalesPage() {
   const { tenantId } = await requireAuth()
+  const admin = createAdminClient()
 
-  const [orders, customers, lots] = await Promise.all([
-    db.select().from(salesOrders)
-      .where(eq(salesOrders.tenantId, tenantId))
-      .orderBy(desc(salesOrders.date)),
-    db.select({ id: tajirCustomers.id, name: tajirCustomers.name }).from(tajirCustomers)
-      .where(eq(tajirCustomers.tenantId, tenantId)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name }).from(inventoryLots)
-      .where(eq(inventoryLots.tenantId, tenantId)),
+  const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }] = await Promise.all([
+    admin.from('sales_orders')
+      .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date')
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: false }),
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
+
+  const orders = rawOrders ?? []
+  const customers = rawCustomers ?? []
+  const lots = rawLots ?? []
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]))
   const lotMap = new Map(lots.map((l) => [l.id, l.name]))
@@ -62,16 +64,16 @@ export default async function SalesPage() {
               </thead>
               <tbody className="divide-y">
                 {orders.map((o) => {
-                  const dueDate = o.paymentDueDate ? new Date(o.paymentDueDate) : null
+                  const dueDate = o.payment_due_date ? new Date(o.payment_due_date) : null
                   const isOverdue = dueDate && dueDate < new Date()
                   return (
                     <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(o.date))}</td>
-                      <td className="px-4 py-3 font-medium">{customerMap.get(o.customerId) ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lotMap.get(o.stockItemId) ?? '—'}</td>
+                      <td className="px-4 py-3 font-medium">{customerMap.get(o.customer_id) ?? '—'}</td>
+                      <td className="px-4 py-3 text-muted-foreground">{lotMap.get(o.stock_item_id) ?? '—'}</td>
                       <td className="px-4 py-3 text-right tabular-nums">{parseFloat(o.quantity).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{o.currencyCode} {parseFloat(o.rate).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkrEquivalent))}</td>
+                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{o.currency_code} {parseFloat(o.rate).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
                       <td className={`px-4 py-3 text-right whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                         {dueDate ? formatPKTDate(dueDate) : '—'}
                       </td>
@@ -79,7 +81,7 @@ export default async function SalesPage() {
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex items-center gap-1">
                             <EditSaleForm
-                              sale={o}
+                              sale={{ id: o.id, customerId: o.customer_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, date: o.date, paymentDueDate: o.payment_due_date }}
                               customers={customers}
                               lots={lots}
                             />

@@ -1,10 +1,8 @@
 export const runtime = 'nodejs'
 
-import { and, eq, asc } from 'drizzle-orm'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
-import { db } from '@/db'
-import { suppliers, purchaseOrders, apPayments, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuthRoute()
@@ -14,16 +12,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params
 
-  const [supplier, purchases, payments, lots] = await Promise.all([
-    db.select().from(suppliers).where(and(eq(suppliers.id, id), eq(suppliers.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null),
-    db.select().from(purchaseOrders).where(and(eq(purchaseOrders.supplierId, id), eq(purchaseOrders.tenantId, tenantId))).orderBy(asc(purchaseOrders.date)),
-    db.select().from(apPayments).where(and(eq(apPayments.supplierId, id), eq(apPayments.tenantId, tenantId))).orderBy(asc(apPayments.date)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name }).from(inventoryLots).where(eq(inventoryLots.tenantId, tenantId)),
+  const admin = createAdminClient()
+
+  const [{ data: supplier }, { data: rawPurchases }, { data: rawPayments }, { data: rawLots }] = await Promise.all([
+    admin.from('suppliers').select('name, opening_balance_pkr_equivalent, created_at').eq('id', id).eq('tenant_id', tenantId).single(),
+    admin.from('purchase_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('ap_payments').select('id, date, pkr_equivalent, payment_method_note').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
   if (!supplier) return new Response('Not Found', { status: 404 })
 
-  const lotMap = new Map(lots.map((l) => [l.id, l.name]))
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet(`${supplier.name} Ledger`)
@@ -38,29 +38,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   let balance = 0
 
-  const ob = parseFloat(supplier.openingBalancePkrEquivalent)
+  const ob = parseFloat(supplier.opening_balance_pkr_equivalent)
   if (ob !== 0) {
     balance += ob
-    sheet.addRow({ date: supplier.createdAt.toISOString().split('T')[0], desc: 'Opening Balance', debit: Math.round(ob * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
+    sheet.addRow({ date: supplier.created_at.split('T')[0], desc: 'Opening Balance', debit: Math.round(ob * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
   }
 
-  type Entry = { kind: 'purchase' | 'payment'; date: string; entry: typeof purchases[0] | typeof payments[0] }
+  type Entry =
+    | { kind: 'purchase'; date: string; entry: NonNullable<typeof rawPurchases>[0] }
+    | { kind: 'payment'; date: string; entry: NonNullable<typeof rawPayments>[0] }
+
   const entries: Entry[] = [
-    ...purchases.map((e) => ({ kind: 'purchase' as const, date: e.date, entry: e })),
-    ...payments.map((e) => ({ kind: 'payment' as const, date: e.date, entry: e })),
+    ...(rawPurchases ?? []).map((e) => ({ kind: 'purchase' as const, date: e.date, entry: e })),
+    ...(rawPayments ?? []).map((e) => ({ kind: 'payment' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
     if (item.kind === 'purchase') {
-      const e = item.entry as typeof purchases[0]
-      const net = parseFloat(e.pkrEquivalent) - parseFloat(e.advancePaid)
+      const e = item.entry as NonNullable<typeof rawPurchases>[0]
+      const net = parseFloat(e.pkr_equivalent) - parseFloat(e.advance_paid)
       balance += net
-      sheet.addRow({ date: item.date, desc: `Purchase — ${lotMap.get(e.stockItemId) ?? '?'} (${e.quantity} @ ${e.currencyCode} ${e.rate})`, debit: Math.round(net * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
+      sheet.addRow({ date: item.date, desc: `Purchase — ${lotMap.get(e.stock_item_id) ?? '?'} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: Math.round(net * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
     } else {
-      const e = item.entry as typeof payments[0]
-      const amt = parseFloat(e.pkrEquivalent)
+      const e = item.entry as NonNullable<typeof rawPayments>[0]
+      const amt = parseFloat(e.pkr_equivalent)
       balance -= amt
-      sheet.addRow({ date: item.date, desc: `Payment${e.paymentMethodNote ? ` — ${e.paymentMethodNote}` : ''}`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
+      sheet.addRow({ date: item.date, desc: `Payment${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     }
   }
 

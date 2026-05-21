@@ -1,8 +1,6 @@
-import { and, eq, desc } from 'drizzle-orm'
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { purchaseOrders, suppliers, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { EditPurchaseForm } from './edit-purchase-form'
 import { DeleteButton } from '@/components/delete-button'
@@ -13,32 +11,24 @@ import { formatPKTDate } from '@/lib/utils/dates'
 
 export default async function PurchasesPage() {
   const { tenantId, role } = await requireAuth()
+  const admin = createAdminClient()
 
-  const [orders, supplierList, lotList] = await Promise.all([
-    db
-      .select({
-        id:            purchaseOrders.id,
-        date:          purchaseOrders.date,
-        quantity:      purchaseOrders.quantity,
-        rate:          purchaseOrders.rate,
-        currencyCode:  purchaseOrders.currencyCode,
-        exchangeRate:  purchaseOrders.exchangeRate,
-        pkrEquivalent: purchaseOrders.pkrEquivalent,
-        advancePaid:   purchaseOrders.advancePaid,
-        supplierId:    purchaseOrders.supplierId,
-        stockItemId:   purchaseOrders.stockItemId,
-        supplierName:  suppliers.name,
-        stockItemName: inventoryLots.name,
-      })
-      .from(purchaseOrders)
-      .innerJoin(suppliers, and(eq(suppliers.id, purchaseOrders.supplierId), eq(suppliers.tenantId, tenantId)))
-      .innerJoin(inventoryLots, and(eq(inventoryLots.id, purchaseOrders.stockItemId), eq(inventoryLots.tenantId, tenantId)))
-      .where(eq(purchaseOrders.tenantId, tenantId))
-      .orderBy(desc(purchaseOrders.date))
+  const [{ data: rawOrders }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
+    admin.from('purchase_orders')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: false })
       .limit(100),
-    db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.tenantId, tenantId)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name, count: inventoryLots.count }).from(inventoryLots).where(eq(inventoryLots.tenantId, tenantId)),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId),
   ])
+
+  const orders = rawOrders ?? []
+  const supplierList = rawSuppliers ?? []
+  const lotList = rawLots ?? []
+
+  const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
+  const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -75,16 +65,16 @@ export default async function PurchasesPage() {
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(o.date))}</td>
-                    <td className="px-4 py-3">{o.supplierName}</td>
-                    <td className="px-4 py-3">{o.stockItemName}</td>
+                    <td className="px-4 py-3">{supplierMap.get(o.supplier_id) ?? '—'}</td>
+                    <td className="px-4 py-3">{lotMap.get(o.stock_item_id) ?? '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{o.quantity}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{o.currencyCode} {o.rate}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkrEquivalent))}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{o.currency_code} {o.rate}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
                         <div className="flex items-center gap-1">
                           <EditPurchaseForm
-                            purchase={o}
+                            purchase={{ id: o.id, supplierId: o.supplier_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, advancePaid: o.advance_paid, date: o.date }}
                             suppliers={supplierList}
                             lots={lotList}
                           />

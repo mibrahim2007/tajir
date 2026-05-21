@@ -1,22 +1,18 @@
-import { eq, desc } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { suppliers, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CreatePurchaseForm } from './create-purchase-form'
 
 export default async function NewPurchasePage() {
   const { tenantId } = await requireAuth()
+  const admin = createAdminClient()
 
-  const [supplierList, lotList] = await Promise.all([
-    db.select({ id: suppliers.id, name: suppliers.name })
-      .from(suppliers)
-      .where(eq(suppliers.tenantId, tenantId))
-      .orderBy(desc(suppliers.createdAt)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name, count: inventoryLots.count })
-      .from(inventoryLots)
-      .where(eq(inventoryLots.tenantId, tenantId))
-      .orderBy(desc(inventoryLots.createdAt)),
+  const [{ data: rawSuppliers }, { data: rawLots }] = await Promise.all([
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
   ])
+
+  const supplierList = rawSuppliers ?? []
+  const lotList = rawLots ?? []
 
   return (
     <div className="p-6 max-w-lg mx-auto">

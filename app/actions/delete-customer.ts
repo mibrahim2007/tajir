@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { tajirCustomers } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -23,12 +21,26 @@ export async function deleteCustomerAction(input: unknown): Promise<ActionResult
 
   const { id } = parsed.data
 
-  const customer = await db.select().from(tajirCustomers).where(and(eq(tajirCustomers.id, id), eq(tajirCustomers.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: customer } = await admin
+    .from('tajir_customers')
+    .select('name, opening_balance, opening_balance_pkr_equivalent')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!customer) return { success: false, error: 'Customer not found', code: 'NOT_FOUND' }
 
-  await db.delete(tajirCustomers).where(and(eq(tajirCustomers.id, id), eq(tajirCustomers.tenantId, tenantId)))
+  const { error } = await admin
+    .from('tajir_customers')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'tajir_customers', entityId: id, before: { name: customer.name, openingBalance: customer.openingBalance, openingBalancePkrEquivalent: customer.openingBalancePkrEquivalent } })
+  if (error) return { success: false, error: 'Failed to delete customer', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'tajir_customers', entityId: id, before: { name: customer.name, openingBalance: customer.opening_balance, openingBalancePkrEquivalent: customer.opening_balance_pkr_equivalent } })
 
   return { success: true, data: undefined }
 }

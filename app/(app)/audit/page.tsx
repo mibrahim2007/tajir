@@ -1,7 +1,5 @@
-import { and, eq, desc } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { auditLog } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKTDateTime } from '@/lib/utils/dates'
 
 const PAGE_SIZE = 50
@@ -19,18 +17,15 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
   const filterEntity = typeof params.entity === 'string' ? params.entity : undefined
   const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
-  const conditions = [
-    eq(auditLog.tenantId, tenantId),
-    ...(filterEntity ? [eq(auditLog.entity, filterEntity)] : []),
-  ]
+  const admin = createAdminClient()
+  let query = admin.from('audit_log').select('id, created_at, action, entity, before, after').eq('tenant_id', tenantId)
+  if (filterEntity) query = query.eq('entity', filterEntity)
 
-  const entries = await db
-    .select()
-    .from(auditLog)
-    .where(and(...conditions))
-    .orderBy(desc(auditLog.createdAt))
-    .limit(PAGE_SIZE)
-    .offset((page - 1) * PAGE_SIZE)
+  const { data: rawEntries } = await query
+    .order('created_at', { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+
+  const entries = rawEntries ?? []
 
   const ENTITIES = ['inventory_lots', 'suppliers', 'purchase_orders', 'ap_payments', 'tajir_customers', 'sales_orders', 'ar_receipts', 'customer_price_lists', 'tenant_users']
 
@@ -69,7 +64,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
                 {entries.map((entry) => (
                   <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
-                      {formatPKTDateTime(entry.createdAt)}
+                      {formatPKTDateTime(new Date(entry.created_at))}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${

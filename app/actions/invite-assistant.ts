@@ -1,12 +1,9 @@
 'use server'
 
 import { z } from 'zod'
-import { and, eq } from 'drizzle-orm'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { db } from '@/db'
-import { tenantUsers } from '@/db/schema'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -39,20 +36,19 @@ export async function inviteAssistantAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  // Block if an active assistant already exists
-  const existing = await db
-    .select({ id: tenantUsers.id })
-    .from(tenantUsers)
-    .where(
-      and(
-        eq(tenantUsers.tenantId, tenantId),
-        eq(tenantUsers.role, 'assistant'),
-        eq(tenantUsers.isActive, true),
-      ),
-    )
-    .limit(1)
+  const admin = createAdminClient()
 
-  if (existing.length > 0) {
+  // Block if an active assistant already exists
+  const { data: existing } = await admin
+    .from('tenant_users')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('role', 'assistant')
+    .eq('is_active', true)
+    .limit(1)
+    .single()
+
+  if (existing) {
     return {
       success: false,
       error: 'An assistant already exists for this account',
@@ -63,7 +59,6 @@ export async function inviteAssistantAction(
   const tempPassword = generateTempPassword()
   const { email } = parsed.data
 
-  const admin = createAdminClient()
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
@@ -82,11 +77,13 @@ export async function inviteAssistantAction(
   const assistantUserId = newUser.user.id
 
   try {
-    await db.insert(tenantUsers).values({
-      tenantId,
-      userId: assistantUserId,
+    const { error: insertError } = await admin.from('tenant_users').insert({
+      tenant_id: tenantId,
+      user_id: assistantUserId,
       role: 'assistant',
     })
+
+    if (insertError) throw insertError
 
     await createAuditEntry({
       tenantId,
@@ -99,7 +96,6 @@ export async function inviteAssistantAction(
 
     return { success: true, data: { email, tempPassword } }
   } catch {
-    // Cleanup orphan auth user if DB insert fails
     await admin.auth.admin.deleteUser(assistantUserId)
     return { success: false, error: 'Failed to save assistant. Please try again.', code: 'INTERNAL_ERROR' }
   }

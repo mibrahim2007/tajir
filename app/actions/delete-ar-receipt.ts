@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { arReceipts } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -23,12 +21,26 @@ export async function deleteArReceiptAction(input: unknown): Promise<ActionResul
 
   const { id } = parsed.data
 
-  const receipt = await db.select().from(arReceipts).where(and(eq(arReceipts.id, id), eq(arReceipts.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: receipt } = await admin
+    .from('ar_receipts')
+    .select('customer_id, amount, pkr_equivalent, date')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!receipt) return { success: false, error: 'Receipt not found', code: 'NOT_FOUND' }
 
-  await db.delete(arReceipts).where(and(eq(arReceipts.id, id), eq(arReceipts.tenantId, tenantId)))
+  const { error } = await admin
+    .from('ar_receipts')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'ar_receipts', entityId: id, before: { customerId: receipt.customerId, amount: receipt.amount, pkrEquivalent: receipt.pkrEquivalent, date: receipt.date } })
+  if (error) return { success: false, error: 'Failed to delete receipt', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'ar_receipts', entityId: id, before: { customerId: receipt.customer_id, amount: receipt.amount, pkrEquivalent: receipt.pkr_equivalent, date: receipt.date } })
 
   return { success: true, data: undefined }
 }

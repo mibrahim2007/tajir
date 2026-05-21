@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { arReceipts } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -31,13 +29,26 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   const { id, amount, currencyCode, exchangeRate, date, paymentMethodNote } = parsed.data
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
-  const existing = await db.select().from(arReceipts).where(and(eq(arReceipts.id, id), eq(arReceipts.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: existing } = await admin
+    .from('ar_receipts')
+    .select('amount, pkr_equivalent, date')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!existing) return { success: false, error: 'Receipt not found', code: 'NOT_FOUND' }
 
-  await db.update(arReceipts).set({ amount: String(amount), currencyCode, pkrEquivalent: String(pkrEquivalent), date, paymentMethodNote: paymentMethodNote ?? null })
-    .where(and(eq(arReceipts.id, id), eq(arReceipts.tenantId, tenantId)))
+  const { error } = await admin
+    .from('ar_receipts')
+    .update({ amount: String(amount), currency_code: currencyCode, pkr_equivalent: String(pkrEquivalent), date, payment_method_note: paymentMethodNote ?? null })
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ar_receipts', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkrEquivalent, date: existing.date }, after: { amount, pkrEquivalent, date } })
+  if (error) return { success: false, error: 'Failed to update receipt', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ar_receipts', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date } })
 
   return { success: true, data: undefined }
 }

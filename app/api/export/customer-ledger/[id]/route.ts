@@ -1,10 +1,8 @@
 export const runtime = 'nodejs'
 
-import { and, eq, asc } from 'drizzle-orm'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
-import { db } from '@/db'
-import { tajirCustomers, salesOrders, arReceipts, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuthRoute()
@@ -14,16 +12,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const { id } = await params
 
-  const [customer, sales, receipts, lots] = await Promise.all([
-    db.select().from(tajirCustomers).where(and(eq(tajirCustomers.id, id), eq(tajirCustomers.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null),
-    db.select().from(salesOrders).where(and(eq(salesOrders.customerId, id), eq(salesOrders.tenantId, tenantId))).orderBy(asc(salesOrders.date)),
-    db.select().from(arReceipts).where(and(eq(arReceipts.customerId, id), eq(arReceipts.tenantId, tenantId))).orderBy(asc(arReceipts.date)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name }).from(inventoryLots).where(eq(inventoryLots.tenantId, tenantId)),
+  const admin = createAdminClient()
+
+  const [{ data: customer }, { data: rawSales }, { data: rawReceipts }, { data: rawLots }] = await Promise.all([
+    admin.from('tajir_customers').select('name, opening_balance_pkr_equivalent, created_at').eq('id', id).eq('tenant_id', tenantId).single(),
+    admin.from('sales_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('ar_receipts').select('id, date, pkr_equivalent, payment_method_note').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
   if (!customer) return new Response('Not Found', { status: 404 })
 
-  const lotMap = new Map(lots.map((l) => [l.id, l.name]))
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   const workbook = new ExcelJS.Workbook()
   const sheet = workbook.addWorksheet(`${customer.name} Ledger`)
@@ -38,29 +38,32 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   let balance = 0
 
-  const ob = parseFloat(customer.openingBalancePkrEquivalent)
+  const ob = parseFloat(customer.opening_balance_pkr_equivalent)
   if (ob !== 0) {
     balance += ob
-    sheet.addRow({ date: customer.createdAt.toISOString().split('T')[0], desc: 'Opening Balance', debit: Math.round(ob * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
+    sheet.addRow({ date: customer.created_at.split('T')[0], desc: 'Opening Balance', debit: Math.round(ob * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
   }
 
-  type Entry = { kind: 'sale' | 'receipt'; date: string; entry: typeof sales[0] | typeof receipts[0] }
+  type Entry =
+    | { kind: 'sale'; date: string; entry: NonNullable<typeof rawSales>[0] }
+    | { kind: 'receipt'; date: string; entry: NonNullable<typeof rawReceipts>[0] }
+
   const entries: Entry[] = [
-    ...sales.map((e) => ({ kind: 'sale' as const, date: e.date, entry: e })),
-    ...receipts.map((e) => ({ kind: 'receipt' as const, date: e.date, entry: e })),
+    ...(rawSales ?? []).map((e) => ({ kind: 'sale' as const, date: e.date, entry: e })),
+    ...(rawReceipts ?? []).map((e) => ({ kind: 'receipt' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
     if (item.kind === 'sale') {
-      const e = item.entry as typeof sales[0]
-      const amt = parseFloat(e.pkrEquivalent)
+      const e = item.entry as NonNullable<typeof rawSales>[0]
+      const amt = parseFloat(e.pkr_equivalent)
       balance += amt
-      sheet.addRow({ date: item.date, desc: `Sale — ${lotMap.get(e.stockItemId) ?? '?'} (${e.quantity} @ ${e.currencyCode} ${e.rate})`, debit: Math.round(amt * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
+      sheet.addRow({ date: item.date, desc: `Sale — ${lotMap.get(e.stock_item_id) ?? '?'} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: Math.round(amt * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
     } else {
-      const e = item.entry as typeof receipts[0]
-      const amt = parseFloat(e.pkrEquivalent)
+      const e = item.entry as NonNullable<typeof rawReceipts>[0]
+      const amt = parseFloat(e.pkr_equivalent)
       balance -= amt
-      sheet.addRow({ date: item.date, desc: `Receipt${e.paymentMethodNote ? ` — ${e.paymentMethodNote}` : ''}`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
+      sheet.addRow({ date: item.date, desc: `Receipt${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     }
   }
 

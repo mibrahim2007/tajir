@@ -1,8 +1,6 @@
-import { and, eq, ilike, count } from 'drizzle-orm'
 import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateLotForm } from './create-lot-form'
 import { EditInventoryLotForm } from './edit-inventory-lot-form'
 import { InventoryFilters } from './inventory-filters'
@@ -24,27 +22,23 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const filterLot = typeof params.lot === 'string' ? params.lot : undefined
   const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
-  const conditions = [
-    eq(inventoryLots.tenantId, tenantId),
-    ...(filterCount ? [ilike(inventoryLots.count, `%${filterCount}%`)] : []),
-    ...(filterType ? [eq(inventoryLots.type, filterType)] : []),
-    ...(filterFiber ? [ilike(inventoryLots.fiber, `%${filterFiber}%`)] : []),
-    ...(filterLot ? [ilike(inventoryLots.lot, `%${filterLot}%`)] : []),
-  ]
+  const admin = createAdminClient()
+  let query = admin
+    .from('inventory_lots')
+    .select('id, name, code, count, type, fiber, lot, current_quantity', { count: 'exact' })
+    .eq('tenant_id', tenantId)
 
-  const where = and(...conditions)
+  if (filterCount) query = query.ilike('count', `%${filterCount}%`)
+  if (filterType) query = query.eq('type', filterType)
+  if (filterFiber) query = query.ilike('fiber', `%${filterFiber}%`)
+  if (filterLot) query = query.ilike('lot', `%${filterLot}%`)
 
-  const [lots, [{ total }]] = await Promise.all([
-    db
-      .select()
-      .from(inventoryLots)
-      .where(where)
-      .limit(PAGE_SIZE)
-      .offset((page - 1) * PAGE_SIZE),
-    db.select({ total: count() }).from(inventoryLots).where(where),
-  ])
+  const { data: lots, count: total } = await query
+    .order('created_at', { ascending: false })
+    .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
 
-  const totalPages = Math.ceil(total / PAGE_SIZE)
+  const totalCount = total ?? 0
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
 
   return (
@@ -53,7 +47,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         <div>
           <h1 className="text-2xl font-semibold">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {total} stock item{total !== 1 ? 's' : ''}
+            {totalCount} stock item{totalCount !== 1 ? 's' : ''}
             {hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
@@ -64,7 +58,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         <InventoryFilters />
       </Suspense>
 
-      {lots.length === 0 ? (
+      {!lots || lots.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <p className="text-muted-foreground text-sm">
             {hasFilters
@@ -98,11 +92,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                       <td className="px-4 py-3">{lot.type ?? '—'}</td>
                       <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
                       <td className="px-4 py-3">{lot.lot ?? '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{lot.currentQuantity}</td>
+                      <td className="px-4 py-3 text-right tabular-nums">{lot.current_quantity}</td>
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex items-center gap-1">
-                            <EditInventoryLotForm lot={lot} />
+                            <EditInventoryLotForm lot={{ id: lot.id, name: lot.name, code: lot.code, count: lot.count, type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
                             <DeleteButton
                               description={`Delete stock item "${lot.name}"? This cannot be undone.`}
                               onDelete={() => deleteInventoryLotAction({ id: lot.id })}
@@ -117,10 +111,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             </div>
           </div>
 
-          {/* Sticky summary row */}
           <div className="mt-2 px-1 flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount}
             </span>
             {totalPages > 1 && (
               <div className="flex gap-1">
@@ -138,7 +131,6 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
           </div>
         </>
       )}
-
     </div>
   )
 }

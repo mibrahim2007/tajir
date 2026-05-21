@@ -1,10 +1,8 @@
 export const runtime = 'nodejs'
 
-import { eq, asc } from 'drizzle-orm'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
-import { db } from '@/db'
-import { suppliers, purchaseOrders, apPayments } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 function ageDays(dateStr: string): number {
   const today = new Date()
@@ -18,11 +16,12 @@ export async function GET() {
   const { tenantId, role } = auth
   if (role !== 'owner') return new Response('Forbidden', { status: 403 })
 
-  const [allSuppliers, allPurchases, allPaymentsData] = await Promise.all([
-    db.select().from(suppliers).where(eq(suppliers.tenantId, tenantId)),
-    db.select().from(purchaseOrders).where(eq(purchaseOrders.tenantId, tenantId)).orderBy(asc(purchaseOrders.date)),
-    db.select({ supplierId: apPayments.supplierId, pkrEquivalent: apPayments.pkrEquivalent })
-      .from(apPayments).where(eq(apPayments.tenantId, tenantId)),
+  const admin = createAdminClient()
+
+  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPaymentsData }] = await Promise.all([
+    admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
+    admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const workbook = new ExcelJS.Workbook()
@@ -42,12 +41,12 @@ export async function GET() {
 
   let grandTotal = 0, grandB0 = 0, grandB31 = 0, grandB61 = 0, grandB90plus = 0
 
-  for (const s of allSuppliers) {
-    const sPurchases = allPurchases.filter((p) => p.supplierId === s.id).map((p) => ({ date: p.date, net: parseFloat(p.pkrEquivalent) - parseFloat(p.advancePaid) })).filter((p) => p.net > 0)
-    const totalPaid = allPaymentsData.filter((p) => p.supplierId === s.id).reduce((sum, p) => sum + parseFloat(p.pkrEquivalent), 0)
+  for (const s of allSuppliers ?? []) {
+    const sPurchases = (allPurchases ?? []).filter((p) => p.supplier_id === s.id).map((p) => ({ date: p.date, net: parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid) })).filter((p) => p.net > 0)
+    const totalPaid = (allPaymentsData ?? []).filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
 
     const lineItems = [
-      ...(parseFloat(s.openingBalancePkrEquivalent) > 0 ? [{ date: s.createdAt.toISOString().split('T')[0], amount: parseFloat(s.openingBalancePkrEquivalent) }] : []),
+      ...(parseFloat(s.opening_balance_pkr_equivalent) > 0 ? [{ date: s.created_at.split('T')[0], amount: parseFloat(s.opening_balance_pkr_equivalent) }] : []),
       ...sPurchases.map((p) => ({ date: p.date, amount: p.net })),
     ].sort((a, b) => a.date.localeCompare(b.date))
 

@@ -1,14 +1,11 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
-import type { InventoryLot } from '@/db/schema'
 
 export const createLotSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -25,7 +22,7 @@ export type CreateLotInput = z.infer<typeof createLotSchema>
 
 export async function createInventoryLotAction(
   input: CreateLotInput,
-): Promise<ActionResult<InventoryLot>> {
+): Promise<ActionResult<{ id: string }>> {
   const parsed = createLotSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
@@ -38,35 +35,42 @@ export async function createInventoryLotAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, code, count, type, fiber, lot, defaultSupplierId, confirmDuplicateLot } =
-    parsed.data
+  const { name, code, count, type, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
+
+  const admin = createAdminClient()
 
   if (lot && !confirmDuplicateLot) {
-    const duplicate = await db
-      .select({ id: inventoryLots.id })
-      .from(inventoryLots)
-      .where(and(eq(inventoryLots.tenantId, tenantId), eq(inventoryLots.lot, lot)))
+    const { data: existing } = await admin
+      .from('inventory_lots')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('lot', lot)
       .limit(1)
-      .then((rows) => rows[0] ?? null)
+      .single()
 
-    if (duplicate) {
+    if (existing) {
       return { success: false, error: 'Lot already exists on another item', code: 'LOT_DUPLICATE' }
     }
   }
 
-  const [newLot] = await db
-    .insert(inventoryLots)
-    .values({
-      tenantId,
+  const { data: newLot, error } = await admin
+    .from('inventory_lots')
+    .insert({
+      tenant_id: tenantId,
       name,
       code: code || null,
       count,
       type: type || null,
       fiber: fiber || null,
       lot: lot || null,
-      defaultSupplierId: defaultSupplierId || null,
+      default_supplier_id: defaultSupplierId || null,
     })
-    .returning()
+    .select('id')
+    .single()
+
+  if (error || !newLot) {
+    return { success: false, error: 'Failed to create stock item', code: 'INTERNAL_ERROR' }
+  }
 
   await createAuditEntry({
     tenantId,

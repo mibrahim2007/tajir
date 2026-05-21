@@ -1,11 +1,9 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { db } from '@/db'
-import { inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
@@ -23,12 +21,26 @@ export async function deleteInventoryLotAction(input: unknown): Promise<ActionRe
 
   const { id } = parsed.data
 
-  const lot = await db.select().from(inventoryLots).where(and(eq(inventoryLots.id, id), eq(inventoryLots.tenantId, tenantId))).limit(1).then((r) => r[0] ?? null)
+  const admin = createAdminClient()
+
+  const { data: lot } = await admin
+    .from('inventory_lots')
+    .select('name, count, fiber, current_quantity')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
+
   if (!lot) return { success: false, error: 'Stock item not found', code: 'NOT_FOUND' }
 
-  await db.delete(inventoryLots).where(and(eq(inventoryLots.id, id), eq(inventoryLots.tenantId, tenantId)))
+  const { error } = await admin
+    .from('inventory_lots')
+    .delete()
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'inventory_lots', entityId: id, before: { name: lot.name, count: lot.count, fiber: lot.fiber, currentQuantity: lot.currentQuantity } })
+  if (error) return { success: false, error: 'Failed to delete stock item', code: 'INTERNAL_ERROR' }
+
+  await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'inventory_lots', entityId: id, before: { name: lot.name, count: lot.count, fiber: lot.fiber, currentQuantity: lot.current_quantity } })
 
   return { success: true, data: undefined }
 }

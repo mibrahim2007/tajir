@@ -1,8 +1,6 @@
-import { and, eq, asc } from 'drizzle-orm'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { db } from '@/db'
-import { tajirCustomers, salesOrders, arReceipts, inventoryLots } from '@/db/schema'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { RecordReceiptForm } from '@/app/(app)/customers/record-receipt-form'
 import { EditArReceiptForm } from '@/app/(app)/customers/edit-ar-receipt-form'
 import { ExportButton } from '@/components/export-button'
@@ -19,27 +17,34 @@ export default async function CustomerLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
 
-  const customer = await db
-    .select()
-    .from(tajirCustomers)
-    .where(and(eq(tajirCustomers.id, id), eq(tajirCustomers.tenantId, tenantId)))
-    .limit(1)
-    .then((rows) => rows[0] ?? null)
+  const admin = createAdminClient()
 
-  if (!customer) notFound()
+  const { data: customerRow } = await admin
+    .from('tajir_customers')
+    .select('id, name, opening_balance_pkr_equivalent, created_at')
+    .eq('id', id)
+    .eq('tenant_id', tenantId)
+    .single()
 
-  const [sales, receipts, lots] = await Promise.all([
-    db.select().from(salesOrders)
-      .where(and(eq(salesOrders.customerId, id), eq(salesOrders.tenantId, tenantId)))
-      .orderBy(asc(salesOrders.date)),
-    db.select().from(arReceipts)
-      .where(and(eq(arReceipts.customerId, id), eq(arReceipts.tenantId, tenantId)))
-      .orderBy(asc(arReceipts.date)),
-    db.select({ id: inventoryLots.id, name: inventoryLots.name }).from(inventoryLots)
-      .where(eq(inventoryLots.tenantId, tenantId)),
+  if (!customerRow) notFound()
+
+  const [{ data: rawSales }, { data: rawReceipts }, { data: rawLots }] = await Promise.all([
+    admin.from('sales_orders')
+      .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent')
+      .eq('customer_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
+    admin.from('ar_receipts')
+      .select('id, date, customer_id, amount, currency_code, pkr_equivalent, payment_method_note')
+      .eq('customer_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
-  const lotMap = new Map(lots.map((l) => [l.id, l.name]))
+  const sales = rawSales ?? []
+  const receipts = rawReceipts ?? []
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   type LedgerRow = {
     id: string
@@ -49,16 +54,16 @@ export default async function CustomerLedgerPage({ params }: Props) {
     debit: number
     credit: number
     balance: number
-    rawReceipt?: typeof receipts[0]
+    rawReceipt?: { id: string; amount: string; currencyCode: string; pkrEquivalent: string; date: string; paymentMethodNote: string | null }
   }
 
   const rows: LedgerRow[] = []
   let runningBalance = 0
 
-  const ob = parseFloat(customer.openingBalancePkrEquivalent)
+  const ob = parseFloat(customerRow.opening_balance_pkr_equivalent)
   if (ob !== 0) {
     runningBalance += ob
-    rows.push({ id: 'ob', kind: 'opening', date: customer.createdAt.toISOString().split('T')[0], description: 'Opening Balance', debit: ob, credit: 0, balance: runningBalance })
+    rows.push({ id: 'ob', kind: 'opening', date: customerRow.created_at.split('T')[0], description: 'Opening Balance', debit: ob, credit: 0, balance: runningBalance })
   }
 
   type RawEntry =
@@ -72,14 +77,30 @@ export default async function CustomerLedgerPage({ params }: Props) {
 
   for (const item of entries) {
     if (item.kind === 'sale') {
-      const amount = parseFloat(item.entry.pkrEquivalent)
+      const amount = parseFloat(item.entry.pkr_equivalent)
       runningBalance += amount
-      const itemName = lotMap.get(item.entry.stockItemId) ?? 'Unknown item'
-      rows.push({ id: item.entry.id, kind: 'sale', date: item.date, description: `Sale — ${itemName} (${item.entry.quantity} units @ ${item.entry.currencyCode} ${item.entry.rate})`, debit: amount, credit: 0, balance: runningBalance })
+      const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
+      rows.push({ id: item.entry.id, kind: 'sale', date: item.date, description: `Sale — ${itemName} (${item.entry.quantity} units @ ${item.entry.currency_code} ${item.entry.rate})`, debit: amount, credit: 0, balance: runningBalance })
     } else {
-      const amount = parseFloat(item.entry.pkrEquivalent)
+      const amount = parseFloat(item.entry.pkr_equivalent)
       runningBalance -= amount
-      rows.push({ id: item.entry.id, kind: 'receipt', date: item.date, description: `Receipt${item.entry.paymentMethodNote ? ` — ${item.entry.paymentMethodNote}` : ''}`, debit: 0, credit: amount, balance: runningBalance, rawReceipt: item.entry })
+      rows.push({
+        id: item.entry.id,
+        kind: 'receipt',
+        date: item.date,
+        description: `Receipt${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
+        debit: 0,
+        credit: amount,
+        balance: runningBalance,
+        rawReceipt: {
+          id: item.entry.id,
+          amount: item.entry.amount,
+          currencyCode: item.entry.currency_code,
+          pkrEquivalent: item.entry.pkr_equivalent,
+          date: item.entry.date,
+          paymentMethodNote: item.entry.payment_method_note,
+        },
+      })
     }
   }
 
@@ -87,7 +108,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-semibold">{customer.name}</h1>
+          <h1 className="text-2xl font-semibold">{customerRow.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Customer Ledger</p>
         </div>
         <div className="flex gap-2">
