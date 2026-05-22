@@ -34,6 +34,13 @@ export default async function DashboardPage() {
           <span className="font-semibold text-green-900">New Sale</span>
           <span className="text-sm text-green-600">Create a sale order</span>
         </a>
+        <a
+          href="/gatepasses/new"
+          className="flex flex-col rounded-xl border border-yellow-200 bg-yellow-50 p-4 hover:bg-yellow-100 transition-colors min-h-[44px]"
+        >
+          <span className="font-semibold text-yellow-900">New Gatepass</span>
+          <span className="text-sm text-yellow-600">Issue a gatepass</span>
+        </a>
         {role === 'owner' && (
           <a
             href="/reports"
