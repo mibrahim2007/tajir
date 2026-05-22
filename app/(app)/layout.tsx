@@ -14,6 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/suppliers', label: 'Suppliers' },
     { href: '/sales', label: 'Sales' },
     { href: '/customers', label: 'Customers' },
+    { href: '/gatepasses', label: 'Gatepasses' },
     { href: '/pricing', label: 'Pricing' },
     { href: '/reports', label: 'Reports' },
     { href: '/audit', label: 'Audit' },
@@ -25,6 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     { href: '/inventory', label: 'Inventory' },
     { href: '/purchases', label: 'Purchases' },
     { href: '/sales', label: 'Sales' },
+    { href: '/gatepasses', label: 'Gatepasses' },
   ]
 
   const navLinks = role === 'owner' ? ownerLinks : assistantLinks
