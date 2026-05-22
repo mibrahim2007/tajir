@@ -22,13 +22,11 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function RecordReceiptForm({ customerId }: { customerId: string }) {
+export function RecordReceiptForm({ customerId, today }: { customerId: string; today: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
-
-  const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,

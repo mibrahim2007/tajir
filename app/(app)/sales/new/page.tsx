@@ -24,11 +24,14 @@ export default async function NewSalePage() {
     rate: r.rate,
   }))
 
+  const today = new Date().toISOString().split('T')[0]
+
   return (
     <div className="p-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-semibold mb-1">New Sale</h1>
       <p className="text-sm text-muted-foreground mb-6">Record a sale to a customer.</p>
       <CreateSaleForm
+        today={today}
         customers={customers}
         stockItems={stockItems}
         pricingRules={pricingRules}

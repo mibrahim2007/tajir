@@ -35,11 +35,13 @@ type FormValues = z.infer<typeof schema>
 type OversellPending = { available: number; requested: number; values: FormValues }
 
 export function CreateSaleForm({
+  today,
   customers,
   stockItems,
   pricingRules,
   isOwner,
 }: {
+  today: string
   customers: Customer[]
   stockItems: StockItem[]
   pricingRules: PricingRule[]
@@ -56,8 +58,6 @@ export function CreateSaleForm({
     name: s.name,
     meta: `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
   }))
-
-  const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,

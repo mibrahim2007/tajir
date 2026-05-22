@@ -16,6 +16,7 @@ type Props = { params: Promise<{ id: string }> }
 export default async function CustomerLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
+  const today = new Date().toISOString().split('T')[0]
 
   const admin = createAdminClient()
 
@@ -113,7 +114,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
         </div>
         <div className="flex gap-2">
           <ExportButton href={`/api/export/customer-ledger/${id}`} label="Export" />
-          <RecordReceiptForm customerId={id} />
+          <RecordReceiptForm customerId={id} today={today} />
         </div>
       </div>
 

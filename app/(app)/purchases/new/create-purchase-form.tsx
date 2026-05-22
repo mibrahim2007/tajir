@@ -30,11 +30,12 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 type Props = {
+  today: string
   suppliers: { id: string; name: string }[]
   lots: { id: string; name: string; count: string }[]
 }
 
-export function CreatePurchaseForm({ suppliers, lots }: Props) {
+export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -46,8 +47,6 @@ export function CreatePurchaseForm({ suppliers, lots }: Props) {
     name: l.name,
     badge: l.count,
   }))
-
-  const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
