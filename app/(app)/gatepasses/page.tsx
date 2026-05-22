@@ -9,7 +9,7 @@ export default async function GatepassesPage() {
   const admin = createAdminClient()
 
   const [
-    { data: rawGatepasses },
+    { data: rawGatepasses, error: gpError },
     { data: rawPurchases },
     { data: rawSales },
     { data: rawSuppliers },
@@ -28,6 +28,8 @@ export default async function GatepassesPage() {
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
+  if (gpError) console.error('[gatepasses] query error:', gpError)
+  console.log('[gatepasses] tenantId:', tenantId, 'rows:', rawGatepasses?.length ?? 0, 'error:', gpError?.message)
   const gatepasses    = rawGatepasses ?? []
   const supplierMap   = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap   = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
