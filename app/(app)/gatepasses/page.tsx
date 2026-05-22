@@ -17,7 +17,7 @@ export default async function GatepassesPage() {
     { data: rawLots },
   ] = await Promise.all([
     admin.from('gatepasses')
-      .select('id, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
+      .select('id, gatepass_number, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(100),
@@ -57,6 +57,7 @@ export default async function GatepassesPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
+                  <th className="text-left px-4 py-3 font-medium">GP No.</th>
                   <th className="text-left px-4 py-3 font-medium">Gatepass Date</th>
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Party</th>
@@ -93,6 +94,7 @@ export default async function GatepassesPage() {
 
                   return (
                     <tr key={g.id} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs">{g.gatepass_number || '—'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(g.date))}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${

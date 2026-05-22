@@ -13,7 +13,7 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
 
   const { data: gatepass } = await admin
     .from('gatepasses')
-    .select('id, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
+    .select('id, gatepass_number, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -59,7 +59,7 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
     quantity   = String(rawSale.quantity)
   }
 
-  const gpNumber = gatepass.id.slice(0, 8).toUpperCase()
+  const gpNumber = gatepass.gatepass_number || gatepass.id.slice(0, 8).toUpperCase()
 
   return (
     <div className="min-h-screen bg-white">

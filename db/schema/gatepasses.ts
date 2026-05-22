@@ -6,6 +6,7 @@ import { salesOrders } from './sales'
 export const gatepasses = pgTable('gatepasses', {
   id:              uuid('id').primaryKey().defaultRandom(),
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  gateppassNumber: text('gatepass_number').notNull(),
   type:            text('type').notNull(), // 'purchase' | 'sale'
   purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id),
   salesOrderId:    uuid('sales_order_id').references(() => salesOrders.id),

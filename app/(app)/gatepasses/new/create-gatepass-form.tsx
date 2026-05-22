@@ -14,6 +14,7 @@ import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createGatepassAction } from '@/app/actions/create-gatepass'
 
 const schema = z.object({
+  gateppassNumber: z.string().min(1, 'Gatepass number is required'),
   type:            z.enum(['purchase', 'sale']),
   purchaseOrderId: z.string().optional(),
   salesOrderId:    z.string().optional(),
@@ -63,6 +64,7 @@ export function CreateGatepassForm({ purchaseOrders, salesOrders }: Props) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
+      gateppassNumber: '',
       type: 'purchase',
       purchaseOrderId: '',
       salesOrderId: '',
@@ -117,6 +119,15 @@ export function CreateGatepassForm({ purchaseOrders, salesOrders }: Props) {
       <CardContent className="pt-6">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+
+            {/* Gatepass Number */}
+            <FormField control={form.control} name="gateppassNumber" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Gatepass No. <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input placeholder="e.g. GP-001" className="min-h-[44px]" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
 
             {/* Type */}
             <FormField control={form.control} name="type" render={({ field }) => (

@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
+  gateppassNumber: z.string().min(1, 'Gatepass number is required'),
   type:            z.enum(['purchase', 'sale']),
   purchaseOrderId: z.string().uuid().optional(),
   salesOrderId:    z.string().uuid().optional(),
@@ -39,7 +40,7 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { type, purchaseOrderId, salesOrderId, date, vehicleNumber, driverName, remarks } = parsed.data
+  const { gateppassNumber, type, purchaseOrderId, salesOrderId, date, vehicleNumber, driverName, remarks } = parsed.data
   const admin = createAdminClient()
 
   let entryDate: string
@@ -74,6 +75,7 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
     .from('gatepasses')
     .insert({
       tenant_id:          tenantId,
+      gatepass_number:    gateppassNumber,
       type,
       purchase_order_id:  type === 'purchase' ? purchaseOrderId : null,
       sales_order_id:     type === 'sale' ? salesOrderId : null,
@@ -96,7 +98,7 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
     action: 'create',
     entity: 'gatepasses',
     entityId: gatepass.id,
-    after: { type, purchaseOrderId, salesOrderId, entryDate, date, vehicleNumber, driverName, remarks },
+    after: { gateppassNumber, type, purchaseOrderId, salesOrderId, entryDate, date, vehicleNumber, driverName, remarks },
   })
 
   return { success: true, data: gatepass }
