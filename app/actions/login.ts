@@ -43,7 +43,7 @@ export async function loginAction(formData: FormData) {
     redirect('/dashboard')
   }
 
-  // Fallback: treat username as email (for super admin accounts)
+  // Fallback: treat username as email (covers super admins and email-based tenant logins)
   const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
     email: username,
     password,
@@ -55,6 +55,10 @@ export async function loginAction(formData: FormData) {
 
   if (user.app_metadata?.is_super_admin) {
     redirect('/admin')
+  }
+
+  if (user.app_metadata?.tenant_id && user.app_metadata?.role) {
+    redirect('/dashboard')
   }
 
   return { success: false, error: 'Invalid username or password' }
