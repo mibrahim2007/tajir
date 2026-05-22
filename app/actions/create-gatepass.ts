@@ -10,8 +10,8 @@ import type { ActionResult } from '@/lib/types'
 const schema = z.object({
   gateppassNumber: z.string().min(1, 'Gatepass number is required'),
   type:            z.enum(['purchase', 'sale']),
-  purchaseOrderId: z.string().uuid().optional(),
-  salesOrderId:    z.string().uuid().optional(),
+  purchaseOrderId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
+  salesOrderId:    z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
   date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid gatepass date'),
   vehicleNumber:   z.string().min(1, 'Vehicle number is required'),
   driverName:      z.string().min(1, 'Driver name is required'),
