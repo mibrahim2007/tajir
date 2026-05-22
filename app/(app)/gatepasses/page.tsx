@@ -66,6 +66,7 @@ export default async function GatepassesPage() {
                   <th className="text-left px-4 py-3 font-medium">Vehicle</th>
                   <th className="text-left px-4 py-3 font-medium">Driver</th>
                   <th className="text-left px-4 py-3 font-medium">Remarks</th>
+                  <th className="px-4 py-3 w-20" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -109,6 +110,11 @@ export default async function GatepassesPage() {
                       <td className="px-4 py-3">{g.vehicle_number}</td>
                       <td className="px-4 py-3">{g.driver_name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{g.remarks ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        <Link href={`/gatepasses/${g.id}/print`}>
+                          <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
+                        </Link>
+                      </td>
                     </tr>
                   )
                 })}
