@@ -3,6 +3,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SubscriptionLockedBanner } from '@/components/subscription-locked-banner'
+import { LogoutButton } from '@/components/logout-button'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, role, tenantId } = await requireAuth()
@@ -51,6 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </Link>
               ))}
             </nav>
+            <LogoutButton />
           </div>
         </header>
         <main className="flex-1">{children}</main>
