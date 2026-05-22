@@ -50,16 +50,15 @@ export type SalesOrderOption = {
 }
 
 type Props = {
+  today: string
   purchaseOrders: PurchaseOrderOption[]
   salesOrders: SalesOrderOption[]
 }
 
-export function CreateGatepassForm({ purchaseOrders, salesOrders }: Props) {
+export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
-
-  const today = new Date().toISOString().split('T')[0]
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,

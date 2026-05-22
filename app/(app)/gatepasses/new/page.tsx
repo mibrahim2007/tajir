@@ -5,6 +5,7 @@ import { CreateGatepassForm } from './create-gatepass-form'
 export default async function NewGatepassPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
+  const today = new Date().toISOString().split('T')[0]
 
   const [
     { data: rawPurchases },
@@ -52,7 +53,7 @@ export default async function NewGatepassPage() {
     <div className="p-6 max-w-lg mx-auto">
       <h1 className="text-2xl font-semibold mb-1">New Gatepass</h1>
       <p className="text-sm text-muted-foreground mb-6">Issue a gatepass linked to a purchase or sale entry.</p>
-      <CreateGatepassForm purchaseOrders={purchaseOrders} salesOrders={salesOrders} />
+      <CreateGatepassForm today={today} purchaseOrders={purchaseOrders} salesOrders={salesOrders} />
     </div>
   )
 }
