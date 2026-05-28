@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { CurrencyInput } from '@/components/currency-input'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   amount: z.number().positive('Amount must be positive'),
@@ -27,6 +28,7 @@ export function RecordReceiptForm({ customerId, today }: { customerId: string; t
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -55,7 +57,7 @@ export function RecordReceiptForm({ customerId, today }: { customerId: string; t
           <SheetDescription>Record a payment received from this customer.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
             <CurrencyInput
               amountName="amount"
               currencyName="currencyCode"

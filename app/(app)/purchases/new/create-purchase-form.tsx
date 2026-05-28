@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { CurrencyInput } from '@/components/currency-input'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createPurchaseAction } from '@/app/actions/create-purchase'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   supplierId:   z.string().min(1, 'Supplier is required'),
@@ -39,6 +40,7 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   const supplierPickerItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
 
@@ -69,7 +71,7 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
     <Card>
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4">
 
             {/* Supplier — popup dialog picker */}
             <FormField control={form.control} name="supplierId" render={({ field }) => (

@@ -40,12 +40,14 @@ import {
 import { Input } from '@/components/ui/input'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 export function CreateLotForm() {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
   const [showDuplicateLotDialog, setShowDuplicateLotDialog] = useState(false)
   const [pendingValues, setPendingValues] = useState<CreateLotInput | null>(null)
 
@@ -109,7 +111,7 @@ export function CreateLotForm() {
           </SheetHeader>
 
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
               <FormField
                 control={form.control}
                 name="name"

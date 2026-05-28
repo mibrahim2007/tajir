@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createGatepassAction } from '@/app/actions/create-gatepass'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   gateppassNumber: z.string().min(1, 'Gatepass number is required'),
@@ -59,6 +60,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -117,7 +119,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
     <Card>
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4">
 
             {/* Gatepass Number */}
             <FormField control={form.control} name="gateppassNumber" render={({ field }) => (

@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { CurrencyInput } from '@/components/currency-input'
 import { createSaleReturnAction } from '@/app/actions/create-sale-return'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   saleOrderId:  z.string().optional(),
@@ -52,6 +53,7 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders }: Pro
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -94,7 +96,7 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders }: Pro
     <Card>
       <CardContent className="pt-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4">
 
             <FormItem>
               <FormLabel>Against Sale Order (optional)</FormLabel>

@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -38,6 +39,7 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier }: Pro
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -59,7 +61,7 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier }: Pro
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-5">
 
         {/* Supplier */}
         <div className="space-y-1">

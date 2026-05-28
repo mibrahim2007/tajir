@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { CurrencyInput } from '@/components/currency-input'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createSaleOrderAction } from '@/app/actions/create-sale-order'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 
 type Customer = { id: string; name: string }
@@ -51,6 +52,7 @@ export function CreateSaleForm({
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const [oversellPending, setOversellPending] = useState<OversellPending | null>(null)
+  const handleEnterToNext = useEnterToNextField()
   const customerPickerItems = customers.map((c) => ({ id: c.id, name: c.name }))
 
   const stockPickerItems = stockItems.map((s) => ({
@@ -115,7 +117,7 @@ export function CreateSaleForm({
       <Card>
         <CardContent className="pt-6">
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
+        <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4">
           <FormField control={form.control} name="customerId" render={({ field }) => (
             <FormItem>
               <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>

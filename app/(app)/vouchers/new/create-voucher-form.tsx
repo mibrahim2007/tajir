@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createJournalEntryAction } from '@/app/actions/create-journal-entry'
+import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const lineSchema = z.object({
   accountId:   z.string().min(1, 'Account required'),
@@ -44,6 +45,7 @@ export function CreateVoucherForm({ today, accounts }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const handleEnterToNext = useEnterToNextField()
 
   // Group accounts by type for the select
   const grouped = TYPE_ORDER.map((type) => ({
@@ -90,7 +92,7 @@ export function CreateVoucherForm({ today, accounts }: Props) {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-6">
 
         {/* Header */}
         <Card>
