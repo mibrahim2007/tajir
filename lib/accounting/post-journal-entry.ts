@@ -1,0 +1,82 @@
+import { createAdminClient } from '@/lib/supabase/admin'
+
+type JournalLine = {
+  accountSystemKey: string
+  description?: string
+  debit: number
+  credit: number
+  customerId?: string
+  supplierId?: string
+  stockItemId?: string
+}
+
+type PostJournalEntryParams = {
+  tenantId: string
+  date: string
+  description: string
+  reference?: string
+  sourceType: string
+  sourceId: string
+  prefix: string
+  lines: JournalLine[]
+}
+
+export async function postJournalEntry(params: PostJournalEntryParams): Promise<void> {
+  const { tenantId, date, description, reference, sourceType, sourceId, prefix, lines } = params
+  const admin = createAdminClient()
+
+  // Look up all account IDs by system_key in one query
+  const systemKeys = [...new Set(lines.map((l) => l.accountSystemKey))]
+  const { data: accounts } = await admin
+    .from('chart_of_accounts')
+    .select('id, system_key')
+    .eq('tenant_id', tenantId)
+    .in('system_key', systemKeys)
+
+  if (!accounts || accounts.length === 0) return // CoA not seeded yet — skip silently
+
+  const accountMap = new Map(accounts.map((a) => [a.system_key, a.id]))
+
+  // Verify all required accounts exist
+  const missingKeys = systemKeys.filter((k) => !accountMap.has(k))
+  if (missingKeys.length > 0) return // partial CoA — skip silently
+
+  // Get next voucher number atomically
+  const { data: voucherRow } = await admin
+    .rpc('get_next_voucher_number', { p_tenant_id: tenantId, p_prefix: prefix })
+
+  const voucherNumber = voucherRow as string | null
+  if (!voucherNumber) return
+
+  // Insert journal entry header
+  const { data: entry, error: entryError } = await admin
+    .from('tajir_journal_entries')
+    .insert({
+      tenant_id:      tenantId,
+      voucher_number: voucherNumber,
+      date,
+      description,
+      reference:      reference ?? null,
+      source_type:    sourceType,
+      source_id:      sourceId,
+    })
+    .select('id')
+    .single()
+
+  if (entryError || !entry) return
+
+  // Insert all lines
+  const lineRows = lines.map((l) => ({
+    journal_entry_id: entry.id,
+    tenant_id:        tenantId,
+    account_id:       accountMap.get(l.accountSystemKey)!,
+    description:      l.description ?? null,
+    debit:            String(l.debit),
+    credit:           String(l.credit),
+    customer_id:      l.customerId ?? null,
+    supplier_id:      l.supplierId ?? null,
+    stock_item_id:    l.stockItemId ?? null,
+  }))
+
+  await admin.from('tajir_journal_entry_lines').insert(lineRows)
+}

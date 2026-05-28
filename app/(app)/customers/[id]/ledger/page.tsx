@@ -29,7 +29,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
 
   if (!customerRow) notFound()
 
-  const [{ data: rawSales }, { data: rawReceipts }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawLots }] = await Promise.all([
     admin.from('sales_orders')
       .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent')
       .eq('customer_id', id)
@@ -40,16 +40,22 @@ export default async function CustomerLedgerPage({ params }: Props) {
       .eq('customer_id', id)
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
+    admin.from('sale_returns')
+      .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, reason')
+      .eq('customer_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const sales = rawSales ?? []
   const receipts = rawReceipts ?? []
+  const saleReturns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   type LedgerRow = {
     id: string
-    kind: 'opening' | 'sale' | 'receipt'
+    kind: 'opening' | 'sale' | 'receipt' | 'sale_return'
     date: string
     description: string
     debit: number
@@ -70,10 +76,12 @@ export default async function CustomerLedgerPage({ params }: Props) {
   type RawEntry =
     | { kind: 'sale'; date: string; entry: typeof sales[0] }
     | { kind: 'receipt'; date: string; entry: typeof receipts[0] }
+    | { kind: 'sale_return'; date: string; entry: typeof saleReturns[0] }
 
   const entries: RawEntry[] = [
     ...sales.map((e) => ({ kind: 'sale' as const, date: e.date, entry: e })),
     ...receipts.map((e) => ({ kind: 'receipt' as const, date: e.date, entry: e })),
+    ...saleReturns.map((e) => ({ kind: 'sale_return' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -82,6 +90,11 @@ export default async function CustomerLedgerPage({ params }: Props) {
       runningBalance += amount
       const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
       rows.push({ id: item.entry.id, kind: 'sale', date: item.date, description: `Sale — ${itemName} (${item.entry.quantity} units @ ${item.entry.currency_code} ${item.entry.rate})`, debit: amount, credit: 0, balance: runningBalance })
+    } else if (item.kind === 'sale_return') {
+      const amount = parseFloat(item.entry.pkr_equivalent)
+      runningBalance -= amount
+      const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
+      rows.push({ id: item.entry.id, kind: 'sale_return', date: item.date, description: `Sale Return — ${itemName} (${item.entry.quantity} units${item.entry.reason ? ` — ${item.entry.reason}` : ''})`, debit: 0, credit: amount, balance: runningBalance })
     } else {
       const amount = parseFloat(item.entry.pkr_equivalent)
       runningBalance -= amount
@@ -161,8 +174,15 @@ export default async function CustomerLedgerPage({ params }: Props) {
                               <EditArReceiptForm receipt={row.rawReceipt} />
                             )}
                             <DeleteButton
-                              description={row.kind === 'sale' ? 'Delete this sale? Stock will be restored.' : 'Delete this receipt?'}
-                              onDelete={row.kind === 'sale' ? deleteSaleAction.bind(null, { id: row.id }) : deleteArReceiptAction.bind(null, { id: row.id })}
+                              description={
+                                row.kind === 'sale' ? 'Delete this sale? Stock will be restored.'
+                                : row.kind === 'sale_return' ? 'Delete this sale return? Stock will be reversed.'
+                                : 'Delete this receipt?'
+                              }
+                              onDelete={
+                                row.kind === 'sale' ? deleteSaleAction.bind(null, { id: row.id })
+                                : deleteArReceiptAction.bind(null, { id: row.id })
+                              }
                             />
                           </div>
                         </RoleGate>

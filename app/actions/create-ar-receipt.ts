@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -51,6 +52,15 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   if (error || !receipt) {
     return { success: false, error: 'Failed to record receipt', code: 'INTERNAL_ERROR' }
   }
+
+  // Auto-post GL: DR Cash in Hand, CR Accounts Receivable
+  await postJournalEntry({
+    tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
+    lines: [
+      { accountSystemKey: 'cash_in_hand',        debit: pkrEquivalent, credit: 0 },
+      { accountSystemKey: 'accounts_receivable',  debit: 0, credit: pkrEquivalent, customerId },
+    ],
+  })
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'ar_receipts', entityId: receipt.id, after: { customerId, amount, currencyCode, pkrEquivalent, date } })
 

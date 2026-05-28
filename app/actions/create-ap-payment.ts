@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -54,12 +55,17 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Failed to record payment', code: 'INTERNAL_ERROR' }
   }
 
+  // Auto-post GL: DR Accounts Payable, CR Cash in Hand
+  await postJournalEntry({
+    tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',
+    lines: [
+      { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId },
+      { accountSystemKey: 'cash_in_hand',     debit: 0, credit: pkrEquivalent },
+    ],
+  })
+
   await createAuditEntry({
-    tenantId,
-    userId: user.id,
-    action: 'create',
-    entity: 'ap_payments',
-    entityId: payment.id,
+    tenantId, userId: user.id, action: 'create', entity: 'ap_payments', entityId: payment.id,
     after: { supplierId, amount, currencyCode, pkrEquivalent, date },
   })
 

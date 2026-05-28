@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -86,6 +87,17 @@ export async function createSaleOrderAction(input: unknown): Promise<
 
   // Decrement inventory quantity
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
+
+  // Auto-post GL: DR Accounts Receivable, CR Sales Revenue + DR COGS, CR Inventory
+  await postJournalEntry({
+    tenantId, date, description: 'Sale Invoice', sourceType: 'sale_order', sourceId: order.id, prefix: 'SI',
+    lines: [
+      { accountSystemKey: 'accounts_receivable', debit: pkrEquivalent, credit: 0, customerId },
+      { accountSystemKey: 'sales_revenue',       debit: 0, credit: pkrEquivalent, customerId },
+      { accountSystemKey: 'cogs',                debit: pkrEquivalent, credit: 0, stockItemId },
+      { accountSystemKey: 'inventory',           debit: 0, credit: pkrEquivalent, stockItemId },
+    ],
+  })
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'sales_orders', entityId: order.id, after: { customerId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date } })
 

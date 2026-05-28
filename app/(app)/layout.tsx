@@ -12,11 +12,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const ownerLinks = [
     { href: '/inventory', label: 'Inventory' },
     { href: '/purchases', label: 'Purchases' },
+    { href: '/purchase-returns', label: 'Purch. Returns' },
     { href: '/suppliers', label: 'Suppliers' },
     { href: '/sales', label: 'Sales' },
+    { href: '/sale-returns', label: 'Sale Returns' },
     { href: '/customers', label: 'Customers' },
     { href: '/gatepasses', label: 'Gatepasses' },
     { href: '/pricing', label: 'Pricing' },
+    { href: '/accounts', label: 'Accounts' },
+    { href: '/vouchers', label: 'Vouchers' },
     { href: '/reports', label: 'Reports' },
     { href: '/audit', label: 'Audit' },
     { href: '/settings/team', label: 'Team' },
@@ -26,7 +30,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const assistantLinks = [
     { href: '/inventory', label: 'Inventory' },
     { href: '/purchases', label: 'Purchases' },
+    { href: '/purchase-returns', label: 'Purch. Returns' },
     { href: '/sales', label: 'Sales' },
+    { href: '/sale-returns', label: 'Sale Returns' },
     { href: '/gatepasses', label: 'Gatepasses' },
   ]
 

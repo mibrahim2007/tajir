@@ -9,22 +9,23 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
-  supplierId:   z.string().uuid('Invalid supplier'),
+  saleOrderId:  z.string().uuid().optional(),
+  customerId:   z.string().uuid('Invalid customer'),
   stockItemId:  z.string().uuid('Invalid stock item'),
   quantity:     z.coerce.number().positive('Quantity must be positive'),
   rate:         z.coerce.number().positive('Rate must be positive'),
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  advancePaid:  z.coerce.number().min(0).default(0),
+  reason:       z.string().optional(),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
 )
 
-export type CreatePurchaseInput = z.infer<typeof schema>
+export type CreateSaleReturnInput = z.infer<typeof schema>
 
-export async function createPurchaseAction(input: unknown): Promise<ActionResult<{ id: string }>> {
+export async function createSaleReturnAction(input: unknown): Promise<ActionResult<{ id: string }>> {
   const parsed = schema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
@@ -37,53 +38,59 @@ export async function createPurchaseAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, advancePaid } = parsed.data
+  const { saleOrderId, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason } = parsed.data
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
   const admin = createAdminClient()
 
-  const { data: order, error: insertError } = await admin
-    .from('purchase_orders')
+  const { data: ret, error: insertError } = await admin
+    .from('sale_returns')
     .insert({
-      tenant_id: tenantId,
-      supplier_id: supplierId,
+      tenant_id:     tenantId,
+      sale_order_id: saleOrderId ?? null,
+      customer_id:   customerId,
       stock_item_id: stockItemId,
-      quantity: String(quantity),
-      rate: String(rate),
+      quantity:      String(quantity),
+      rate:          String(rate),
       currency_code: currencyCode,
       exchange_rate: String(exchangeRate),
       pkr_equivalent: String(pkrEquivalent),
-      advance_paid: String(advancePaid),
       date,
-      confirmed_at: new Date().toISOString(),
+      reason:        reason ?? null,
     })
     .select('id')
     .single()
 
-  if (insertError || !order) {
-    return { success: false, error: 'Failed to create purchase', code: 'INTERNAL_ERROR' }
+  if (insertError || !ret) {
+    return { success: false, error: 'Failed to create sale return', code: 'INTERNAL_ERROR' }
   }
 
-  // Increment inventory quantity
+  // Increment inventory (goods returned to stock)
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
 
-  // Auto-post GL: DR Inventory, CR Accounts Payable
+  // Auto-post GL:
+  //   DR Sales Returns & Allowances (contra-revenue), CR Accounts Receivable
+  //   DR Stock in Trade, CR Cost of Goods Sold
   await postJournalEntry({
-    tenantId, date, description: 'Purchase Invoice', sourceType: 'purchase_order', sourceId: order.id, prefix: 'PI',
+    tenantId,
+    date,
+    description:  `Sale Return${reason ? ` — ${reason}` : ''}`,
+    sourceType:   'sale_return',
+    sourceId:     ret.id,
+    prefix:       'SR',
     lines: [
-      { accountSystemKey: 'inventory',        debit: pkrEquivalent, credit: 0, stockItemId },
-      { accountSystemKey: 'accounts_payable', debit: 0, credit: pkrEquivalent, supplierId },
+      { accountSystemKey: 'sales_returns_contra',  debit: pkrEquivalent, credit: 0, customerId },
+      { accountSystemKey: 'accounts_receivable',   debit: 0, credit: pkrEquivalent, customerId },
+      { accountSystemKey: 'inventory',             debit: pkrEquivalent, credit: 0, stockItemId },
+      { accountSystemKey: 'cogs',                  debit: 0, credit: pkrEquivalent, stockItemId },
     ],
   })
 
   await createAuditEntry({
-    tenantId,
-    userId: user.id,
-    action: 'create',
-    entity: 'purchase_orders',
-    entityId: order.id,
-    after: { supplierId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date },
+    tenantId, userId: user.id, action: 'create',
+    entity: 'sale_returns', entityId: ret.id,
+    after: { customerId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date, reason },
   })
 
-  return { success: true, data: order }
+  return { success: true, data: ret }
 }

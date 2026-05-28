@@ -29,7 +29,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   if (!supplierRow) notFound()
 
-  const [{ data: rawPurchases }, { data: rawPayments }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawLots }] = await Promise.all([
     admin.from('purchase_orders')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid')
       .eq('supplier_id', id)
@@ -40,16 +40,22 @@ export default async function SupplierLedgerPage({ params }: Props) {
       .eq('supplier_id', id)
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
+    admin.from('purchase_returns')
+      .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, reason')
+      .eq('supplier_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const purchases = rawPurchases ?? []
   const payments = rawPayments ?? []
+  const purchaseReturns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   type LedgerRow = {
     id: string
-    kind: 'opening' | 'purchase' | 'payment'
+    kind: 'opening' | 'purchase' | 'payment' | 'purchase_return'
     date: string
     description: string
     debit: number
@@ -70,10 +76,12 @@ export default async function SupplierLedgerPage({ params }: Props) {
   type RawEntry =
     | { kind: 'purchase'; date: string; entry: typeof purchases[0] }
     | { kind: 'payment'; date: string; entry: typeof payments[0] }
+    | { kind: 'purchase_return'; date: string; entry: typeof purchaseReturns[0] }
 
   const entries: RawEntry[] = [
     ...purchases.map((e) => ({ kind: 'purchase' as const, date: e.date, entry: e })),
     ...payments.map((e) => ({ kind: 'payment' as const, date: e.date, entry: e })),
+    ...purchaseReturns.map((e) => ({ kind: 'purchase_return' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -82,6 +90,11 @@ export default async function SupplierLedgerPage({ params }: Props) {
       runningBalance += net
       const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
       rows.push({ id: item.entry.id, kind: 'purchase', date: item.date, description: `Purchase — ${itemName} (${item.entry.quantity} units @ ${item.entry.currency_code} ${item.entry.rate})`, debit: net, credit: 0, balance: runningBalance })
+    } else if (item.kind === 'purchase_return') {
+      const amount = parseFloat(item.entry.pkr_equivalent)
+      runningBalance -= amount
+      const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
+      rows.push({ id: item.entry.id, kind: 'purchase_return', date: item.date, description: `Purchase Return — ${itemName} (${item.entry.quantity} units${item.entry.reason ? ` — ${item.entry.reason}` : ''})`, debit: 0, credit: amount, balance: runningBalance })
     } else {
       const paid = parseFloat(item.entry.pkr_equivalent)
       runningBalance -= paid
