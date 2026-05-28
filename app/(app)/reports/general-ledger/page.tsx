@@ -16,6 +16,7 @@ const SOURCE_LABELS: Record<string, string> = {
   manual: 'Manual', sale_order: 'Sale', purchase_order: 'Purchase',
   ar_receipt: 'Receipt', ap_payment: 'Payment',
   sale_return: 'Sale Return', purchase_return: 'Purch. Return',
+  expense: 'Expense',
 }
 
 export default async function GeneralLedgerPage({ searchParams }: { searchParams: SearchParams }) {
