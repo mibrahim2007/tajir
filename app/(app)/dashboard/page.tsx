@@ -72,6 +72,13 @@ export default async function DashboardPage() {
               <span className="text-sm text-emerald-600">P&amp;L statement</span>
             </a>
             <a
+              href="/reports/balance-sheet"
+              className="flex flex-col rounded-xl border border-indigo-200 bg-indigo-50 p-4 hover:bg-indigo-100 transition-colors min-h-[44px]"
+            >
+              <span className="font-semibold text-indigo-900">Balance Sheet</span>
+              <span className="text-sm text-indigo-600">Assets &amp; liabilities</span>
+            </a>
+            <a
               href="/reports"
               className="flex flex-col rounded-xl border border-purple-200 bg-purple-50 p-4 hover:bg-purple-100 transition-colors min-h-[44px]"
             >
