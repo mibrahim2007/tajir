@@ -55,6 +55,20 @@ export default async function DashboardPage() {
           <span className="font-semibold text-pink-900">Sale Return</span>
           <span className="text-sm text-pink-600">Customer return</span>
         </a>
+        <a
+          href="/receipts/new"
+          className="flex flex-col rounded-xl border border-cyan-200 bg-cyan-50 p-4 hover:bg-cyan-100 transition-colors min-h-[44px]"
+        >
+          <span className="font-semibold text-cyan-900">New Receipt</span>
+          <span className="text-sm text-cyan-600">Customer payment</span>
+        </a>
+        <a
+          href="/payments/new"
+          className="flex flex-col rounded-xl border border-violet-200 bg-violet-50 p-4 hover:bg-violet-100 transition-colors min-h-[44px]"
+        >
+          <span className="font-semibold text-violet-900">New Payment</span>
+          <span className="text-sm text-violet-600">Supplier payment</span>
+        </a>
         {role === 'owner' && (
           <>
             <a
