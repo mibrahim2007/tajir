@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { BarChart3, Package, TrendingDown, TrendingUp, ArrowLeftRight } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 
 const reports = [
@@ -7,6 +7,8 @@ const reports = [
   { href: '/reports/stock-summary', label: 'Stock Summary', description: 'All stock items with current quantities. Filterable and exportable.', icon: Package },
   { href: '/reports/receivables-aging', label: 'Receivables Aging', description: 'Outstanding customer balances by 0–30, 31–60, 61–90, 90+ day buckets.', icon: TrendingUp },
   { href: '/reports/payables-aging', label: 'Payables Aging', description: 'Outstanding supplier balances by aging bucket.', icon: TrendingDown },
+  { href: '/reports/trial-balance', label: 'Trial Balance', description: 'All GL account balances as of a given date. Verifies that total debits equal total credits.', icon: Scale },
+  { href: '/reports/general-ledger', label: 'General Ledger', description: 'Full double-entry ledger with date range and account filters. Shows running balance per account.', icon: BookOpen },
 ]
 
 export default async function ReportsPage() {
