@@ -3,9 +3,8 @@ import { Plus } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
-import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
-import { deleteApPaymentAction } from '@/app/actions/delete-ap-payment'
+import { DeletePaymentButton } from './delete-payment-button'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -76,7 +75,7 @@ export default async function PaymentsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <RoleGate allowedRoles={['owner']}>
-                      <DeleteButton onDelete={() => deleteApPaymentAction({ id: p.id })} />
+                      <DeletePaymentButton id={p.id} />
                     </RoleGate>
                   </td>
                 </tr>
