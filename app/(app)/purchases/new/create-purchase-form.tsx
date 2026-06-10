@@ -147,7 +147,7 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
               <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending || suppliers.length === 0 || lots.length === 0}>
+              <Button type="submit" className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending || suppliers.length === 0 || lots.length === 0}>
                 {isPending ? 'Saving…' : 'Confirm Purchase'}
               </Button>
             </div>

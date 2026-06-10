@@ -201,7 +201,7 @@ export function CreateSaleForm({
             <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
               Cancel
             </Button>
-            <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending}>
+            <Button type="submit" className="flex-1 min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending}>
               {isPending ? 'Creating…' : 'Confirm Sale'}
             </Button>
           </div>
