@@ -42,10 +42,10 @@ export default async function OpeningBalancesPage() {
   }))
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-10">
+    <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold mb-1">Opening Balances</h1>
-        <p className="text-sm text-muted-foreground">Set quantities and outstanding balances to bring your current business state into Tajir. Changes are saved immediately and reflected across all reports.</p>
+        <h1 className="text-2xl font-semibold">Opening Balances</h1>
+        <p className="text-sm text-muted-foreground mt-1">Set quantities and outstanding balances to bring your current business state into Tajir. Changes are saved immediately and reflected across all reports.</p>
       </div>
 
       <section>

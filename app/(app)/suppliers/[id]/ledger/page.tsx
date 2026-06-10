@@ -131,9 +131,9 @@ export default async function SupplierLedgerPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="mb-6 text-right">
+      <div className="mb-6 flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
         <p className="text-sm text-muted-foreground">Outstanding Balance</p>
-        <p className={`text-2xl font-semibold tabular-nums ${runningBalance > 0 ? 'text-destructive' : ''}`}>
+        <p className={`text-xl font-semibold tabular-nums ${runningBalance > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
           {formatPKR(runningBalance)}
         </p>
       </div>

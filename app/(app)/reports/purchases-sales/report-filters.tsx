@@ -29,7 +29,7 @@ export function ReportFilters() {
         <label className="text-xs text-muted-foreground">From</label>
         <Input
           type="date"
-          className="h-9 w-36"
+          className="min-h-[44px] w-36"
           defaultValue={from}
           onBlur={(e) => apply({ from: e.target.value })}
         />
@@ -38,7 +38,7 @@ export function ReportFilters() {
         <label className="text-xs text-muted-foreground">To</label>
         <Input
           type="date"
-          className="h-9 w-36"
+          className="min-h-[44px] w-36"
           defaultValue={to}
           onBlur={(e) => apply({ to: e.target.value })}
         />
@@ -49,7 +49,7 @@ export function ReportFilters() {
             key={t}
             size="sm"
             variant={type === t ? 'default' : 'outline'}
-            className="capitalize min-h-[36px]"
+            className="capitalize min-h-[44px]"
             onClick={() => apply({ type: t })}
             disabled={isPending}
           >

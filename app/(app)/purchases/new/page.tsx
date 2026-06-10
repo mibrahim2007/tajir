@@ -17,8 +17,10 @@ export default async function NewPurchasePage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Purchase</h1>
-      <p className="text-sm text-muted-foreground mb-6">Record a purchase from a supplier.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Purchase</h1>
+        <p className="text-sm text-muted-foreground mt-1">Record a purchase from a supplier.</p>
+      </div>
       <CreatePurchaseForm today={today} suppliers={supplierList} lots={lotList} />
     </div>
   )

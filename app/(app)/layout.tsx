@@ -4,6 +4,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SubscriptionLockedBanner } from '@/components/subscription-locked-banner'
 import { LogoutButton } from '@/components/logout-button'
+import { AppNav } from '@/components/app-nav'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, role, tenantId } = await requireAuth()
@@ -45,23 +46,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AuthProvider value={{ userId: user.id, role, tenantId }}>
       <div className="min-h-screen flex flex-col">
         <SubscriptionLockedBanner status={tenant.subscriptionStatus} />
-        <header className="border-b bg-background sticky top-0 z-10">
+        <header className="sticky top-0 z-10 bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 shadow-md shadow-purple-500/20">
           <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-            <Link href="/dashboard" className="font-semibold text-lg shrink-0">
+            <Link href="/dashboard" className="font-bold text-lg shrink-0 text-white drop-shadow-sm tracking-tight">
               Tajir
             </Link>
-            <nav className="flex items-center gap-1 overflow-x-auto">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="text-sm px-3 py-2 rounded-md hover:bg-accent whitespace-nowrap min-h-[44px] flex items-center"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-            <LogoutButton />
+            <AppNav links={navLinks} />
+            <div className="shrink-0 [&_button]:text-white [&_button:hover]:bg-white/15 [&_button:hover]:text-white">
+              <LogoutButton />
+            </div>
           </div>
         </header>
         <main className="flex-1">{children}</main>

@@ -45,8 +45,10 @@ export default async function NewVoucherPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Journal Voucher</h1>
-      <p className="text-sm text-muted-foreground mb-6">Debits must equal credits. Minimum 2 lines.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Journal Voucher</h1>
+        <p className="text-sm text-muted-foreground mt-1">Debits must equal credits. Minimum 2 lines.</p>
+      </div>
       <CreateVoucherForm
         today={today}
         accounts={accounts}

@@ -21,7 +21,7 @@ export function TrialBalanceFilters({ asOf }: { asOf: string }) {
         <Input
           type="date"
           defaultValue={asOf}
-          className="min-h-[40px] w-40"
+          className="min-h-[44px] w-40"
           onChange={(e) => update('asOf', e.target.value)}
         />
       </div>

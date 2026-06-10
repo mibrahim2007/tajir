@@ -20,8 +20,10 @@ export default async function NewExpensePage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Expense</h1>
-      <p className="text-sm text-muted-foreground mb-6">Record a cash expense against an expense account.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Expense</h1>
+        <p className="text-sm text-muted-foreground mt-1">Record a cash expense against an expense account.</p>
+      </div>
       {accounts.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">
           <p className="text-muted-foreground text-sm">

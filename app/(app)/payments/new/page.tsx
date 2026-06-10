@@ -60,8 +60,10 @@ export default async function NewPaymentPage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Payment</h1>
-      <p className="text-sm text-muted-foreground mb-6">Record a payment made to a supplier.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Payment</h1>
+        <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
+      </div>
       <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} />
     </div>
   )

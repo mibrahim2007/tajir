@@ -51,8 +51,10 @@ export default async function NewGatepassPage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Gatepass</h1>
-      <p className="text-sm text-muted-foreground mb-6">Issue a gatepass linked to a purchase or sale entry.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Gatepass</h1>
+        <p className="text-sm text-muted-foreground mt-1">Issue a gatepass linked to a purchase or sale entry.</p>
+      </div>
       <CreateGatepassForm today={today} purchaseOrders={purchaseOrders} salesOrders={salesOrders} />
     </div>
   )

@@ -92,11 +92,13 @@ export default async function PayablesAgingPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-2xl font-semibold">Payables Aging</h1>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Payables Aging</h1>
+          <p className="text-sm text-muted-foreground mt-1">Outstanding amounts by supplier, aged from purchase date to today.</p>
+        </div>
         <ExportButton href="/api/export/payables-aging" />
       </div>
-      <p className="text-sm text-muted-foreground mb-6">Outstanding amounts by supplier, aged from purchase date to today.</p>
 
       {rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center">

@@ -40,21 +40,21 @@ export function GeneralLedgerFilters({ from, to, accountId, accounts }: Props) {
       <div>
         <Label className="text-xs mb-1 block">From</Label>
         <Input
-          type="date" defaultValue={from} className="min-h-[40px] w-36"
+          type="date" defaultValue={from} className="min-h-[44px] w-36"
           onChange={(e) => update('from', e.target.value)}
         />
       </div>
       <div>
         <Label className="text-xs mb-1 block">To</Label>
         <Input
-          type="date" defaultValue={to} className="min-h-[40px] w-36"
+          type="date" defaultValue={to} className="min-h-[44px] w-36"
           onChange={(e) => update('to', e.target.value)}
         />
       </div>
       <div>
         <Label className="text-xs mb-1 block">Account (optional)</Label>
         <Select value={accountId} onValueChange={(v) => update('accountId', v === 'all' ? '' : v)}>
-          <SelectTrigger className="min-h-[40px] w-64">
+          <SelectTrigger className="min-h-[44px] w-64">
             <SelectValue placeholder="All accounts" />
           </SelectTrigger>
           <SelectContent>

@@ -59,8 +59,10 @@ export default async function NewReceiptPage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">New Receipt</h1>
-      <p className="text-sm text-muted-foreground mb-6">Record a payment received from a customer.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">New Receipt</h1>
+        <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
+      </div>
       <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} />
     </div>
   )

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 
 const reports = [
@@ -11,6 +11,7 @@ const reports = [
   { href: '/reports/balance-sheet', label: 'Balance Sheet', description: 'Assets, liabilities, and equity as of a given date. Verifies the accounting equation.', icon: Landmark },
   { href: '/reports/trial-balance', label: 'Trial Balance', description: 'All GL account balances as of a given date. Verifies that total debits equal total credits.', icon: Scale },
   { href: '/reports/general-ledger', label: 'General Ledger', description: 'Full double-entry ledger with date range and account filters. Shows running balance per account.', icon: BookOpen },
+  { href: '/reports/cashbook', label: 'Daily Cashbook', description: 'Cash in, cash out, and running balance across cash & bank accounts for a single day, with opening and closing balances.', icon: Wallet },
 ]
 
 export default async function ReportsPage() {
@@ -18,8 +19,10 @@ export default async function ReportsPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">Reports</h1>
-      <p className="text-sm text-muted-foreground mb-6">Generate and export business reports.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Reports</h1>
+        <p className="text-sm text-muted-foreground mt-1">Generate and export business reports.</p>
+      </div>
 
       <div className="grid gap-4">
         {reports.map((r) => (

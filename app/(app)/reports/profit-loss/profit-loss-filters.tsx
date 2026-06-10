@@ -19,14 +19,14 @@ export function ProfitLossFilters({ from, to }: { from: string; to: string }) {
       <div>
         <Label className="text-xs mb-1 block">From</Label>
         <Input
-          type="date" defaultValue={from} className="min-h-[40px] w-36"
+          type="date" defaultValue={from} className="min-h-[44px] w-36"
           onChange={(e) => update('from', e.target.value)}
         />
       </div>
       <div>
         <Label className="text-xs mb-1 block">To</Label>
         <Input
-          type="date" defaultValue={to} className="min-h-[40px] w-36"
+          type="date" defaultValue={to} className="min-h-[44px] w-36"
           onChange={(e) => update('to', e.target.value)}
         />
       </div>

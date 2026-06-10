@@ -108,7 +108,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* ── Header ── */}
-      <div className="flex items-start justify-between mb-4 print:mb-2">
+      <div className="flex items-start justify-between mb-6 print:mb-2">
         <div>
           <h1 className="text-2xl font-semibold">Purchase &amp; Sales Report</h1>
           <p className="text-sm text-muted-foreground mt-1 print:block">{dateLabel}</p>
@@ -125,7 +125,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
       </Suspense>
 
       {/* ── Summary cards ── */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
         {type !== 'sales' && (
           <div className="rounded-lg border p-4">
             <p className="text-xs text-muted-foreground mb-1">Total Purchases</p>

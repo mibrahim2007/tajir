@@ -88,7 +88,7 @@ export default async function TrialBalancePage({ searchParams }: { searchParams:
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-start justify-between mb-4 print:mb-2">
+      <div className="flex items-start justify-between mb-6 print:mb-2">
         <div>
           <h1 className="text-2xl font-semibold">Trial Balance</h1>
           <p className="text-sm text-muted-foreground mt-1">

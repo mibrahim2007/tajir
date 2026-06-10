@@ -31,8 +31,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">Audit Trail</h1>
-      <p className="text-sm text-muted-foreground mb-6">Every change to your account, in reverse chronological order.</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Audit Trail</h1>
+        <p className="text-sm text-muted-foreground mt-1">Every change to your account, in reverse chronological order.</p>
+      </div>
 
       <div className="mb-4 flex gap-2 flex-wrap">
         <a href="/audit" className={`text-sm px-3 py-1.5 rounded-md border min-h-[44px] flex items-center ${!filterEntity ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'}`}>All</a>

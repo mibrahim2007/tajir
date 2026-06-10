@@ -36,8 +36,10 @@ export default async function TeamSettingsPage() {
 
   return (
     <div className="p-6 max-w-lg mx-auto">
-      <h1 className="text-2xl font-semibold mb-1">Team</h1>
-      <p className="text-sm text-muted-foreground mb-8">Manage your assistant&apos;s access</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold">Team</h1>
+        <p className="text-sm text-muted-foreground mt-1">Manage your assistant&apos;s access</p>
+      </div>
 
       {assistant ? (
         <AssistantManagement assistantEmail={assistantEmail} isActive={assistant.isActive} />
