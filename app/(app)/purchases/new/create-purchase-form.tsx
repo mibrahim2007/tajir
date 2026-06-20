@@ -26,6 +26,7 @@ const schema = z.object({
   advancePaid: z.number().min(0).default(0),
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
+  locationId: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -38,9 +39,10 @@ type Props = {
   today: string
   suppliers: { id: string; name: string }[]
   lots: { id: string; name: string; count: string }[]
+  locations: { id: string; name: string }[]
 }
 
-export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
+export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -52,7 +54,7 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       supplierId: '', date: today, advancePaid: 0,
-      currencyCode: 'PKR', exchangeRate: 1,
+      currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: 0, rate: 0 }],
     },
   })
@@ -80,6 +82,7 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
           exchangeRate: values.exchangeRate,
           date: values.date,
           advancePaid: i === 0 ? values.advancePaid : 0,
+          locationId: values.locationId || undefined,
         })
         if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
       }
@@ -131,6 +134,24 @@ export function CreatePurchaseForm({ today, suppliers, lots }: Props) {
                 <FormMessage />
               </FormItem>
             )} />
+
+            {locations.length > 0 && (
+              <FormField control={form.control} name="locationId" render={({ field }) => (
+                <FormItem className="sm:col-span-2">
+                  <FormLabel>Location</FormLabel>
+                  <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">No location</SelectItem>
+                      {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             <div className="sm:col-span-2 flex gap-2 items-end">
               <FormField control={form.control} name="currencyCode" render={({ field }) => (

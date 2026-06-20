@@ -6,10 +6,11 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const customers = rawCustomers ?? []
@@ -24,6 +25,7 @@ export default async function NewSalePage() {
     stockItemId: r.stock_item_id,
     rate: r.rate,
   }))
+  const locations = rawLocs ?? []
 
   const today = new Date().toISOString().split('T')[0]
 
@@ -39,6 +41,7 @@ export default async function NewSalePage() {
         stockItems={stockItems}
         pricingRules={pricingRules}
         isOwner={role === 'owner'}
+        locations={locations}
       />
     </div>
   )

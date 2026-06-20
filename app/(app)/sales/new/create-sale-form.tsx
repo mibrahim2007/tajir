@@ -31,18 +31,20 @@ const schema = z.object({
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
+  locationId: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'Add at least one item'),
 })
 
 type FormValues = z.infer<typeof schema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations }: {
   today: string
   customers: Customer[]
   stockItems: StockItem[]
   pricingRules: PricingRule[]
   isOwner: boolean
+  locations: { id: string; name: string }[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -68,6 +70,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
       paymentDueDate: '',
       currencyCode: 'PKR',
       exchangeRate: 1,
+      locationId: '',
       lines: [{ stockItemId: '', quantity: 0, rate: 0 }],
     },
   })
@@ -123,6 +126,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
           date: values.date,
           paymentDueDate: values.paymentDueDate || undefined,
           allowOversell,
+          locationId: values.locationId || undefined,
         })
 
         if (!result.success) {
@@ -196,6 +200,24 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                   <FormMessage />
                 </FormItem>
               )} />
+
+              {locations.length > 0 && (
+                <FormField control={form.control} name="locationId" render={({ field }) => (
+                  <FormItem className="sm:col-span-2">
+                    <FormLabel>Location</FormLabel>
+                    <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">No location</SelectItem>
+                        {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
 
               <div className="sm:col-span-2 flex gap-2 items-end">
                 <FormField control={form.control} name="currencyCode" render={({ field }) => (

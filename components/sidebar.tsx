@@ -27,6 +27,8 @@ import {
   Landmark,
   LogOut,
   X,
+  MapPin,
+  ArrowLeftRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -55,6 +57,8 @@ const ownerGroups: NavGroup[] = [
       { href: "/sales", label: "Sales", icon: ShoppingBag },
       { href: "/sale-returns", label: "Sale Returns", icon: RefreshCcw },
       { href: "/gatepasses", label: "Gatepasses", icon: ClipboardList },
+      { href: "/locations", label: "Locations", icon: MapPin },
+      { href: "/stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight },
     ],
   },
   {
@@ -101,6 +105,7 @@ const assistantGroups: NavGroup[] = [
       { href: "/sales", label: "Sales", icon: ShoppingBag },
       { href: "/sale-returns", label: "Sale Returns", icon: RefreshCcw },
       { href: "/gatepasses", label: "Gatepasses", icon: ClipboardList },
+      { href: "/stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight },
     ],
   },
 ];

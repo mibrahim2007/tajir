@@ -18,6 +18,7 @@ const schema = z.object({
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   allowOversell:  z.boolean().optional(),
+  locationId:     z.string().uuid().optional(),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
@@ -40,7 +41,7 @@ export async function createSaleOrderAction(input: unknown): Promise<
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, paymentDueDate, allowOversell } = parsed.data
+  const { customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, paymentDueDate, allowOversell, locationId } = parsed.data
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
   const admin = createAdminClient()
@@ -76,6 +77,7 @@ export async function createSaleOrderAction(input: unknown): Promise<
       pkr_equivalent: String(pkrEquivalent),
       date,
       payment_due_date: paymentDueDate ?? null,
+      location_id:     locationId ?? null,
       confirmed_at: new Date().toISOString(),
     })
     .select('id')

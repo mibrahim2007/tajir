@@ -7,7 +7,7 @@ export default async function NewSaleReturnPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawLots }, { data: rawOrders }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
     admin.from('sales_orders')
@@ -15,6 +15,7 @@ export default async function NewSaleReturnPage() {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const customerList = rawCustomers ?? []
@@ -28,6 +29,7 @@ export default async function NewSaleReturnPage() {
     rate: o.rate,
     currencyCode: o.currency_code,
   }))
+  const locations = rawLocs ?? []
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -40,6 +42,7 @@ export default async function NewSaleReturnPage() {
         customers={customerList}
         lots={lotList}
         saleOrders={saleOrderList}
+        locations={locations}
       />
     </div>
   )
