@@ -78,7 +78,8 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
     }))
   }, [watchedFrom, items, fromLocMap])
 
-  // When from-location changes, clear stockItemId if it's no longer available
+  // When from-location changes, clear stockItemId if no longer available there;
+  // also clear toLocationId if it matches the new from-location
   const handleFromChange = (v: string) => {
     form.setValue('fromLocationId', v)
     const currentItem = form.getValues('stockItemId')
@@ -87,6 +88,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
       locationStock.filter(ls => ls.locationId === v).forEach(ls => { newMap[ls.stockItemId] = ls.quantity })
       if ((newMap[currentItem] ?? 0) <= 0) form.setValue('stockItemId', '')
     }
+    if (form.getValues('toLocationId') === v) form.setValue('toLocationId', '')
   }
 
   const onSubmit = (values: FormValues) => {
@@ -137,7 +139,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
                     <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                    {locations.filter(l => l.id !== watchedFrom).map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <FormMessage />
