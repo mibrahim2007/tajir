@@ -1,10 +1,11 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 
 const reports = [
   { href: '/reports/purchases-sales', label: 'Purchase & Sales', description: 'Date-range report of all purchases and sales with totals and gross profit. Printable and exportable.', icon: ArrowLeftRight },
   { href: '/reports/stock-summary', label: 'Stock Summary', description: 'All stock items with current quantities. Filterable and exportable.', icon: Package },
+  { href: '/reports/location-stock', label: 'Location-wise Stock', description: 'Stock quantities per location, computed from purchases, sales, returns, and transfers. Filterable and printable.', icon: MapPin },
   { href: '/reports/receivables-aging', label: 'Receivables Aging', description: 'Outstanding customer balances by 0–30, 31–60, 61–90, 90+ day buckets.', icon: TrendingUp },
   { href: '/reports/payables-aging', label: 'Payables Aging', description: 'Outstanding supplier balances by aging bucket.', icon: TrendingDown },
   { href: '/reports/profit-loss', label: 'Profit & Loss', description: 'Revenue, cost of sales, operating expenses, and net profit for a date range.', icon: BarChart2 },

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useCallback } from 'react'
+import { useState, useTransition, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -18,6 +18,7 @@ import { createSaleOrderAction } from '@/app/actions/create-sale-order'
 type Customer = { id: string; name: string }
 type StockItem = { id: string; name: string; currentQuantity: string; barcode: string | null }
 type PricingRule = { customerId: string; stockItemId: string; rate: string }
+type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
@@ -25,7 +26,7 @@ const lineSchema = z.object({
   rate: z.number().positive('Enter rate'),
 })
 
-const schema = z.object({
+const baseSchema = z.object({
   customerId: z.string().uuid('Select a customer'),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
@@ -33,18 +34,22 @@ const schema = z.object({
   exchangeRate: z.number().positive().default(1),
   locationId: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'Add at least one item'),
-})
+}).refine(
+  (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
+  { message: 'Exchange Rate is required for USD', path: ['exchangeRate'] },
+)
 
-type FormValues = z.infer<typeof schema>
+type FormValues = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock }: {
   today: string
   customers: Customer[]
   stockItems: StockItem[]
   pricingRules: PricingRule[]
   isOwner: boolean
   locations: { id: string; name: string }[]
+  locationStock: LocationStock[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -55,15 +60,19 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const barcodeRef = useRef<HTMLInputElement>(null)
 
+  const requireLocation = locations.length > 0
+
+  const formSchema = useMemo(
+    () => requireLocation
+      ? baseSchema.refine(d => !!d.locationId, { message: 'Select a location', path: ['locationId'] })
+      : baseSchema,
+    [requireLocation],
+  )
+
   const customerPickerItems = customers.map((c) => ({ id: c.id, name: c.name }))
-  const stockPickerItems = stockItems.map((s) => ({
-    id: s.id,
-    name: s.name,
-    meta: `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
-  }))
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema) as Resolver<FormValues>,
+    resolver: zodResolver(formSchema) as Resolver<FormValues>,
     defaultValues: {
       customerId: '',
       date: today,
@@ -81,9 +90,33 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const watchedCurrency = form.watch('currencyCode')
   const watchedExchangeRate = form.watch('exchangeRate')
   const watchedLines = form.watch('lines')
+  const watchedLocation = form.watch('locationId')
 
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const totalPkr = watchedLines.reduce((sum, l) => sum + (l.quantity || 0) * (l.rate || 0) * er, 0)
+
+  // Build location → { stockItemId → qty } map
+  const locStockMap = useMemo<Record<string, number> | null>(() => {
+    if (!watchedLocation) return null
+    const map: Record<string, number> = {}
+    locationStock
+      .filter(ls => ls.locationId === watchedLocation)
+      .forEach(ls => { map[ls.stockItemId] = ls.quantity })
+    return map
+  }, [watchedLocation, locationStock])
+
+  // Stock picker items filtered to location stock when a location is selected
+  const stockPickerItems = useMemo(() => {
+    return stockItems
+      .filter(s => !locStockMap || (locStockMap[s.id] ?? 0) > 0)
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        meta: locStockMap
+          ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
+          : `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
+      }))
+  }, [stockItems, locStockMap])
 
   const getPricedRate = (customerId: string, stockItemId: string) => {
     const rule = pricingRules.find((r) => r.customerId === customerId && r.stockItemId === stockItemId)
@@ -204,16 +237,14 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
               {locations.length > 0 && (
                 <FormField control={form.control} name="locationId" render={({ field }) => (
                   <FormItem className="sm:col-span-2">
-                    <FormLabel>Location</FormLabel>
-                    <Select
-                      value={field.value || '_none_'}
-                      onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
-                    >
+                    <FormLabel>Location <span className="text-destructive">*</span></FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
                       <FormControl>
-                        <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
+                        <SelectTrigger className="min-h-[44px]">
+                          <SelectValue placeholder="Select location…" />
+                        </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="_none_">No location</SelectItem>
                         {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -281,6 +312,9 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
               {barcodeError && <p className="text-xs text-destructive mt-1">{barcodeError}</p>}
             </CardHeader>
             <CardContent className="px-5 pb-5">
+              {requireLocation && !watchedLocation && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">Select a location above to see available stock.</p>
+              )}
               <div className="rounded-lg border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
@@ -299,7 +333,9 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                         const line = watchedLines[index] ?? {}
                         const lineAmount = (line.quantity || 0) * (line.rate || 0) * er
                         const item = stockItems.find((s) => s.id === line.stockItemId)
-                        const avail = item ? parseFloat(item.currentQuantity) : null
+                        const avail = item
+                          ? (locStockMap ? (locStockMap[item.id] ?? 0) : parseFloat(item.currentQuantity))
+                          : null
 
                         return (
                           <tr key={field.id} className="align-top">
@@ -323,7 +359,9 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                                     />
                                     {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
                                     {avail !== null && (
-                                      <p className="text-xs text-muted-foreground mt-0.5">Avail: {avail.toLocaleString()}</p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">
+                                        Avail{locStockMap ? ' at location' : ''}: {avail.toLocaleString()}
+                                      </p>
                                     )}
                                   </div>
                                 )}
