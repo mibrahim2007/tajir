@@ -1,7 +1,6 @@
 'use server'
 
 import { z } from 'zod'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
@@ -28,24 +27,29 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
 
   const { businessName, username, email, password } = parsed.data
 
-  const supabase = await createClient()
-  const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
-
-  if (signUpError) {
-    return { success: false, error: signUpError.message, code: 'SIGNUP_ERROR' }
-  }
-
-  if (!signUpData.user) {
-    // Supabase returns null user (no error) when the email already exists but is unconfirmed.
-    return {
-      success: false,
-      error: 'An account with this email already exists. Please check your inbox for a confirmation link or try signing in.',
-      code: 'EMAIL_EXISTS',
-    }
-  }
-
-  const authUserId = signUpData.user.id
   const admin = createAdminClient()
+
+  // Use admin createUser instead of signUp to avoid sending confirmation emails
+  // (which hit Supabase's email rate limit). Users are auto-confirmed on creation.
+  const { data: authData, error: authError } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  })
+
+  if (authError) {
+    const msg = authError.message?.toLowerCase() ?? ''
+    if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
+      return { success: false, error: 'An account with this email already exists. Please sign in.', code: 'EMAIL_EXISTS' }
+    }
+    return { success: false, error: authError.message, code: 'SIGNUP_ERROR' }
+  }
+
+  if (!authData.user) {
+    return { success: false, error: 'Registration failed. Please try again.', code: 'SIGNUP_ERROR' }
+  }
+
+  const authUserId = authData.user.id
 
   let tenantId: string | null = null
   let tenantUserId: string | null = null
