@@ -13,39 +13,41 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
   const params = await searchParams
 
   const filterCount = typeof params.count === 'string' ? params.count : undefined
-  const filterType = typeof params.type === 'string' ? params.type : undefined
+  const filterType  = typeof params.type  === 'string' ? params.type  : undefined
   const filterFiber = typeof params.fiber === 'string' ? params.fiber : undefined
-  const filterLot = typeof params.lot === 'string' ? params.lot : undefined
-  const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
+  const filterLot   = typeof params.lot   === 'string' ? params.lot   : undefined
+  const page        = typeof params.page  === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
   const admin = createAdminClient()
 
   let query = admin
     .from('inventory_lots')
-    .select('id, name, code, count, type, fiber, lot, current_quantity, default_supplier_id', { count: 'exact' })
+    .select('id, name, code, count, type, fiber, lot, current_quantity, default_supplier_id, item_type_id, item_types(name)', { count: 'exact' })
     .eq('tenant_id', tenantId)
 
   if (filterCount) query = query.ilike('count', `%${filterCount}%`)
-  if (filterType) query = query.eq('type', filterType)
+  if (filterType)  query = query.eq('item_type_id', filterType)
   if (filterFiber) query = query.ilike('fiber', `%${filterFiber}%`)
-  if (filterLot) query = query.ilike('lot', `%${filterLot}%`)
+  if (filterLot)   query = query.ilike('lot',   `%${filterLot}%`)
 
-  const [{ data: rawLots, count: total }, { data: rawSuppliers }] = await Promise.all([
+  const [{ data: rawLots, count: total }, { data: rawSuppliers }, { data: itemTypes }] = await Promise.all([
     query.order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
+    admin.from('item_types').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const lots = rawLots ?? []
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
+  const safeItemTypes = itemTypes ?? []
   const totalCount = total ?? 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
 
   const exportParams = new URLSearchParams()
   if (filterCount) exportParams.set('count', filterCount)
-  if (filterType) exportParams.set('type', filterType)
+  if (filterType)  exportParams.set('type', filterType)
   if (filterFiber) exportParams.set('fiber', filterFiber)
-  if (filterLot) exportParams.set('lot', filterLot)
+  if (filterLot)   exportParams.set('lot', filterLot)
   const exportHref = `/api/export/stock-summary${exportParams.size > 0 ? `?${exportParams}` : ''}`
 
   return (
@@ -61,7 +63,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
       </div>
 
       <Suspense>
-        <InventoryFilters />
+        <InventoryFilters itemTypes={safeItemTypes} />
       </Suspense>
 
       {lots.length === 0 ? (
@@ -88,18 +90,23 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {lots.map((lot) => (
-                    <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-4 py-3 font-medium">{lot.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.count}</td>
-                      <td className="px-4 py-3">{lot.type ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.lot ?? '—'}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '—') : '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{parseFloat(lot.current_quantity).toLocaleString()}</td>
-                    </tr>
-                  ))}
+                  {lots.map((lot) => {
+                    const typeName = Array.isArray(lot.item_types)
+                      ? (lot.item_types[0] as { name: string } | undefined)?.name
+                      : (lot.item_types as { name: string } | null)?.name
+                    return (
+                      <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3 font-medium">{lot.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.count}</td>
+                        <td className="px-4 py-3">{typeName ?? lot.type ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.lot ?? '—'}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '—') : '—'}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{parseFloat(String(lot.current_quantity)).toLocaleString()}</td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

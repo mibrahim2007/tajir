@@ -12,7 +12,9 @@ import {
 } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
 
-export function InventoryFilters() {
+type ItemType = { id: string; name: string }
+
+export function InventoryFilters({ itemTypes }: { itemTypes: ItemType[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -25,7 +27,7 @@ export function InventoryFilters() {
       } else {
         params.delete(key)
       }
-      params.delete('page') // reset pagination on filter change
+      params.delete('page')
       router.push(`${pathname}?${params.toString()}`)
     },
     [router, pathname, searchParams],
@@ -46,19 +48,22 @@ export function InventoryFilters() {
         onChange={(e) => updateParam('count', e.target.value)}
       />
 
-      <Select
-        value={searchParams.get('type') ?? 'all'}
-        onValueChange={(v) => updateParam('type', v === 'all' ? '' : v)}
-      >
-        <SelectTrigger className="w-36 min-h-[44px]">
-          <SelectValue placeholder="Type" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All types</SelectItem>
-          <SelectItem value="Combed">Combed</SelectItem>
-          <SelectItem value="Carded">Carded</SelectItem>
-        </SelectContent>
-      </Select>
+      {itemTypes.length > 0 && (
+        <Select
+          value={searchParams.get('type') ?? 'all'}
+          onValueChange={(v) => updateParam('type', v === 'all' ? '' : v)}
+        >
+          <SelectTrigger className="w-40 min-h-[44px]">
+            <SelectValue placeholder="Item Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All types</SelectItem>
+            {itemTypes.map((t) => (
+              <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
       <Input
         placeholder="Fiber"

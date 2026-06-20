@@ -2,12 +2,14 @@
 
 import dynamic from 'next/dynamic'
 
+type ItemType = { id: string; name: string }
+
 type Lot = {
   id: string
   name: string
   code: string | null
   count: string
-  type: string | null
+  itemTypeId: string | null
   fiber: string | null
   lot: string | null
 }
@@ -22,10 +24,10 @@ const EditInventoryLotFormDynamic = dynamic(
   { ssr: false, loading: () => null }
 )
 
-export function CreateLotFormWrapper() {
-  return <CreateLotFormDynamic />
+export function CreateLotFormWrapper({ itemTypes }: { itemTypes: ItemType[] }) {
+  return <CreateLotFormDynamic itemTypes={itemTypes} />
 }
 
-export function EditInventoryLotFormWrapper({ lot }: { lot: Lot }) {
-  return <EditInventoryLotFormDynamic lot={lot} />
+export function EditInventoryLotFormWrapper({ lot, itemTypes }: { lot: Lot; itemTypes: ItemType[] }) {
+  return <EditInventoryLotFormDynamic lot={lot} itemTypes={itemTypes} />
 }

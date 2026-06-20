@@ -29,6 +29,7 @@ import {
   X,
   MapPin,
   ArrowLeftRight,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -83,6 +84,7 @@ const ownerGroups: NavGroup[] = [
   {
     title: "Settings",
     links: [
+      { href: "/item-types", label: "Item Types", icon: Layers },
       { href: "/settings/team", label: "Team", icon: UsersRound },
       { href: "/settings/opening-balances", label: "Opening Balances", icon: Wallet },
       { href: "/banks", label: "Banks", icon: Landmark },

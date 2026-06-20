@@ -14,27 +14,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
 
 const schema = z.object({
-  name:  z.string().min(1, 'Name is required'),
-  code:  z.string().optional(),
-  count: z.string().min(1, 'Count is required'),
-  type:  z.enum(['combed', 'carded']),
-  fiber: z.string().min(1, 'Fiber is required'),
-  lot:   z.string().optional(),
+  name:       z.string().min(1, 'Name is required'),
+  code:       z.string().optional(),
+  count:      z.string().min(1, 'Count is required'),
+  itemTypeId: z.string().uuid().optional(),
+  fiber:      z.string().optional(),
+  lot:        z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
+type ItemType = { id: string; name: string }
 
 type Lot = {
   id: string
   name: string
   code: string | null
   count: string
-  type: string | null
+  itemTypeId: string | null
   fiber: string | null
   lot: string | null
 }
 
-export function EditInventoryLotForm({ lot }: { lot: Lot }) {
+export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: ItemType[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -43,12 +44,12 @@ export function EditInventoryLotForm({ lot }: { lot: Lot }) {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      name:  lot.name,
-      code:  lot.code ?? '',
-      count: lot.count,
-      type:  (lot.type ?? 'combed') as 'combed' | 'carded',
-      fiber: lot.fiber ?? '',
-      lot:   lot.lot ?? '',
+      name:       lot.name,
+      code:       lot.code ?? '',
+      count:      lot.count,
+      itemTypeId: lot.itemTypeId ?? undefined,
+      fiber:      lot.fiber ?? '',
+      lot:        lot.lot ?? '',
     },
   })
 
@@ -92,24 +93,33 @@ export function EditInventoryLotForm({ lot }: { lot: Lot }) {
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="type" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="combed">Combed</SelectItem>
-                    <SelectItem value="carded">Carded</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+
+            {itemTypes.length > 0 && (
+              <FormField control={form.control} name="itemTypeId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Item Type</FormLabel>
+                  <Select
+                    value={field.value ?? '_none_'}
+                    onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select type…" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="_none_">No type</SelectItem>
+                      {itemTypes.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+
             <FormField control={form.control} name="fiber" render={({ field }) => (
               <FormItem>
-                <FormLabel>Fiber <span className="text-destructive">*</span></FormLabel>
+                <FormLabel>Fiber</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
                 <FormMessage />
               </FormItem>

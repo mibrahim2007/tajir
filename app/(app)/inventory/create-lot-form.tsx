@@ -42,7 +42,9 @@ import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
-export function CreateLotForm() {
+type ItemType = { id: string; name: string }
+
+export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -57,7 +59,7 @@ export function CreateLotForm() {
       name: '',
       code: '',
       count: '',
-      type: undefined,
+      itemTypeId: undefined,
       fiber: '',
       lot: '',
       defaultSupplierId: undefined,
@@ -154,27 +156,34 @@ export function CreateLotForm() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="type"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
-                      <FormControl>
-                        <SelectTrigger className="min-h-[44px]">
-                          <SelectValue placeholder="Select type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Combed">Combed</SelectItem>
-                        <SelectItem value="Carded">Carded</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {itemTypes.length > 0 && (
+                <FormField
+                  control={form.control}
+                  name="itemTypeId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Item Type</FormLabel>
+                      <Select
+                        value={field.value ?? '_none_'}
+                        onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="min-h-[44px]">
+                            <SelectValue placeholder="Select type…" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="_none_">No type</SelectItem>
+                          {itemTypes.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -218,7 +227,6 @@ export function CreateLotForm() {
         </SheetContent>
       </Sheet>
 
-      {/* Duplicate lot confirmation dialog */}
       <Dialog open={showDuplicateLotDialog} onOpenChange={setShowDuplicateLotDialog}>
         <DialogContent>
           <DialogHeader>

@@ -16,17 +16,17 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const { tenantId, role } = await requireAuth()
   const params = await searchParams
 
-  const filterCount = typeof params.count === 'string' ? params.count : undefined
-  const filterType = typeof params.type === 'string' ? params.type : undefined
-  const filterFiber = typeof params.fiber === 'string' ? params.fiber : undefined
-  const filterLot = typeof params.lot === 'string' ? params.lot : undefined
-  const page = typeof params.page === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
+  const filterCount    = typeof params.count === 'string' ? params.count    : undefined
+  const filterType     = typeof params.type  === 'string' ? params.type     : undefined
+  const filterFiber    = typeof params.fiber === 'string' ? params.fiber    : undefined
+  const filterLot      = typeof params.lot   === 'string' ? params.lot      : undefined
+  const page           = typeof params.page  === 'string' ? Math.max(1, parseInt(params.page, 10) || 1) : 1
 
   const admin = createAdminClient()
 
   let dataQuery = admin
     .from('inventory_lots')
-    .select('id, name, code, count, type, fiber, lot, current_quantity')
+    .select('id, name, code, count, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
     .eq('tenant_id', tenantId)
 
   let countQuery = admin
@@ -35,18 +35,20 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
     .eq('tenant_id', tenantId)
 
   if (filterCount) { dataQuery = dataQuery.ilike('count', `%${filterCount}%`); countQuery = countQuery.ilike('count', `%${filterCount}%`) }
-  if (filterType) { dataQuery = dataQuery.eq('type', filterType); countQuery = countQuery.eq('type', filterType) }
+  if (filterType)  { dataQuery = dataQuery.eq('item_type_id', filterType);      countQuery = countQuery.eq('item_type_id', filterType) }
   if (filterFiber) { dataQuery = dataQuery.ilike('fiber', `%${filterFiber}%`); countQuery = countQuery.ilike('fiber', `%${filterFiber}%`) }
-  if (filterLot) { dataQuery = dataQuery.ilike('lot', `%${filterLot}%`); countQuery = countQuery.ilike('lot', `%${filterLot}%`) }
+  if (filterLot)   { dataQuery = dataQuery.ilike('lot',   `%${filterLot}%`);   countQuery = countQuery.ilike('lot',   `%${filterLot}%`) }
 
-  const [{ data: lots }, { count: totalRaw }] = await Promise.all([
+  const [{ data: lots }, { count: totalRaw }, { data: itemTypes }] = await Promise.all([
     dataQuery.order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     countQuery,
+    admin.from('item_types').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const totalCount = totalRaw ?? 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
+  const safeItemTypes = itemTypes ?? []
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -58,11 +60,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             {hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
-        <CreateLotFormWrapper />
+        <CreateLotFormWrapper itemTypes={safeItemTypes} />
       </div>
 
       <Suspense>
-        <InventoryFilters />
+        <InventoryFilters itemTypes={safeItemTypes} />
       </Suspense>
 
       {!lots || lots.length === 0 ? (
@@ -91,28 +93,44 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {lots.map((lot) => (
-                    <tr key={lot.id} className="hover:bg-secondary/50 transition-colors">
-                      <td className="px-4 py-3 font-medium">{lot.name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.count}</td>
-                      <td className="px-4 py-3">{lot.type ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
-                      <td className="px-4 py-3">{lot.lot ?? '—'}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{lot.current_quantity}</td>
-                      <td className="px-4 py-3">
-                        <RoleGate allowedRoles={['owner']}>
-                          <div className="flex items-center gap-1">
-                            <EditInventoryLotFormWrapper lot={{ id: lot.id, name: lot.name, code: lot.code, count: String(lot.count ?? ''), type: lot.type, fiber: lot.fiber, lot: lot.lot }} />
-                            <DeleteButton
-                              description={`Delete stock item "${lot.name}"? This cannot be undone.`}
-                              onDelete={deleteInventoryLotAction.bind(null, { id: lot.id })}
-                            />
-                          </div>
-                        </RoleGate>
-                      </td>
-                    </tr>
-                  ))}
+                  {lots.map((lot) => {
+                    const typeName = Array.isArray(lot.item_types)
+                      ? (lot.item_types[0] as { name: string } | undefined)?.name
+                      : (lot.item_types as { name: string } | null)?.name
+                    return (
+                      <tr key={lot.id} className="hover:bg-secondary/50 transition-colors">
+                        <td className="px-4 py-3 font-medium">{lot.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.count}</td>
+                        <td className="px-4 py-3">{typeName ?? lot.type ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
+                        <td className="px-4 py-3">{lot.lot ?? '—'}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{lot.current_quantity}</td>
+                        <td className="px-4 py-3">
+                          <RoleGate allowedRoles={['owner']}>
+                            <div className="flex items-center gap-1">
+                              <EditInventoryLotFormWrapper
+                                lot={{
+                                  id: lot.id,
+                                  name: lot.name,
+                                  code: lot.code,
+                                  count: String(lot.count ?? ''),
+                                  itemTypeId: lot.item_type_id ?? null,
+                                  fiber: lot.fiber,
+                                  lot: lot.lot,
+                                }}
+                                itemTypes={safeItemTypes}
+                              />
+                              <DeleteButton
+                                description={`Delete stock item "${lot.name}"? This cannot be undone.`}
+                                onDelete={deleteInventoryLotAction.bind(null, { id: lot.id })}
+                              />
+                            </div>
+                          </RoleGate>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
