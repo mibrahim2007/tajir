@@ -1,0 +1,19 @@
+/* Canvas DS — Shadow tokens.
+   Two systems: neutral workspace elevation (warm-tinted soft greys),
+   and brand-tinted glow (teal at low opacity) for primary CTAs. */
+:root {
+  /* ---- Neutral workspace elevation ---- */
+  --shadow-xs:  0 1px 2px rgba(120,90,40,.04);
+  --shadow-sm:  0 1px 2px rgba(120,90,40,.04), 0 2px 6px rgba(120,90,40,.05);
+  --shadow:     0 2px 4px rgba(120,90,40,.05), 0 8px 20px rgba(120,90,40,.07);
+  --shadow-md:  0 4px 8px rgba(120,90,40,.06), 0 12px 28px rgba(120,90,40,.09);
+  --shadow-lg:  0 8px 16px rgba(120,90,40,.07), 0 20px 48px rgba(120,90,40,.11);
+  --shadow-xl:  0 12px 24px rgba(120,90,40,.08), 0 32px 64px rgba(120,90,40,.13);
+
+  /* ---- Brand glow (teal) — CTAs, focus rings ---- */
+  --shadow-brand:    0 4px 14px rgba(13,148,136,.25);
+  --shadow-brand-lg: 0 8px 30px rgba(13,148,136,.30);
+
+  /* ---- Input focus ---- */
+  --ring-offset: 0 0 0 3px rgba(13,148,136,.20);
+}

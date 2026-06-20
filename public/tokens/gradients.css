@@ -1,0 +1,35 @@
+/* Canvas DS — Gradient tokens.
+   Brand: teal-600 → teal-700 for headers and hero.
+   Domain: per-module diagonal accents for dashboard tiles.
+   Eyebrow bars: short vertical segments for section labels. */
+:root {
+  /* ---- Brand header/hero gradient ---- */
+  --gradient-brand: linear-gradient(
+    135deg,
+    #0d9488 0%,
+    #0f766e 60%,
+    #115e59 100%
+  );
+
+  /* ---- Domain tile gradients (dashboard quick-actions) ---- */
+  --gradient-sales:     linear-gradient(135deg, #10b981, #059669);   /* Sales       */
+  --gradient-purchase:  linear-gradient(135deg, #f97316, #ea580c);   /* Purchases   */
+  --gradient-inventory: linear-gradient(135deg, #0ea5e9, #0284c7);   /* Inventory   */
+  --gradient-receipt:   linear-gradient(135deg, #06b6d4, #0891b2);   /* Receipts    */
+  --gradient-payment:   linear-gradient(135deg, #8b5cf6, #7c3aed);   /* Payments    */
+  --gradient-expense:   linear-gradient(135deg, #f43f5e, #e11d48);   /* Expenses    */
+  --gradient-transfer:  linear-gradient(135deg, #14b8a6, #0d9488);   /* Transfers   */
+  --gradient-report:    linear-gradient(135deg, #ea8c2a, #b45309);   /* Reports     */
+  --gradient-analysis:  linear-gradient(135deg, #6366f1, #4f46e5);   /* Analysis    */
+  --gradient-ledger:    linear-gradient(135deg, #0d9488, #0f766e);   /* Ledger      */
+
+  /* ---- Section eyebrow bars ---- */
+  --gradient-bar-trading:  linear-gradient(180deg, #10b981, #059669);
+  --gradient-bar-finance:  linear-gradient(180deg, #8b5cf6, #7c3aed);
+  --gradient-bar-inventory:linear-gradient(180deg, #0ea5e9, #0284c7);
+  --gradient-bar-reports:  linear-gradient(180deg, #ea8c2a, #b45309);
+  --gradient-bar-brand:    linear-gradient(180deg, #0d9488, #115e59);
+
+  /* ---- Ambient page wash ---- */
+  --gradient-wash: linear-gradient(180deg, #d7f0ec 0%, #f0fdf9 40%, transparent 100%);
+}

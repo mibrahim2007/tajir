@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist } from 'next/font/google'
+import { Sora, Space_Grotesk } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { Analytics } from '@vercel/analytics/next'
 import './globals.css'
@@ -14,8 +14,14 @@ export const metadata: Metadata = {
   description: 'Inventory, purchases, and sales for yarn and grey fabric traders',
 }
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const sora = Sora({
+  variable: '--font-sans',
+  display: 'swap',
+  subsets: ['latin'],
+})
+
+const spaceGrotesk = Space_Grotesk({
+  variable: '--font-num',
   display: 'swap',
   subsets: ['latin'],
 })
@@ -27,8 +33,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.className} antialiased`} suppressHydrationWarning>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <body className={`${sora.variable} ${spaceGrotesk.variable} antialiased`} suppressHydrationWarning>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
           {children}
         </ThemeProvider>
         <Analytics />
