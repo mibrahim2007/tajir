@@ -31,28 +31,37 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
   const supabase = await createClient()
   const { data: signUpData, error: signUpError } = await supabase.auth.signUp({ email, password })
 
-  if (signUpError || !signUpData.user) {
+  if (signUpError) {
+    return { success: false, error: signUpError.message, code: 'SIGNUP_ERROR' }
+  }
+
+  if (!signUpData.user) {
+    // Supabase returns null user (no error) when the email already exists but is unconfirmed.
     return {
       success: false,
-      error: signUpError?.message ?? 'Registration failed',
-      code: 'SIGNUP_ERROR',
+      error: 'An account with this email already exists. Please check your inbox for a confirmation link or try signing in.',
+      code: 'EMAIL_EXISTS',
     }
   }
 
   const authUserId = signUpData.user.id
   const admin = createAdminClient()
 
+  let tenantId: string | null = null
+  let tenantUserId: string | null = null
+
   try {
-    // Insert tenant
     const { data: tenant, error: tenantError } = await admin
       .from('tenants')
       .insert({ name: businessName })
       .select('id')
       .single()
 
-    if (tenantError || !tenant) throw new Error('Failed to create tenant')
+    if (tenantError || !tenant) {
+      throw new Error(`Failed to create tenant: ${tenantError?.message ?? 'unknown'}`)
+    }
+    tenantId = tenant.id
 
-    // Insert tenant user
     const { data: tenantUser, error: userError } = await admin
       .from('tenant_users')
       .insert({ tenant_id: tenant.id, user_id: authUserId, username, role: 'owner' })
@@ -61,8 +70,13 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
 
     if (userError || !tenantUser) {
       await admin.from('tenants').delete().eq('id', tenant.id)
-      throw new Error('Failed to create tenant user')
+      // 23505 = unique_violation
+      if (userError?.code === '23505' && userError.message?.includes('username')) {
+        return { success: false, error: 'That username is already taken. Please choose a different one.', code: 'USERNAME_TAKEN' }
+      }
+      throw new Error(`Failed to create tenant user: ${userError?.message ?? 'unknown'}`)
     }
+    tenantUserId = tenantUser.id
 
     const { error: metaError } = await admin.auth.admin.updateUserById(authUserId, {
       app_metadata: { role: 'owner', tenant_id: tenant.id },
@@ -88,7 +102,11 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
     })
 
     return { success: true, data: { redirectTo: '/dashboard' } }
-  } catch {
+  } catch (err) {
+    // Best-effort cleanup of any partially-created records
+    if (tenantUserId) await admin.from('tenant_users').delete().eq('id', tenantUserId)
+    if (tenantId) await admin.from('tenants').delete().eq('id', tenantId)
+    console.error('[register] error:', err)
     return { success: false, error: 'Registration failed. Please try again.', code: 'INTERNAL_ERROR' }
   }
 }
