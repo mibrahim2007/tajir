@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createPurchaseAction } from '@/app/actions/create-purchase'
+import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
@@ -46,6 +47,7 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const uploaderRef = useRef<FileUploaderHandle>(null)
 
   const supplierPickerItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
   const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
@@ -71,6 +73,7 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
+      let firstEntryId: string | null = null
       for (let i = 0; i < values.lines.length; i++) {
         const line = values.lines[i]
         const result = await createPurchaseAction({
@@ -85,7 +88,9 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
           locationId: values.locationId || undefined,
         })
         if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
+        if (i === 0) firstEntryId = result.data.id
       }
+      if (firstEntryId) await uploaderRef.current?.uploadFiles(firstEntryId, 'purchase_order')
       router.push('/purchases')
     })
   }
@@ -280,6 +285,8 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
             </div>
           </CardContent>
         </Card>
+
+        <FileUploader ref={uploaderRef} />
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

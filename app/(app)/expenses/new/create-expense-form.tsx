@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createExpenseAction } from '@/app/actions/create-expense'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
 type Account = { id: string; code: string; name: string; account_type: string }
 type Bank = { id: string; name: string; account_number: string | null }
@@ -42,6 +43,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
@@ -60,6 +62,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
       setServerError(null)
       const result = await createExpenseAction({ ...values, bankId: values.bankId || undefined })
       if (!result.success) { setServerError(result.error); return }
+      await uploaderRef.current?.uploadFiles(result.data.id, 'expense')
       router.push('/expenses')
     })
   }
@@ -155,6 +158,8 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
           />
         </div>
       )}
+
+      <FileUploader ref={uploaderRef} />
 
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

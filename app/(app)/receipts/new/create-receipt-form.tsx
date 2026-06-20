@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, FormProvider, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CurrencyInput } from '@/components/currency-input'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -43,6 +44,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
@@ -59,6 +61,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
       setServerError(null)
       const result = await createArReceiptAction({ ...values, chequeNumber: values.chequeNumber || undefined, bankId: values.bankId || undefined })
       if (!result.success) { setServerError(result.error); return }
+      await uploaderRef.current?.uploadFiles(result.data.id, 'ar_receipt')
       router.push('/receipts')
     })
   }
@@ -172,6 +175,8 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
             />
           </div>
         )}
+
+        <FileUploader ref={uploaderRef} />
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

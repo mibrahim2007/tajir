@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createJournalEntryAction } from '@/app/actions/create-journal-entry'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
 const lineSchema = z.object({
   accountId:   z.string().min(1, 'Account required'),
@@ -48,6 +49,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
 
   // Group accounts by type for the select
@@ -91,6 +93,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
         })),
       })
       if (!result.success) { setServerError(result.error); return }
+      await uploaderRef.current?.uploadFiles(result.data.id, 'journal_entry')
       router.push(`/vouchers/${result.data.id}`)
     })
   }
@@ -259,6 +262,8 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
             </p>
           )}
         </div>
+
+        <FileUploader ref={uploaderRef} />
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

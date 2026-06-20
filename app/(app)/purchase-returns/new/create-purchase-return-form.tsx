@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createPurchaseReturnAction } from '@/app/actions/create-purchase-return'
+import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
@@ -50,6 +51,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const uploaderRef = useRef<FileUploaderHandle>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -90,6 +92,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
+      let firstEntryId: string | null = null
       for (let i = 0; i < values.lines.length; i++) {
         const line = values.lines[i]
         const result = await createPurchaseReturnAction({
@@ -105,7 +108,9 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
           locationId: values.locationId || undefined,
         })
         if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
+        if (i === 0) firstEntryId = result.data.id
       }
+      if (firstEntryId) await uploaderRef.current?.uploadFiles(firstEntryId, 'purchase_return')
       router.push('/purchase-returns')
     })
   }
@@ -310,6 +315,8 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
             </div>
           </CardContent>
         </Card>
+
+        <FileUploader ref={uploaderRef} />
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 
