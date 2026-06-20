@@ -205,12 +205,15 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                 <FormField control={form.control} name="locationId" render={({ field }) => (
                   <FormItem className="sm:col-span-2">
                     <FormLabel>Location</FormLabel>
-                    <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value || '_none_'}
+                      onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
+                    >
                       <FormControl>
                         <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">No location</SelectItem>
+                        <SelectItem value="_none_">No location</SelectItem>
                         {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
