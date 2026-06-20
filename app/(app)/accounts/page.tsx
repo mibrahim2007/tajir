@@ -46,7 +46,7 @@ export default async function AccountsPage() {
     return children.map((child) => (
       <div key={child.id}>
         <div
-          className={`flex items-center gap-3 py-2 px-4 border-b last:border-b-0 hover:bg-muted/20 transition-colors ${!child.is_active ? 'opacity-50' : ''}`}
+          className={`flex items-center gap-3 py-2 px-4 border-b last:border-b-0 hover:bg-secondary/50 transition-colors ${!child.is_active ? 'opacity-50' : ''}`}
           style={{ paddingLeft: `${(depth + 1) * 20}px` }}
         >
           <span className="font-mono text-xs text-muted-foreground w-16 shrink-0">{child.code}</span>
@@ -64,7 +64,7 @@ export default async function AccountsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Chart of Accounts</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Chart of Accounts</h1>
           <p className="text-sm text-muted-foreground mt-1">Pakistani standard CoA (ICAP/SECP) — {accounts.length} accounts</p>
         </div>
         {role === 'owner' && accounts.length === 0 && (
@@ -73,13 +73,13 @@ export default async function AccountsPage() {
       </div>
 
       {accounts.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm mb-4">No accounts yet. Click above to seed the standard Pakistani chart of accounts.</p>
         </div>
       ) : (
         <div className="space-y-4">
           {topLevel.map((section) => (
-            <div key={section.id} className="rounded-lg border overflow-hidden">
+            <div key={section.id} className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
               <div className={`flex items-center gap-3 px-4 py-3 border-b ${TYPE_COLORS[section.account_type] ?? ''}`}>
                 <span className="font-mono text-xs w-16 shrink-0 opacity-70">{section.code}</span>
                 <span className="font-bold text-sm uppercase tracking-wide">{section.name}</span>

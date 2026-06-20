@@ -7,7 +7,7 @@ export default async function NewPaymentPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
     admin.from('suppliers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -25,6 +25,7 @@ export default async function NewPaymentPage() {
     admin.from('inventory_lots')
       .select('id, name')
       .eq('tenant_id', tenantId),
+    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
 
   const suppliers = rawSuppliers ?? []
@@ -32,6 +33,7 @@ export default async function NewPaymentPage() {
   const payments = rawPayments ?? []
   const returns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const banks = rawBanks ?? []
 
   // Compute outstanding per supplier
   const supplierList = suppliers.map((s) => {
@@ -61,10 +63,10 @@ export default async function NewPaymentPage() {
   return (
     <div className="p-6 max-w-lg mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">New Payment</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">New Payment</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
       </div>
-      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} />
+      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} />
     </div>
   )
 }

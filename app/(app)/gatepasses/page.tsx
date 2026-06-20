@@ -41,7 +41,7 @@ export default async function GatepassesPage() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Gatepasses</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Gatepasses</h1>
           <p className="text-sm text-muted-foreground mt-1">{gatepasses.length} record{gatepasses.length !== 1 ? 's' : ''}</p>
         </div>
         <Link href="/gatepasses/new">
@@ -50,25 +50,25 @@ export default async function GatepassesPage() {
       </div>
 
       {gatepasses.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No gatepasses yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium">GP No.</th>
-                  <th className="text-left px-4 py-3 font-medium">Gatepass Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Type</th>
-                  <th className="text-left px-4 py-3 font-medium">Party</th>
-                  <th className="text-left px-4 py-3 font-medium">Item</th>
-                  <th className="text-right px-4 py-3 font-medium">Qty</th>
-                  <th className="text-left px-4 py-3 font-medium">Entry Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Vehicle</th>
-                  <th className="text-left px-4 py-3 font-medium">Driver</th>
-                  <th className="text-left px-4 py-3 font-medium">Remarks</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">GP No.</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Gatepass Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Party</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Entry Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vehicle</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Driver</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Remarks</th>
                   <th className="px-4 py-3 w-20" />
                 </tr>
               </thead>
@@ -95,7 +95,7 @@ export default async function GatepassesPage() {
                   }
 
                   return (
-                    <tr key={g.id} className="hover:bg-muted/30 transition-colors">
+                    <tr key={g.id} className="hover:bg-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-mono text-xs">{g.gatepass_number || '—'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(g.date))}</td>
                       <td className="px-4 py-3">

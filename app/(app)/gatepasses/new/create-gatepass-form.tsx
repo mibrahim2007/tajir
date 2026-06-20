@@ -2,53 +2,36 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { useForm, type Resolver } from 'react-hook-form'
+import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createGatepassAction } from '@/app/actions/create-gatepass'
-import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+
+const lineSchema = z.object({
+  orderId: z.string().min(1, 'Select an entry'),
+})
 
 const schema = z.object({
   gateppassNumber: z.string().min(1, 'Gatepass number is required'),
-  type:            z.enum(['purchase', 'sale']),
-  purchaseOrderId: z.string().optional(),
-  salesOrderId:    z.string().optional(),
-  date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  vehicleNumber:   z.string().min(1, 'Vehicle number is required'),
-  driverName:      z.string().min(1, 'Driver name is required'),
-  remarks:         z.string().optional(),
-}).superRefine((d, ctx) => {
-  if (d.type === 'purchase' && !d.purchaseOrderId) {
-    ctx.addIssue({ code: 'custom', path: ['purchaseOrderId'], message: 'Select a purchase entry' })
-  }
-  if (d.type === 'sale' && !d.salesOrderId) {
-    ctx.addIssue({ code: 'custom', path: ['salesOrderId'], message: 'Select a sale entry' })
-  }
+  type: z.enum(['purchase', 'sale']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  vehicleNumber: z.string().min(1, 'Vehicle number is required'),
+  driverName: z.string().min(1, 'Driver name is required'),
+  remarks: z.string().optional(),
+  lines: z.array(lineSchema).min(1, 'Add at least one entry'),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export type PurchaseOrderOption = {
-  id: string
-  supplierName: string
-  stockItemName: string
-  quantity: string
-  date: string
-}
-
-export type SalesOrderOption = {
-  id: string
-  customerName: string
-  stockItemName: string
-  quantity: string
-  date: string
-}
+export type PurchaseOrderOption = { id: string; supplierName: string; stockItemName: string; quantity: string; date: string }
+export type SalesOrderOption = { id: string; customerName: string; stockItemName: string; quantity: string; date: string }
 
 type Props = {
   today: string
@@ -60,30 +43,24 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
-  const handleEnterToNext = useEnterToNextField()
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       gateppassNumber: '',
       type: 'purchase',
-      purchaseOrderId: '',
-      salesOrderId: '',
       date: today,
       vehicleNumber: '',
       driverName: '',
       remarks: '',
+      lines: [{ orderId: '' }],
     },
   })
 
-  const watchType = form.watch('type')
-  const watchPurchaseOrderId = form.watch('purchaseOrderId')
-  const watchSalesOrderId = form.watch('salesOrderId')
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
 
-  const entryDate =
-    watchType === 'purchase'
-      ? purchaseOrders.find((o) => o.id === watchPurchaseOrderId)?.date
-      : salesOrders.find((o) => o.id === watchSalesOrderId)?.date
+  const watchType = form.watch('type')
+  const watchedLines = form.watch('lines')
 
   const purchasePickerItems = purchaseOrders.map((o) => ({
     id: o.id,
@@ -99,46 +76,73 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
     meta: `Qty: ${o.quantity}`,
   }))
 
+  const pickerItems = watchType === 'purchase' ? purchasePickerItems : salesPickerItems
+  const pickerTitle = watchType === 'purchase' ? 'Select Purchase Entry' : 'Select Sale Entry'
+  const pickerPlaceholder = watchType === 'purchase' ? 'Select purchase entry…' : 'Select sale entry…'
+  const ordersEmpty = watchType === 'purchase' ? purchaseOrders.length === 0 : salesOrders.length === 0
+
   const handleTypeChange = (value: string) => {
     form.setValue('type', value as 'purchase' | 'sale')
-    form.setValue('purchaseOrderId', '')
-    form.setValue('salesOrderId', '')
-    form.clearErrors(['purchaseOrderId', 'salesOrderId'])
+    form.setValue('lines', [{ orderId: '' }])
+  }
+
+  const getOrderLabel = (orderId: string) => {
+    if (watchType === 'purchase') {
+      const o = purchaseOrders.find((p) => p.id === orderId)
+      return o ? `${o.date} · ${o.supplierName} · ${o.stockItemName} (${o.quantity})` : orderId
+    }
+    const o = salesOrders.find((s) => s.id === orderId)
+    return o ? `${o.date} · ${o.customerName} · ${o.stockItemName} (${o.quantity})` : orderId
   }
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createGatepassAction(values)
-      if (!result.success) { setServerError(result.error); return }
+      for (let i = 0; i < values.lines.length; i++) {
+        const line = values.lines[i]
+        const result = await createGatepassAction({
+          gateppassNumber: values.lines.length > 1 ? `${values.gateppassNumber}/${i + 1}` : values.gateppassNumber,
+          type: values.type,
+          purchaseOrderId: values.type === 'purchase' ? line.orderId : undefined,
+          salesOrderId: values.type === 'sale' ? line.orderId : undefined,
+          date: values.date,
+          vehicleNumber: values.vehicleNumber,
+          driverName: values.driverName,
+          remarks: values.remarks || undefined,
+        })
+        if (!result.success) { setServerError(`Entry ${i + 1}: ${result.error}`); return }
+      }
       router.push('/gatepasses')
     })
   }
 
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
 
-            {/* Gatepass Number */}
+        {/* Header */}
+        <Card>
+          <CardHeader className="pb-4 pt-5 px-5">
+            <CardTitle className="text-base">Gatepass Details</CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
             <FormField control={form.control} name="gateppassNumber" render={({ field }) => (
               <FormItem>
                 <FormLabel>Gatepass No. <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input placeholder="e.g. GP-001" className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
+                {fields.length > 1 && (
+                  <p className="text-xs text-muted-foreground">Multiple entries will be numbered GP-001/1, GP-001/2…</p>
+                )}
               </FormItem>
             )} />
 
-            {/* Type */}
             <FormField control={form.control} name="type" render={({ field }) => (
               <FormItem>
                 <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={handleTypeChange}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[44px]">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="purchase">Purchase</SelectItem>
@@ -149,61 +153,6 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
               </FormItem>
             )} />
 
-            {/* Purchase order picker */}
-            {watchType === 'purchase' && (
-              <FormField control={form.control} name="purchaseOrderId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Purchase Entry <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <ItemPickerDialog
-                      items={purchasePickerItems}
-                      value={field.value ?? ''}
-                      onSelect={field.onChange}
-                      placeholder="Select purchase entry…"
-                      title="Select Purchase Entry"
-                      disabled={purchaseOrders.length === 0}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  {purchaseOrders.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No purchase entries found.</p>
-                  )}
-                </FormItem>
-              )} />
-            )}
-
-            {/* Sales order picker */}
-            {watchType === 'sale' && (
-              <FormField control={form.control} name="salesOrderId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Sale Entry <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <ItemPickerDialog
-                      items={salesPickerItems}
-                      value={field.value ?? ''}
-                      onSelect={field.onChange}
-                      placeholder="Select sale entry…"
-                      title="Select Sale Entry"
-                      disabled={salesOrders.length === 0}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                  {salesOrders.length === 0 && (
-                    <p className="text-xs text-muted-foreground">No sale entries found.</p>
-                  )}
-                </FormItem>
-              )} />
-            )}
-
-            {/* Entry date (auto-populated, display only) */}
-            {entryDate && (
-              <div className="rounded-md border bg-muted/50 px-3 py-2.5 text-sm">
-                <span className="text-muted-foreground">Entry Date: </span>
-                <span className="font-medium">{entryDate}</span>
-              </div>
-            )}
-
-            {/* Gatepass date */}
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem>
                 <FormLabel>Gatepass Date <span className="text-destructive">*</span></FormLabel>
@@ -212,7 +161,6 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
               </FormItem>
             )} />
 
-            {/* Vehicle Number */}
             <FormField control={form.control} name="vehicleNumber" render={({ field }) => (
               <FormItem>
                 <FormLabel>Vehicle Number <span className="text-destructive">*</span></FormLabel>
@@ -221,7 +169,6 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
               </FormItem>
             )} />
 
-            {/* Driver Name */}
             <FormField control={form.control} name="driverName" render={({ field }) => (
               <FormItem>
                 <FormLabel>Driver Name <span className="text-destructive">*</span></FormLabel>
@@ -230,7 +177,6 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
               </FormItem>
             )} />
 
-            {/* Remarks */}
             <FormField control={form.control} name="remarks" render={({ field }) => (
               <FormItem>
                 <FormLabel>Remarks</FormLabel>
@@ -238,20 +184,82 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                 <FormMessage />
               </FormItem>
             )} />
+          </CardContent>
+        </Card>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>
-                Cancel
-              </Button>
-              <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending}>
-                {isPending ? 'Saving…' : 'Issue Gatepass'}
-              </Button>
+        {/* Entries (lines) */}
+        <Card>
+          <CardHeader className="pb-2 pt-5 px-5">
+            <CardTitle className="text-base">
+              {watchType === 'purchase' ? 'Purchase' : 'Sale'} Entries
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-5 pb-5">
+            <div className="space-y-2">
+              {fields.map((field, index) => {
+                const orderId = watchedLines[index]?.orderId ?? ''
+                return (
+                  <div key={field.id} className="flex items-start gap-2">
+                    <span className="text-xs text-muted-foreground pt-3 w-5 shrink-0">{index + 1}</span>
+                    <div className="flex-1">
+                      <Controller
+                        control={form.control}
+                        name={`lines.${index}.orderId`}
+                        render={({ field: f, fieldState }) => (
+                          <div>
+                            <ItemPickerDialog
+                              items={pickerItems}
+                              value={f.value}
+                              onSelect={f.onChange}
+                              placeholder={pickerPlaceholder}
+                              title={pickerTitle}
+                              disabled={ordersEmpty}
+                            />
+                            {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
+                            {orderId && (
+                              <p className="text-xs text-muted-foreground mt-0.5">{getOrderLabel(orderId)}</p>
+                            )}
+                          </div>
+                        )}
+                      />
+                    </div>
+                    <Button
+                      type="button" variant="ghost" size="icon-sm"
+                      onClick={() => remove(index)} disabled={fields.length === 1}
+                      className="text-muted-foreground hover:text-destructive mt-1 shrink-0"
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                )
+              })}
             </div>
-          </form>
-        </Form>
-      </CardContent>
-    </Card>
+
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={() => append({ orderId: '' })}
+              className="mt-3 gap-1.5"
+              disabled={ordersEmpty}
+            >
+              <Plus className="size-4" /> Add Entry
+            </Button>
+            {ordersEmpty && (
+              <p className="text-xs text-muted-foreground mt-2">
+                No {watchType} entries found.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>Cancel</Button>
+          <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending}>
+            {isPending ? 'Saving…' : `Issue Gatepass${fields.length > 1 ? ` (${fields.length} entries)` : ''}`}
+          </Button>
+        </div>
+      </form>
+    </Form>
   )
 }

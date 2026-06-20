@@ -122,7 +122,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-semibold">{customerRow.name}</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">{customerRow.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Customer Ledger</p>
         </div>
         <div className="flex gap-2">
@@ -139,26 +139,26 @@ export default async function CustomerLedgerPage({ params }: Props) {
       </div>
 
       {rows.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No transactions yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Description</th>
-                  <th className="text-right px-4 py-3 font-medium">Debit (PKR)</th>
-                  <th className="text-right px-4 py-3 font-medium">Credit (PKR)</th>
-                  <th className="text-right px-4 py-3 font-medium">Balance (PKR)</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Debit (PKR)</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Credit (PKR)</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Balance (PKR)</th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={row.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(row.date))}</td>
                     <td className="px-4 py-3 text-muted-foreground">{row.description}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{row.debit > 0 ? formatPKR(row.debit) : '—'}</td>

@@ -48,7 +48,7 @@ export default async function VouchersPage() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Vouchers / Journal Entries</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Vouchers / Journal Entries</h1>
           <p className="text-sm text-muted-foreground mt-1">{entries.length} entries</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
@@ -59,26 +59,26 @@ export default async function VouchersPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No journal entries yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium">Voucher #</th>
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Type</th>
-                  <th className="text-left px-4 py-3 font-medium">Description</th>
-                  <th className="text-right px-4 py-3 font-medium">Amount (Dr)</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Voucher #</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (Dr)</th>
                   <th className="px-4 py-3 w-24" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {entries.map((e) => (
-                  <tr key={e.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={e.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs">
                       <Link href={`/vouchers/${e.id}`} className="hover:underline text-primary">
                         {e.voucher_number}

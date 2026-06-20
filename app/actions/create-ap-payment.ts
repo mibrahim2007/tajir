@@ -15,6 +15,8 @@ const schema = z.object({
   exchangeRate:      z.coerce.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
+  chequeNumber:      z.string().optional(),
+  bankId:            z.string().uuid().optional(),
 })
 
 export async function createApPaymentAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -33,7 +35,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, amount, currencyCode, exchangeRate, date, paymentMethodNote } = parsed.data
+  const { supplierId, amount, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId } = parsed.data
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
   const admin = createAdminClient()
@@ -46,6 +48,8 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
       currency_code: currencyCode,
       pkr_equivalent: String(pkrEquivalent),
       payment_method_note: paymentMethodNote || null,
+      cheque_number: chequeNumber || null,
+      bank_id: bankId ?? null,
       date,
     })
     .select('id')

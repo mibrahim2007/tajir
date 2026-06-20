@@ -30,7 +30,7 @@ export default async function SaleReturnsPage() {
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Sale Returns</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Sale Returns</h1>
           <p className="text-sm text-muted-foreground mt-1">{returns.length} record{returns.length !== 1 ? 's' : ''}</p>
         </div>
         <Link href="/sale-returns/new">
@@ -39,28 +39,28 @@ export default async function SaleReturnsPage() {
       </div>
 
       {returns.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No sale returns yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium">Date</th>
-                  <th className="text-left px-4 py-3 font-medium">Customer</th>
-                  <th className="text-left px-4 py-3 font-medium">Item</th>
-                  <th className="text-right px-4 py-3 font-medium">Qty</th>
-                  <th className="text-right px-4 py-3 font-medium">Rate</th>
-                  <th className="text-right px-4 py-3 font-medium">PKR Total</th>
-                  <th className="text-left px-4 py-3 font-medium">Reason</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {returns.map((r) => (
-                  <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={r.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
                     <td className="px-4 py-3">{customerMap.get(r.customer_id) ?? '—'}</td>
                     <td className="px-4 py-3">{lotMap.get(r.stock_item_id) ?? '—'}</td>

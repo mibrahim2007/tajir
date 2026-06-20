@@ -30,9 +30,9 @@ export default async function NewSaleReturnPage() {
   }))
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">New Sale Return</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">New Sale Return</h1>
         <p className="text-sm text-muted-foreground mt-1">Record goods returned by a customer. Stock will be incremented.</p>
       </div>
       <CreateSaleReturnForm

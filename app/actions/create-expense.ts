@@ -13,6 +13,7 @@ const schema = z.object({
   date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   description:      z.string().min(1, 'Description is required'),
   note:             z.string().optional(),
+  bankId:           z.string().uuid().optional(),
 })
 
 export async function createExpenseAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -25,7 +26,7 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { expenseAccountId, amount, date, description, note } = parsed.data
+  const { expenseAccountId, amount, date, description, note, bankId } = parsed.data
   const admin = createAdminClient()
 
   // Verify expense account belongs to this tenant
@@ -66,6 +67,7 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
       voucher_number: voucherNumber as string,
       date,
       description:    narration,
+      bank_id:        bankId ?? null,
       source_type:    'expense',
       source_id:      crypto.randomUUID(),
     })

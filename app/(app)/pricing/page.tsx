@@ -33,31 +33,31 @@ export default async function PricingPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Customer Pricing</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Customer Pricing</h1>
           <p className="text-sm text-muted-foreground mt-1">{activeRules.length} active rule{activeRules.length !== 1 ? 's' : ''}</p>
         </div>
         {role === 'owner' && <SetPriceForm customers={customers} stockItems={stockItems} />}
       </div>
 
       {activeRules.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No custom pricing rules yet. Default rates from sales orders will be used.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">Customer</th>
-                <th className="text-left px-4 py-3 font-medium">Stock Item</th>
-                <th className="text-right px-4 py-3 font-medium">Rate (PKR)</th>
-                <th className="text-right px-4 py-3 font-medium">Since</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Stock Item</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate (PKR)</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Since</th>
                 <th className="px-4 py-3 w-24" />
               </tr>
             </thead>
             <tbody className="divide-y">
               {activeRules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-muted/30 transition-colors">
+                <tr key={rule.id} className="hover:bg-secondary/50 transition-colors">
                   <td className="px-4 py-3 font-medium">{customerMap.get(rule.customer_id) ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{itemMap.get(rule.stock_item_id) ?? '—'}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(rule.rate))}</td>

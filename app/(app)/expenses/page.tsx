@@ -50,7 +50,7 @@ export default async function ExpensesPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Expenses</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Expenses</h1>
           <p className="text-sm text-muted-foreground mt-1">{entries.length} expense{entries.length !== 1 ? 's' : ''}</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
@@ -61,19 +61,19 @@ export default async function ExpensesPage() {
       </div>
 
       {entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No expenses recorded yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium w-28">Date</th>
-                <th className="text-left px-4 py-3 font-medium w-28">Voucher #</th>
-                <th className="text-left px-4 py-3 font-medium">Account</th>
-                <th className="text-left px-4 py-3 font-medium">Description</th>
-                <th className="text-right px-4 py-3 font-medium w-36">Amount (PKR)</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Date</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Voucher #</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Account</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Amount (PKR)</th>
                 <th className="px-4 py-3 w-16" />
               </tr>
             </thead>
@@ -82,7 +82,7 @@ export default async function ExpensesPage() {
                 const line = lineByEntry.get(e.id)
                 const acc = line ? accountMap.get(line.account_id) : null
                 return (
-                  <tr key={e.id} className="hover:bg-muted/20 transition-colors">
+                  <tr key={e.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap text-xs">
                       {formatPKTDate(e.date + 'T00:00:00')}
                     </td>

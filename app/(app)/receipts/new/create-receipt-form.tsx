@@ -17,11 +17,13 @@ import { formatPKTDate } from '@/lib/utils/dates'
 
 type Customer = { id: string; name: string; outstanding: number }
 type Sale = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number }
+type Bank = { id: string; name: string; account_number: string | null }
 
 type Props = {
   today: string
   customers: Customer[]
   salesByCustomer: Record<string, Sale[]>
+  banks: Bank[]
 }
 
 const schema = z.object({
@@ -31,11 +33,13 @@ const schema = z.object({
   exchangeRate:      z.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
+  chequeNumber:      z.string().optional(),
+  bankId:            z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function CreateReceiptForm({ today, customers, salesByCustomer }: Props) {
+export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -43,7 +47,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer }: Props) 
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '' },
+    defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '' },
   })
 
   const selectedCustomerId = form.watch('customerId')
@@ -53,7 +57,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer }: Props) 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createArReceiptAction(values)
+      const result = await createArReceiptAction({ ...values, chequeNumber: values.chequeNumber || undefined, bankId: values.bankId || undefined })
       if (!result.success) { setServerError(result.error); return }
       router.push('/receipts')
     })
@@ -133,10 +137,41 @@ export function CreateReceiptForm({ today, customers, salesByCustomer }: Props) 
           {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
         </div>
 
-        <div className="space-y-1">
-          <Label>Note (optional)</Label>
-          <Input placeholder="e.g. Bank transfer, cheque no. 1234…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-1">
+            <Label>Cheque No. (optional)</Label>
+            <Input placeholder="e.g. 001234" {...form.register('chequeNumber')} className="min-h-[44px]" />
+          </div>
+          <div className="space-y-1">
+            <Label>Note (optional)</Label>
+            <Input placeholder="e.g. Bank transfer…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
+          </div>
         </div>
+
+        {banks.length > 0 && (
+          <div className="space-y-1">
+            <Label>Bank (optional)</Label>
+            <Controller
+              control={form.control}
+              name="bankId"
+              render={({ field }) => (
+                <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
+                  <SelectTrigger className="min-h-[44px]">
+                    <SelectValue placeholder="Cash / no bank" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Cash / no bank</SelectItem>
+                    {banks.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name}{b.account_number ? ` — ${b.account_number}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+        )}
 
         {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

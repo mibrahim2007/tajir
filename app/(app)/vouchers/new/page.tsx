@@ -18,7 +18,7 @@ export default async function NewVoucherPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawAccounts }, { data: rawCustomers }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawAccounts }, { data: rawCustomers }, { data: rawSuppliers }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
     admin.from('chart_of_accounts')
       .select('id, code, name, account_type, is_header')
       .eq('tenant_id', tenantId)
@@ -27,12 +27,14 @@ export default async function NewVoucherPage() {
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
 
   const accounts = (rawAccounts ?? []).filter((a) => !a.is_header)
   const customers = rawCustomers ?? []
   const suppliers = rawSuppliers ?? []
   const lots = rawLots ?? []
+  const banks = rawBanks ?? []
 
   if (accounts.length === 0) {
     return (
@@ -46,7 +48,7 @@ export default async function NewVoucherPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">New Journal Voucher</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">New Journal Voucher</h1>
         <p className="text-sm text-muted-foreground mt-1">Debits must equal credits. Minimum 2 lines.</p>
       </div>
       <CreateVoucherForm
@@ -55,6 +57,7 @@ export default async function NewVoucherPage() {
         customers={customers}
         suppliers={suppliers}
         lots={lots}
+        banks={banks}
       />
     </div>
   )

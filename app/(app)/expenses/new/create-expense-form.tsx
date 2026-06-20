@@ -13,16 +13,14 @@ import { createExpenseAction } from '@/app/actions/create-expense'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 type Account = { id: string; code: string; name: string; account_type: string }
+type Bank = { id: string; name: string; account_number: string | null }
 
 type Props = {
   today: string
   accounts: Account[]
+  banks: Bank[]
 }
 
-const TYPE_ORDER = ['expense']
-const GROUP_LABELS: Record<string, string> = {
-  expense: 'Expenses',
-}
 const CODE_GROUP_LABELS: Record<string, string> = {
   '5': 'Cost of Sales',
   '6': 'Operating Expenses',
@@ -35,11 +33,12 @@ const schema = z.object({
   date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   description:      z.string().min(1, 'Description is required'),
   note:             z.string().optional(),
+  bankId:           z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function CreateExpenseForm({ today, accounts }: Props) {
+export function CreateExpenseForm({ today, accounts, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -47,7 +46,7 @@ export function CreateExpenseForm({ today, accounts }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { expenseAccountId: '', amount: 0, date: today, description: '', note: '' },
+    defaultValues: { expenseAccountId: '', amount: 0, date: today, description: '', note: '', bankId: '' },
   })
 
   // Group accounts by code prefix (5xxx, 6xxx, 7xxx)
@@ -59,7 +58,7 @@ export function CreateExpenseForm({ today, accounts }: Props) {
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createExpenseAction(values)
+      const result = await createExpenseAction({ ...values, bankId: values.bankId || undefined })
       if (!result.success) { setServerError(result.error); return }
       router.push('/expenses')
     })
@@ -131,6 +130,31 @@ export function CreateExpenseForm({ today, accounts }: Props) {
         <Label>Note (optional)</Label>
         <Input placeholder="e.g. Payee name, invoice number…" {...form.register('note')} className="min-h-[44px]" />
       </div>
+
+      {banks.length > 0 && (
+        <div className="space-y-1">
+          <Label>Bank (optional)</Label>
+          <Controller
+            control={form.control}
+            name="bankId"
+            render={({ field }) => (
+              <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
+                <SelectTrigger className="min-h-[44px]">
+                  <SelectValue placeholder="Cash / no bank" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Cash / no bank</SelectItem>
+                  {banks.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}{b.account_number ? ` — ${b.account_number}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+        </div>
+      )}
 
       {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

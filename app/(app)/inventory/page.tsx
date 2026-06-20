@@ -52,7 +52,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Inventory</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Inventory</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {totalCount} stock item{totalCount !== 1 ? 's' : ''}
             {hasFilters ? ' (filtered)' : ''}
@@ -66,7 +66,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
       </Suspense>
 
       {!lots || lots.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">
             {hasFilters
               ? 'No stock items match your filters'
@@ -75,24 +75,24 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         </div>
       ) : (
         <>
-          <div className="rounded-lg border overflow-hidden">
+          <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium">Name</th>
-                    <th className="text-left px-4 py-3 font-medium">Code</th>
-                    <th className="text-left px-4 py-3 font-medium">Count</th>
-                    <th className="text-left px-4 py-3 font-medium">Type</th>
-                    <th className="text-left px-4 py-3 font-medium">Fiber</th>
-                    <th className="text-left px-4 py-3 font-medium">Lot</th>
-                    <th className="text-right px-4 py-3 font-medium">Qty</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Code</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Count</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Fiber</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lot</th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
                     <th className="px-4 py-3 w-16" />
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {lots.map((lot) => (
-                    <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
+                    <tr key={lot.id} className="hover:bg-secondary/50 transition-colors">
                       <td className="px-4 py-3 font-medium">{lot.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
                       <td className="px-4 py-3">{lot.count}</td>

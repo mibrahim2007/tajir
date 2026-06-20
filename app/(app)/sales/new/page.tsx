@@ -8,7 +8,7 @@ export default async function NewSalePage() {
 
   const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name, current_quantity').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
   ])
 
@@ -17,6 +17,7 @@ export default async function NewSalePage() {
     id: l.id,
     name: l.name,
     currentQuantity: l.current_quantity,
+    barcode: l.code ?? null,
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({
     customerId: r.customer_id,
@@ -27,9 +28,9 @@ export default async function NewSalePage() {
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
+    <div className="p-6 max-w-3xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">New Sale</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">New Sale</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a sale to a customer.</p>
       </div>
       <CreateSaleForm

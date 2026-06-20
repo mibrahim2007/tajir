@@ -29,7 +29,7 @@ export default async function ReceiptsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Receipts</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Receipts</h1>
           <p className="text-sm text-muted-foreground mt-1">{receipts.length} receipt{receipts.length !== 1 ? 's' : ''}</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
@@ -40,24 +40,24 @@ export default async function ReceiptsPage() {
       </div>
 
       {receipts.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No receipts yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-left px-4 py-3 font-medium">Customer</th>
-                <th className="text-left px-4 py-3 font-medium">Note</th>
-                <th className="text-right px-4 py-3 font-medium">Amount (PKR)</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
                 <th className="px-4 py-3 w-16" />
               </tr>
             </thead>
             <tbody className="divide-y">
               {receipts.map((r) => (
-                <tr key={r.id} className="hover:bg-muted/20 transition-colors">
+                <tr key={r.id} className="hover:bg-secondary/50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-xs">
                     {formatPKTDate(r.date + 'T00:00:00')}
                   </td>

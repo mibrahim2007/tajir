@@ -7,7 +7,7 @@ export default async function NewReceiptPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
     admin.from('tajir_customers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -25,6 +25,7 @@ export default async function NewReceiptPage() {
     admin.from('inventory_lots')
       .select('id, name')
       .eq('tenant_id', tenantId),
+    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
 
   const customers = rawCustomers ?? []
@@ -32,6 +33,7 @@ export default async function NewReceiptPage() {
   const receipts = rawReceipts ?? []
   const returns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const banks = rawBanks ?? []
 
   // Compute outstanding per customer
   const customerList = customers.map((c) => {
@@ -60,10 +62,10 @@ export default async function NewReceiptPage() {
   return (
     <div className="p-6 max-w-lg mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">New Receipt</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
       </div>
-      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} />
+      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} />
     </div>
   )
 }

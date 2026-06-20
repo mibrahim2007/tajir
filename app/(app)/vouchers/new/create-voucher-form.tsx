@@ -24,12 +24,14 @@ const schema = z.object({
   date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   description: z.string().min(1, 'Narration is required'),
   reference:   z.string().optional(),
+  bankId:      z.string().optional(),
   lines:       z.array(lineSchema).min(2),
 })
 
 type FormValues = z.infer<typeof schema>
 
 type Account = { id: string; code: string; name: string; account_type: string }
+type Bank = { id: string; name: string; account_number: string | null }
 
 type Props = {
   today: string
@@ -37,11 +39,12 @@ type Props = {
   customers: { id: string; name: string }[]
   suppliers: { id: string; name: string }[]
   lots: { id: string; name: string }[]
+  banks: Bank[]
 }
 
 const TYPE_ORDER = ['asset', 'liability', 'equity', 'revenue', 'expense']
 
-export function CreateVoucherForm({ today, accounts }: Props) {
+export function CreateVoucherForm({ today, accounts, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -60,6 +63,7 @@ export function CreateVoucherForm({ today, accounts }: Props) {
       date: today,
       description: '',
       reference: '',
+      bankId: '',
       lines: [
         { accountId: '', description: '', debit: 0, credit: 0 },
         { accountId: '', description: '', debit: 0, credit: 0 },
@@ -80,6 +84,7 @@ export function CreateVoucherForm({ today, accounts }: Props) {
       const result = await createJournalEntryAction({
         ...values,
         reference: values.reference || undefined,
+        bankId: values.bankId || undefined,
         lines: values.lines.map((l) => ({
           ...l,
           description: l.description || undefined,
@@ -114,6 +119,30 @@ export function CreateVoucherForm({ today, accounts }: Props) {
                 </FormItem>
               )} />
             </div>
+
+            {banks.length > 0 && (
+              <FormField control={form.control} name="bankId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bank (optional)</FormLabel>
+                  <Select onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)} value={field.value || '__none__'}>
+                    <FormControl>
+                      <SelectTrigger className="min-h-[44px]">
+                        <SelectValue placeholder="Cash / no bank" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="__none__">Cash / no bank</SelectItem>
+                      {banks.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.name}{b.account_number ? ` — ${b.account_number}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             <FormField control={form.control} name="description" render={({ field }) => (
               <FormItem>

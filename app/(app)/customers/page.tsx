@@ -38,23 +38,23 @@ export default async function CustomersPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Customers</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Customers</h1>
           <p className="text-sm text-muted-foreground mt-1">{customers.length} customer{customers.length !== 1 ? 's' : ''}</p>
         </div>
         <CreateCustomerForm />
       </div>
 
       {customers.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No customers yet. Add your first customer to start tracking receivables.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">Name</th>
-                <th className="text-right px-4 py-3 font-medium">Outstanding (PKR)</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Name</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Outstanding (PKR)</th>
                 <th className="px-4 py-3" />
                 <th className="px-4 py-3 w-24" />
               </tr>
@@ -63,7 +63,7 @@ export default async function CustomersPage() {
               {customers.map((c) => {
                 const outstanding = outstandingByCustomer.get(c.id) ?? 0
                 return (
-                  <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={c.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
                     <td className={`px-4 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
                       {formatPKR(outstanding)}

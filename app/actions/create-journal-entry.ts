@@ -27,6 +27,7 @@ const schema = z.object({
   date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   description: z.string().min(1, 'Description is required'),
   reference:   z.string().optional(),
+  bankId:      z.string().uuid().optional(),
   lines:       z.array(lineSchema).min(2, 'At least 2 lines required'),
 }).refine((d) => {
   const totalDebit  = d.lines.reduce((s, l) => s + l.debit, 0)
@@ -52,7 +53,7 @@ export async function createJournalEntryAction(input: unknown): Promise<ActionRe
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { date, description, reference, lines } = parsed.data
+  const { date, description, reference, bankId, lines } = parsed.data
   const admin = createAdminClient()
 
   // Get next voucher number
@@ -73,6 +74,7 @@ export async function createJournalEntryAction(input: unknown): Promise<ActionRe
       date,
       description,
       reference:      reference ?? null,
+      bank_id:        bankId ?? null,
       source_type:    'manual',
       source_id:      null,
     })

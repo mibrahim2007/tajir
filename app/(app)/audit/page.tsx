@@ -32,7 +32,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold">Audit Trail</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">Audit Trail</h1>
         <p className="text-sm text-muted-foreground mt-1">Every change to your account, in reverse chronological order.</p>
       </div>
 
@@ -46,25 +46,25 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
       </div>
 
       {entries.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No audit entries yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium whitespace-nowrap">Timestamp (PKT)</th>
-                  <th className="text-left px-4 py-3 font-medium">Action</th>
-                  <th className="text-left px-4 py-3 font-medium">Entity</th>
-                  <th className="text-left px-4 py-3 font-medium">Before</th>
-                  <th className="text-left px-4 py-3 font-medium">After</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground whitespace-nowrap">Timestamp (PKT)</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Action</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Entity</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Before</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">After</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-muted/30 transition-colors">
+                  <tr key={entry.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                       {formatPKTDateTime(new Date(entry.created_at))}
                     </td>

@@ -29,7 +29,7 @@ export default async function PaymentsPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold">Payments</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">{payments.length} payment{payments.length !== 1 ? 's' : ''}</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
@@ -40,24 +40,24 @@ export default async function PaymentsPage() {
       </div>
 
       {payments.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">No payments yet.</p>
         </div>
       ) : (
-        <div className="rounded-lg border overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-4 py-3 font-medium">Date</th>
-                <th className="text-left px-4 py-3 font-medium">Supplier</th>
-                <th className="text-left px-4 py-3 font-medium">Note</th>
-                <th className="text-right px-4 py-3 font-medium">Amount (PKR)</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note</th>
+                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
                 <th className="px-4 py-3 w-16" />
               </tr>
             </thead>
             <tbody className="divide-y">
               {payments.map((p) => (
-                <tr key={p.id} className="hover:bg-muted/20 transition-colors">
+                <tr key={p.id} className="hover:bg-secondary/50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-xs">
                     {formatPKTDate(p.date + 'T00:00:00')}
                   </td>
