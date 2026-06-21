@@ -18,7 +18,7 @@ export default async function NewPurchasePage() {
   const locationList = rawLocs ?? []
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a purchase from a supplier.</p>
