@@ -21,7 +21,10 @@ const lineSchema = z.object({
   description: z.string().optional(),
   debit:       z.number().min(0),
   credit:      z.number().min(0),
-})
+}).refine(
+  (d) => d.debit > 0 || d.credit > 0,
+  { message: 'Enter debit or credit amount', path: ['debit'] },
+)
 
 const schema = z.object({
   date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
@@ -212,7 +215,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                             </td>
                             <td className="px-2 py-1.5">
                               <Input type="number" step="0.01" min="0"
-                                className="min-h-[40px] text-right tabular-nums text-xs"
+                                className={`min-h-[40px] text-right tabular-nums text-xs ${form.formState.errors.lines?.[index]?.debit ? 'border-destructive' : ''}`}
                                 {...form.register(`lines.${index}.debit`, {
                                   valueAsNumber: true,
                                   onChange: (e) => {
@@ -220,6 +223,11 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                                   },
                                 })}
                               />
+                              {form.formState.errors.lines?.[index]?.debit && (
+                                <p className="text-xs text-destructive mt-0.5 whitespace-nowrap">
+                                  {form.formState.errors.lines[index].debit.message}
+                                </p>
+                              )}
                             </td>
                             <td className="px-2 py-1.5">
                               <Input type="number" step="0.01" min="0"
