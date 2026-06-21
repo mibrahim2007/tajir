@@ -46,7 +46,7 @@ export default async function NewVoucherPage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-5xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Journal Voucher</h1>
         <p className="text-sm text-muted-foreground mt-1">Debits must equal credits. Minimum 2 lines.</p>

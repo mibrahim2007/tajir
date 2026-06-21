@@ -32,7 +32,7 @@ export default async function NewPurchaseReturnPage() {
   const locations = rawLocs ?? []
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase Return</h1>
         <p className="text-sm text-muted-foreground mt-1">Return goods to a supplier. Stock will be decremented.</p>

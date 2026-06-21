@@ -6,8 +6,10 @@ import { useForm, FormProvider, Controller, type Resolver } from 'react-hook-for
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
@@ -18,13 +20,13 @@ import { formatPKTDate } from '@/lib/utils/dates'
 
 type Supplier = { id: string; name: string; outstanding: number }
 type Purchase = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number; advancePaid: number }
-type Bank = { id: string; name: string; account_number: string | null }
+type Bank     = { id: string; name: string; account_number: string | null }
 
 type Props = {
-  today: string
-  suppliers: Supplier[]
+  today:               string
+  suppliers:           Supplier[]
   purchasesBySupplier: Record<string, Purchase[]>
-  banks: Bank[]
+  banks:               Bank[]
 }
 
 const schema = z.object({
@@ -53,8 +55,15 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier, banks
   })
 
   const selectedSupplierId = form.watch('supplierId')
-  const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId)
-  const supplierPurchases = selectedSupplierId ? (purchasesBySupplier[selectedSupplierId] ?? []) : []
+  const watchedAmount       = form.watch('amount')
+  const watchedCurrency     = form.watch('currencyCode')
+  const watchedExchangeRate = form.watch('exchangeRate')
+
+  const selectedSupplier   = suppliers.find((s) => s.id === selectedSupplierId)
+  const supplierPurchases  = selectedSupplierId ? (purchasesBySupplier[selectedSupplierId] ?? []) : []
+  const er                 = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
+  const amountPkr          = (watchedAmount || 0) * er
+  const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -68,124 +77,170 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier, banks
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-5">
+      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
 
-        {/* Supplier */}
-        <div className="space-y-1">
-          <Label>Supplier <span className="text-destructive">*</span></Label>
-          <Controller
-            control={form.control}
-            name="supplierId"
-            render={({ field, fieldState }) => (
-              <>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue placeholder="Select supplier…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}
-                        {s.outstanding > 0 && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            ({formatPKR(s.outstanding)} outstanding)
-                          </span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
-              </>
-            )}
-          />
-        </div>
+          {/* ── LEFT COLUMN ── */}
+          <div className="space-y-5">
+            <Card>
+              <CardHeader className="pb-3 pt-5 px-5">
+                <CardTitle className="text-base">Payment Details</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 space-y-4">
 
-        {/* Outstanding purchases reference */}
-        {selectedSupplier && (
-          <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="font-medium">Outstanding balance</span>
-              <span className={`font-semibold tabular-nums ${selectedSupplier.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                {formatPKR(selectedSupplier.outstanding)}
-              </span>
-            </div>
-            {supplierPurchases.length > 0 && (
-              <>
-                <p className="text-xs text-muted-foreground">Invoices for reference:</p>
+                {/* Supplier */}
                 <div className="space-y-1">
-                  {supplierPurchases.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{formatPKTDate(p.date + 'T00:00:00')} · {p.itemName} × {p.qty}</span>
-                      <span className="tabular-nums">
-                        {formatPKR(p.pkrEquivalent - p.advancePaid)}
-                        {p.advancePaid > 0 && <span className="ml-1 text-green-600">(adv. {formatPKR(p.advancePaid)})</span>}
+                  <Label>Supplier <span className="text-destructive">*</span></Label>
+                  <Controller
+                    control={form.control}
+                    name="supplierId"
+                    render={({ field, fieldState }) => (
+                      <>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="min-h-[44px]">
+                            <SelectValue placeholder="Select supplier…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {suppliers.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                {s.name}
+                                {s.outstanding > 0 && (
+                                  <span className="ml-2 text-xs text-muted-foreground">({formatPKR(s.outstanding)} outstanding)</span>
+                                )}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
+                      </>
+                    )}
+                  />
+                </div>
+
+                {/* Outstanding reference */}
+                {selectedSupplier && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Outstanding balance</span>
+                      <span className={`font-semibold tabular-nums ${selectedSupplier.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatPKR(selectedSupplier.outstanding)}
                       </span>
                     </div>
-                  ))}
+                    {supplierPurchases.length > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
+                        <div className="space-y-1">
+                          {supplierPurchases.map((p) => (
+                            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatPKTDate(p.date + 'T00:00:00')} · {p.itemName} × {p.qty}</span>
+                              <span className="tabular-nums">
+                                {formatPKR(p.pkrEquivalent - p.advancePaid)}
+                                {p.advancePaid > 0 && <span className="ml-1 text-green-600">(adv. {formatPKR(p.advancePaid)})</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <CurrencyInput amountName="amount" currencyName="currencyCode" exchangeRateName="exchangeRate" label="Amount Paid" required />
+
+                <div className="space-y-1">
+                  <Label>Date <span className="text-destructive">*</span></Label>
+                  <Input type="date" {...form.register('date')} className="min-h-[44px]" />
+                  {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                 </div>
-              </>
-            )}
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Cheque No.</Label>
+                    <Input placeholder="e.g. 001234" {...form.register('chequeNumber')} className="min-h-[44px]" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Note</Label>
+                    <Input placeholder="e.g. Bank transfer…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
+                  </div>
+                </div>
+
+                {banks.length > 0 && (
+                  <div className="space-y-1">
+                    <Label>Bank (optional)</Label>
+                    <Controller
+                      control={form.control}
+                      name="bankId"
+                      render={({ field }) => (
+                        <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
+                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Cash / no bank</SelectItem>
+                            {banks.map((b) => (
+                              <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        )}
 
-        <CurrencyInput
-          amountName="amount"
-          currencyName="currencyCode"
-          exchangeRateName="exchangeRate"
-          label="Amount Paid"
-          required
-        />
+          {/* ── RIGHT COLUMN — sticky summary ── */}
+          <div className="lg:sticky lg:top-6">
+            <Card>
+              <CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Payment Summary</p>
 
-        <div className="space-y-1">
-          <Label>Date <span className="text-destructive">*</span></Label>
-          <Input type="date" {...form.register('date')} className="min-h-[44px]" />
-          {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
+                <div className="space-y-2 text-sm">
+                  {selectedSupplier ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Supplier</span>
+                        <span className="font-medium text-right max-w-[140px] truncate">{selectedSupplier.name}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Outstanding</span>
+                        <span className={`tabular-nums font-medium ${selectedSupplier.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          Rs {fmt(selectedSupplier.outstanding)}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Select a supplier to see balance.</p>
+                  )}
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center mb-5">
+                  <span className="font-bold text-sm">Paying</span>
+                  <span className="text-xl font-extrabold tabular-nums tracking-tight">
+                    Rs {fmt(amountPkr)}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending}>
+                    {isPending ? 'Saving…' : 'Record Payment'}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.back()}>
+                    Cancel
+                  </Button>
+                </div>
+
+                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+
+                <div className="mt-4 pt-4 border-t">
+                  <FileUploader ref={uploaderRef} />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
         </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label>Cheque No. (optional)</Label>
-            <Input placeholder="e.g. 001234" {...form.register('chequeNumber')} className="min-h-[44px]" />
-          </div>
-          <div className="space-y-1">
-            <Label>Note (optional)</Label>
-            <Input placeholder="e.g. Bank transfer…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
-          </div>
-        </div>
-
-        {banks.length > 0 && (
-          <div className="space-y-1">
-            <Label>Bank (optional)</Label>
-            <Controller
-              control={form.control}
-              name="bankId"
-              render={({ field }) => (
-                <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue placeholder="Cash / no bank" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Cash / no bank</SelectItem>
-                    {banks.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}{b.account_number ? ` — ${b.account_number}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-          </div>
-        )}
-
-        <FileUploader ref={uploaderRef} />
-
-        {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-
-        <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-          {isPending ? 'Saving…' : 'Record Payment'}
-        </Button>
       </form>
     </FormProvider>
   )

@@ -36,7 +36,7 @@ export default async function NewSalePage() {
   const today = new Date().toISOString().split('T')[0]
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Sale</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a sale to a customer.</p>
