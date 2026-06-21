@@ -181,24 +181,29 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                         {fields.map((field, index) => (
                           <tr key={field.id}>
                             <td className="px-2 py-1.5 min-w-[180px]">
-                              <FormField control={form.control} name={`lines.${index}.accountId`} render={({ field: f }) => (
-                                <Select onValueChange={f.onChange} value={f.value}>
-                                  <SelectTrigger className="min-h-[40px] text-xs">
-                                    <SelectValue placeholder="Select account…" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {grouped.map((g) => (
-                                      <div key={g.type}>
-                                        <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
-                                        {g.items.map((a) => (
-                                          <SelectItem key={a.id} value={a.id} className="text-xs">
-                                            <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
-                                          </SelectItem>
-                                        ))}
-                                      </div>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                              <FormField control={form.control} name={`lines.${index}.accountId`} render={({ field: f, fieldState }) => (
+                                <div>
+                                  <Select onValueChange={f.onChange} value={f.value}>
+                                    <SelectTrigger className={`min-h-[40px] text-xs ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}>
+                                      <SelectValue placeholder="Select account… *" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {grouped.map((g) => (
+                                        <div key={g.type}>
+                                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
+                                          {g.items.map((a) => (
+                                            <SelectItem key={a.id} value={a.id} className="text-xs">
+                                              <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
+                                            </SelectItem>
+                                          ))}
+                                        </div>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {fieldState.error && (
+                                    <p className="text-xs text-destructive mt-0.5">{fieldState.error.message}</p>
+                                  )}
+                                </div>
                               )} />
                             </td>
                             <td className="px-2 py-1.5 min-w-[140px]">
