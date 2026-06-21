@@ -208,21 +208,23 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                             <td className="px-2 py-1.5">
                               <Input type="number" step="0.01" min="0"
                                 className="min-h-[40px] text-right tabular-nums text-xs"
-                                {...form.register(`lines.${index}.debit`, { valueAsNumber: true })}
-                                onChange={(e) => {
-                                  form.setValue(`lines.${index}.debit`, parseFloat(e.target.value) || 0)
-                                  if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.credit`, 0)
-                                }}
+                                {...form.register(`lines.${index}.debit`, {
+                                  valueAsNumber: true,
+                                  onChange: (e) => {
+                                    if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.credit`, 0)
+                                  },
+                                })}
                               />
                             </td>
                             <td className="px-2 py-1.5">
                               <Input type="number" step="0.01" min="0"
                                 className="min-h-[40px] text-right tabular-nums text-xs"
-                                {...form.register(`lines.${index}.credit`, { valueAsNumber: true })}
-                                onChange={(e) => {
-                                  form.setValue(`lines.${index}.credit`, parseFloat(e.target.value) || 0)
-                                  if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.debit`, 0)
-                                }}
+                                {...form.register(`lines.${index}.credit`, {
+                                  valueAsNumber: true,
+                                  onChange: (e) => {
+                                    if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.debit`, 0)
+                                  },
+                                })}
                               />
                             </td>
                             <td className="px-2 py-1.5">
