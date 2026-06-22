@@ -32,7 +32,7 @@ const schema = z.object({
   advancePaid:  z.number().min(0).default(0),
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
-  locationId:   z.string().optional(),
+  locationId:   z.string().min(1, 'Location is required'),
   lines:        z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -163,26 +163,29 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                   </FormItem>
                 )} />
 
-                {locations.length > 0 && (
-                  <FormField control={form.control} name="locationId" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Receive At</FormLabel>
-                      <Select
-                        value={field.value || '_none_'}
-                        onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="_none_">No location</SelectItem>
-                          {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                )}
+                <FormField control={form.control} name="locationId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Receive At <span className="text-destructive">*</span></FormLabel>
+                    <Select
+                      value={field.value || ''}
+                      onValueChange={field.onChange}
+                      disabled={locations.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]">
+                          <SelectValue placeholder={locations.length === 0 ? 'No locations defined' : 'Select location…'} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {locations.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Add locations in Settings → Locations</p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <div className="flex gap-2 items-end">
                   <FormField control={form.control} name="currencyCode" render={({ field }) => (

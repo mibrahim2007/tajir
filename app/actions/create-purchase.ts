@@ -17,7 +17,7 @@ const schema = z.object({
   exchangeRate: z.coerce.number().positive().default(1),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   advancePaid:  z.coerce.number().min(0).default(0),
-  locationId:   z.string().uuid().optional(),
+  locationId:   z.string().uuid('Select a location'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
@@ -56,7 +56,7 @@ export async function createPurchaseAction(input: unknown): Promise<ActionResult
       pkr_equivalent: String(pkrEquivalent),
       advance_paid: String(advancePaid),
       date,
-      location_id:  locationId ?? null,
+      location_id:  locationId,
       confirmed_at: new Date().toISOString(),
     })
     .select('id')
