@@ -254,6 +254,8 @@ export default async function DashboardPage({
     admin.from('purchase_orders').select('date, pkr_equivalent').eq('tenant_id', tenantId).gte('date', sixMonAgo),
   ])
 
+  const parse = (v: unknown) => parseFloat((v as string) || '0') || 0
+
   /* Owner-only queries */
   let periodSalesRows: { stock_item_id: unknown; customer_id: unknown; pkr_equivalent: unknown }[] = []
   let mtdCollections  = 0
@@ -277,8 +279,6 @@ export default async function DashboardPage({
     mtdCollections  = (mrd ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
     mtdOrderCount   = moc ?? 0
   }
-
-  const parse = (v: unknown) => parseFloat((v as string) || '0') || 0
 
   const mtdSales      = (mtdSalesData ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
   const mtdPurchases  = (mtdPurchasesData ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
