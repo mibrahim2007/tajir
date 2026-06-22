@@ -11,7 +11,7 @@ const schema = z.object({
   id:         z.string().uuid(),
   name:       z.string().min(1, 'Name is required'),
   code:       z.string().optional(),
-  count:      z.string().min(1, 'Count is required'),
+  count:      z.string().optional(),
   itemTypeId: z.string().uuid().optional(),
   fiber:      z.string().optional(),
   lot:        z.string().optional(),
@@ -42,7 +42,7 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   const { error } = await admin
     .from('inventory_lots')
-    .update({ name, code: code ?? null, count, item_type_id: itemTypeId ?? null, fiber: fiber ?? null, lot: lot ?? null })
+    .update({ name, code: code ?? null, count: count ?? null, item_type_id: itemTypeId ?? null, fiber: fiber ?? null, lot: lot ?? null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 

@@ -46,7 +46,7 @@ export async function createInventoryLotAction(
       tenant_id: tenantId,
       name,
       code: code || null,
-      count,
+      count: count || null,
       item_type_id: itemTypeId || null,
       fiber: fiber || null,
       lot: lot || null,
