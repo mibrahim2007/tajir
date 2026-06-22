@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseAction } from '@/app/actions/create-purchase'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
@@ -53,8 +54,16 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
   const [serverError, setServerError] = useState<string | null>(null)
   const uploaderRef = useRef<FileUploaderHandle>(null)
 
-  const supplierPickerItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
-  const lotPickerItems      = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  // Local state so newly created items appear immediately without page refresh
+  const [supplierList, setSupplierList] = useState<PickerItem[]>(
+    suppliers.map((s) => ({ id: s.id, name: s.name }))
+  )
+  const [lotList, setLotList] = useState<PickerItem[]>(
+    lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  )
+
+  const supplierPickerItems = supplierList
+  const lotPickerItems      = lotList
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -108,7 +117,7 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
     })
   }
 
-  const canSubmit = !isPending && suppliers.length > 0 && lots.length > 0
+  const canSubmit = !isPending && supplierList.length > 0 && lotList.length > 0
 
   return (
     <Form {...form}>
@@ -135,7 +144,11 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                         onSelect={field.onChange}
                         placeholder="Select supplier…"
                         title="Select Supplier"
-                        disabled={suppliers.length === 0}
+                        createLabel="New Supplier"
+                        onCreateSuccess={(item) => setSupplierList((prev) => [...prev, item])}
+                        quickCreate={(onSuccess, onCancel) => (
+                          <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
+                        )}
                       />
                     </FormControl>
                     <FormMessage />
@@ -243,7 +256,11 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                                         onSelect={f.onChange}
                                         placeholder="Select item…"
                                         title="Select Stock Item"
-                                        disabled={lots.length === 0}
+                                        createLabel="New Stock Item"
+                                        onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
+                                        quickCreate={(onSuccess, onCancel) => (
+                                          <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                                        )}
                                       />
                                       {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
                                     </div>
@@ -367,9 +384,9 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                 </div>
 
                 {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-                {(suppliers.length === 0 || lots.length === 0) && (
+                {(supplierList.length === 0 || lotList.length === 0) && (
                   <p className="text-xs text-muted-foreground text-center mt-2">
-                    {suppliers.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
+                    {supplierList.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
                   </p>
                 )}
 
