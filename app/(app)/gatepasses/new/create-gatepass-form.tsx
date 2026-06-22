@@ -23,8 +23,8 @@ const schema = z.object({
   gateppassNumber: z.string().min(1, 'Gatepass number is required'),
   type:            z.enum(['purchase', 'sale']),
   date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  vehicleNumber:   z.string().min(1, 'Vehicle number is required'),
-  driverName:      z.string().min(1, 'Driver name is required'),
+  vehicleNumber:   z.string().optional(),
+  driverName:      z.string().optional(),
   remarks:         z.string().optional(),
   lines:           z.array(lineSchema).min(1, 'Add at least one entry'),
 })
@@ -161,7 +161,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
 
                 <FormField control={form.control} name="vehicleNumber" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Vehicle Number <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Vehicle Number</FormLabel>
                     <FormControl><Input placeholder="e.g. ABC-1234" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
@@ -169,7 +169,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
 
                 <FormField control={form.control} name="driverName" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Driver Name <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Driver Name</FormLabel>
                     <FormControl><Input placeholder="Driver's full name" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>

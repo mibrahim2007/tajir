@@ -13,8 +13,8 @@ const schema = z.object({
   purchaseOrderId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
   salesOrderId:    z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
   date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid gatepass date'),
-  vehicleNumber:   z.string().min(1, 'Vehicle number is required'),
-  driverName:      z.string().min(1, 'Driver name is required'),
+  vehicleNumber:   z.string().optional(),
+  driverName:      z.string().optional(),
   remarks:         z.string().optional(),
 }).superRefine((d, ctx) => {
   if (d.type === 'purchase' && !d.purchaseOrderId) {
@@ -81,8 +81,8 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
       sales_order_id:     type === 'sale' ? salesOrderId : null,
       entry_date:         entryDate,
       date,
-      vehicle_number:     vehicleNumber,
-      driver_name:        driverName,
+      vehicle_number:     vehicleNumber || null,
+      driver_name:        driverName || null,
       remarks:            remarks ?? null,
     })
     .select('id')
