@@ -112,13 +112,12 @@ export function QuickCreateLot({ onSuccess, onCancel }: QuickCreateProps) {
   const [error, setError]     = useState<string | null>(null)
 
   const submit = () => {
-    if (!name.trim())  { setError('Name is required'); return }
-    if (!count.trim()) { setError('Count / grade is required'); return }
+    if (!name.trim()) { setError('Name is required'); return }
     start(async () => {
       setError(null)
-      const result = await createInventoryLotAction({ name: name.trim(), count: count.trim() })
+      const result = await createInventoryLotAction({ name: name.trim(), count: count.trim() || undefined })
       if (!result.success) { setError(result.error); return }
-      onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() })
+      onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() || undefined })
     })
   }
 
