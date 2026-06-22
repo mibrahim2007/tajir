@@ -8,41 +8,36 @@ export default async function GatepassesPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [
-    { data: rawGatepasses, error: gpError },
-    { data: rawPurchases },
-    { data: rawSales },
-    { data: rawSuppliers },
-    { data: rawCustomers },
-    { data: rawLots },
-  ] = await Promise.all([
-    admin.from('gatepasses')
-      .select('id, gatepass_number, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: false })
-      .limit(100),
-    admin.from('purchase_orders').select('id, supplier_id, stock_item_id, quantity').eq('tenant_id', tenantId),
-    admin.from('sales_orders').select('id, customer_id, stock_item_id, quantity').eq('tenant_id', tenantId),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
-  ])
+  const { data: rawGatepasses } = await admin
+    .from('gatepasses')
+    .select('id, gatepass_number, type, date, vehicle_number, driver_name, remarks')
+    .eq('tenant_id', tenantId)
+    .order('date', { ascending: false })
+    .limit(100)
 
-  if (gpError) console.error('[gatepasses] query error:', gpError)
-  console.log('[gatepasses] tenantId:', tenantId, 'rows:', rawGatepasses?.length ?? 0, 'error:', gpError?.message)
-  const gatepasses    = rawGatepasses ?? []
-  const supplierMap   = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
-  const customerMap   = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
-  const lotMap        = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
-  const purchaseMap   = new Map((rawPurchases ?? []).map((o) => [o.id, o]))
-  const salesMap      = new Map((rawSales ?? []).map((o) => [o.id, o]))
+  const gatepasses = rawGatepasses ?? []
+  const gpIds      = gatepasses.map(g => g.id)
+
+  /* Count items per gatepass */
+  const itemCountMap = new Map<string, number>()
+  if (gpIds.length > 0) {
+    const { data: itemRows } = await admin
+      .from('gatepass_items')
+      .select('gatepass_id')
+      .in('gatepass_id', gpIds)
+    for (const r of itemRows ?? []) {
+      itemCountMap.set(r.gatepass_id, (itemCountMap.get(r.gatepass_id) ?? 0) + 1)
+    }
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Gatepasses</h1>
-          <p className="text-sm text-muted-foreground mt-1">{gatepasses.length} record{gatepasses.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {gatepasses.length} record{gatepasses.length !== 1 ? 's' : ''}
+          </p>
         </div>
         <Link href="/gatepasses/new">
           <Button className="min-h-[44px]">New Gatepass</Button>
@@ -60,12 +55,9 @@ export default async function GatepassesPage() {
               <thead className="bg-muted/50 border-b">
                 <tr>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">GP No.</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Gatepass Date</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Party</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Entry Date</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vehicle</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Driver</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Remarks</th>
@@ -73,55 +65,32 @@ export default async function GatepassesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {gatepasses.map((g) => {
-                  let partyName = '—'
-                  let itemName  = '—'
-                  let qty       = '—'
-
-                  if (g.type === 'purchase' && g.purchase_order_id) {
-                    const po = purchaseMap.get(g.purchase_order_id)
-                    if (po) {
-                      partyName = supplierMap.get(po.supplier_id) ?? '—'
-                      itemName  = lotMap.get(po.stock_item_id) ?? '—'
-                      qty       = String(po.quantity)
-                    }
-                  } else if (g.type === 'sale' && g.sales_order_id) {
-                    const so = salesMap.get(g.sales_order_id)
-                    if (so) {
-                      partyName = customerMap.get(so.customer_id) ?? '—'
-                      itemName  = lotMap.get(so.stock_item_id) ?? '—'
-                      qty       = String(so.quantity)
-                    }
-                  }
-
-                  return (
-                    <tr key={g.id} className="hover:bg-secondary/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs">{g.gatepass_number || '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(g.date))}</td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          g.type === 'purchase'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        }`}>
-                          {g.type === 'purchase' ? 'Purchase' : 'Sale'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">{partyName}</td>
-                      <td className="px-4 py-3">{itemName}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{qty}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(g.entry_date))}</td>
-                      <td className="px-4 py-3">{g.vehicle_number}</td>
-                      <td className="px-4 py-3">{g.driver_name}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{g.remarks ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        <Link href={`/gatepasses/${g.id}/print`}>
-                          <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
+                {gatepasses.map((g) => (
+                  <tr key={g.id} className="hover:bg-secondary/50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs font-semibold">{g.gatepass_number || '—'}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(g.date))}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        g.type === 'purchase'
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      }`}>
+                        {g.type === 'purchase' ? 'Purchase' : 'Sale'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {itemCountMap.get(g.id) ?? 0}
+                    </td>
+                    <td className="px-4 py-3">{g.vehicle_number ?? '—'}</td>
+                    <td className="px-4 py-3">{g.driver_name ?? '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{g.remarks ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <Link href={`/gatepasses/${g.id}/print`}>
+                        <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -13,53 +13,73 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
 
   const { data: gatepass } = await admin
     .from('gatepasses')
-    .select('id, gatepass_number, type, date, entry_date, vehicle_number, driver_name, remarks, purchase_order_id, sales_order_id')
+    .select('id, gatepass_number, type, date, vehicle_number, driver_name, remarks')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!gatepass) notFound()
 
+  const { data: rawItems } = await admin
+    .from('gatepass_items')
+    .select('id, purchase_order_id, sales_order_id, entry_date')
+    .eq('gatepass_id', id)
+    .order('created_at')
+
+  const items = rawItems ?? []
+
+  /* Collect all order IDs and resolve in one batch */
+  const purchaseIds = items.map(i => i.purchase_order_id).filter(Boolean) as string[]
+  const saleIds     = items.map(i => i.sales_order_id).filter(Boolean) as string[]
+
   const [
     { data: rawSuppliers },
     { data: rawCustomers },
     { data: rawLots },
-    { data: rawPurchase },
-    { data: rawSale },
+    { data: rawPurchases },
+    { data: rawSales },
   ] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
-    gatepass.purchase_order_id
-      ? admin.from('purchase_orders').select('supplier_id, stock_item_id, quantity').eq('id', gatepass.purchase_order_id).single()
-      : Promise.resolve({ data: null }),
-    gatepass.sales_order_id
-      ? admin.from('sales_orders').select('customer_id, stock_item_id, quantity').eq('id', gatepass.sales_order_id).single()
-      : Promise.resolve({ data: null }),
+    purchaseIds.length > 0
+      ? admin.from('purchase_orders').select('id, supplier_id, stock_item_id, quantity').in('id', purchaseIds)
+      : Promise.resolve({ data: [] }),
+    saleIds.length > 0
+      ? admin.from('sales_orders').select('id, customer_id, stock_item_id, quantity').in('id', saleIds)
+      : Promise.resolve({ data: [] }),
   ])
 
-  const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
-  const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
-  const lotMap     = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const supplierMap  = new Map((rawSuppliers  ?? []).map(s => [s.id, s.name]))
+  const customerMap  = new Map((rawCustomers  ?? []).map(c => [c.id, c.name]))
+  const lotMap       = new Map((rawLots       ?? []).map(l => [l.id, l.name]))
+  const purchaseMap  = new Map((rawPurchases  ?? []).map(o => [o.id, o]))
+  const saleMap      = new Map((rawSales      ?? []).map(o => [o.id, o]))
 
-  let partyLabel = ''
-  let partyName  = '—'
-  let itemName   = '—'
-  let quantity   = '—'
+  const partyLabel = gatepass.type === 'purchase' ? 'Supplier' : 'Customer'
+  const gpNumber   = gatepass.gatepass_number || gatepass.id.slice(0, 8).toUpperCase()
 
-  if (gatepass.type === 'purchase' && rawPurchase) {
-    partyLabel = 'Supplier'
-    partyName  = supplierMap.get(rawPurchase.supplier_id) ?? '—'
-    itemName   = lotMap.get(rawPurchase.stock_item_id) ?? '—'
-    quantity   = String(rawPurchase.quantity)
-  } else if (gatepass.type === 'sale' && rawSale) {
-    partyLabel = 'Customer'
-    partyName  = customerMap.get(rawSale.customer_id) ?? '—'
-    itemName   = lotMap.get(rawSale.stock_item_id) ?? '—'
-    quantity   = String(rawSale.quantity)
-  }
-
-  const gpNumber = gatepass.gatepass_number || gatepass.id.slice(0, 8).toUpperCase()
+  /* Resolve each item's display values */
+  const resolvedItems = items.map(item => {
+    if (gatepass.type === 'purchase' && item.purchase_order_id) {
+      const po = purchaseMap.get(item.purchase_order_id)
+      return {
+        party:     po ? (supplierMap.get(po.supplier_id) ?? '—') : '—',
+        itemName:  po ? (lotMap.get(po.stock_item_id)  ?? '—') : '—',
+        quantity:  po ? String(po.quantity) : '—',
+        entryDate: item.entry_date,
+      }
+    } else if (gatepass.type === 'sale' && item.sales_order_id) {
+      const so = saleMap.get(item.sales_order_id)
+      return {
+        party:     so ? (customerMap.get(so.customer_id) ?? '—') : '—',
+        itemName:  so ? (lotMap.get(so.stock_item_id)   ?? '—') : '—',
+        quantity:  so ? String(so.quantity) : '—',
+        entryDate: item.entry_date,
+      }
+    }
+    return { party: '—', itemName: '—', quantity: '—', entryDate: null }
+  })
 
   return (
     <div className="min-h-screen bg-white">
@@ -81,13 +101,13 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
         </div>
 
         {/* Meta row */}
-        <div className="flex justify-between mb-8 text-sm">
+        <div className="flex justify-between mb-6 text-sm flex-wrap gap-2">
           <div>
             <span className="text-muted-foreground print:text-gray-500">No: </span>
             <span className="font-mono font-semibold">{gpNumber}</span>
           </div>
           <div>
-            <span className="text-muted-foreground print:text-gray-500">Gatepass Date: </span>
+            <span className="text-muted-foreground print:text-gray-500">Date: </span>
             <span className="font-semibold">{formatPKTDate(new Date(gatepass.date))}</span>
           </div>
           <div>
@@ -96,16 +116,38 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        {/* Details grid */}
+        {/* Vehicle / Driver / Remarks */}
+        {(gatepass.vehicle_number || gatepass.driver_name || gatepass.remarks) && (
+          <table className="w-full text-sm mb-6 border border-gray-300">
+            <tbody>
+              {gatepass.vehicle_number && <Row label="Vehicle No." value={gatepass.vehicle_number} />}
+              {gatepass.driver_name    && <Row label="Driver"      value={gatepass.driver_name} />}
+              {gatepass.remarks        && <Row label="Remarks"     value={gatepass.remarks} />}
+            </tbody>
+          </table>
+        )}
+
+        {/* Items table */}
         <table className="w-full text-sm mb-8 border border-gray-300">
+          <thead className="bg-gray-50 print:bg-gray-100">
+            <tr>
+              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-8">#</th>
+              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">{partyLabel}</th>
+              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Stock Item</th>
+              <th className="text-right px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Qty</th>
+              <th className="text-left px-3 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Entry Date</th>
+            </tr>
+          </thead>
           <tbody>
-            <Row label={partyLabel || 'Party'} value={partyName} />
-            <Row label="Stock Item"             value={itemName} />
-            <Row label="Quantity"               value={quantity} />
-            <Row label="Entry Date"             value={formatPKTDate(new Date(gatepass.entry_date))} />
-            <Row label="Vehicle No."            value={gatepass.vehicle_number} />
-            <Row label="Driver"                 value={gatepass.driver_name} />
-            {gatepass.remarks && <Row label="Remarks" value={gatepass.remarks} />}
+            {resolvedItems.map((item, i) => (
+              <tr key={i} className="border-b border-gray-200 last:border-0">
+                <td className="px-3 py-2.5 border-r border-gray-200 text-muted-foreground print:text-gray-500 tabular-nums">{i + 1}</td>
+                <td className="px-3 py-2.5 border-r border-gray-200">{item.party}</td>
+                <td className="px-3 py-2.5 border-r border-gray-200">{item.itemName}</td>
+                <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{item.quantity}</td>
+                <td className="px-3 py-2.5">{item.entryDate ? formatPKTDate(new Date(item.entryDate)) : '—'}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
 

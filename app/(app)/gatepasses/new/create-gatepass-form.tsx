@@ -56,12 +56,12 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
 
-  const watchType          = form.watch('type')
-  const watchedLines       = form.watch('lines')
-  const watchedGPNumber    = form.watch('gateppassNumber')
-  const watchedDate        = form.watch('date')
-  const watchedVehicle     = form.watch('vehicleNumber')
-  const watchedDriver      = form.watch('driverName')
+  const watchType       = form.watch('type')
+  const watchedLines    = form.watch('lines')
+  const watchedGPNumber = form.watch('gateppassNumber')
+  const watchedDate     = form.watch('date')
+  const watchedVehicle  = form.watch('vehicleNumber')
+  const watchedDriver   = form.watch('driverName')
 
   const purchasePickerItems = purchaseOrders.map((o) => ({
     id: o.id, name: `${o.supplierName} — ${o.stockItemName}`, badge: o.date, meta: `Qty: ${o.quantity}`,
@@ -92,20 +92,16 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      for (let i = 0; i < values.lines.length; i++) {
-        const line = values.lines[i]
-        const result = await createGatepassAction({
-          gateppassNumber: values.lines.length > 1 ? `${values.gateppassNumber}/${i + 1}` : values.gateppassNumber,
-          type:            values.type,
-          purchaseOrderId: values.type === 'purchase' ? line.orderId : undefined,
-          salesOrderId:    values.type === 'sale'     ? line.orderId : undefined,
-          date:            values.date,
-          vehicleNumber:   values.vehicleNumber,
-          driverName:      values.driverName,
-          remarks:         values.remarks || undefined,
-        })
-        if (!result.success) { setServerError(`Entry ${i + 1}: ${result.error}`); return }
-      }
+      const result = await createGatepassAction({
+        gateppassNumber: values.gateppassNumber,
+        type:            values.type,
+        date:            values.date,
+        vehicleNumber:   values.vehicleNumber,
+        driverName:      values.driverName,
+        remarks:         values.remarks,
+        lines:           values.lines,
+      })
+      if (!result.success) { setServerError(result.error); return }
       router.push('/gatepasses')
     })
   }
@@ -129,9 +125,6 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                     <FormLabel>Gatepass No. <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input placeholder="e.g. GP-001" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
-                    {fields.length > 1 && (
-                      <p className="text-xs text-muted-foreground">Multiple entries will be numbered GP-001/1, GP-001/2…</p>
-                    )}
                   </FormItem>
                 )} />
 
@@ -185,7 +178,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
               </CardContent>
             </Card>
 
-            {/* Entries card */}
+            {/* Detail lines card */}
             <Card>
               <CardHeader className="pb-2 pt-5 px-5">
                 <CardTitle className="text-base">
@@ -198,7 +191,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                     const orderId = watchedLines[index]?.orderId ?? ''
                     return (
                       <div key={field.id} className="flex items-start gap-2">
-                        <span className="text-xs text-muted-foreground pt-3 w-5 shrink-0">{index + 1}</span>
+                        <span className="text-xs text-muted-foreground pt-3 w-5 shrink-0 tabular-nums">{index + 1}</span>
                         <div className="flex-1">
                           <Controller
                             control={form.control}
@@ -237,7 +230,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                   <Plus className="size-4" /> Add Entry
                 </Button>
                 {ordersEmpty && (
-                  <p className="text-xs text-muted-foreground mt-2">No {watchType} entries found.</p>
+                  <p className="text-xs text-muted-foreground mt-2">No {watchType} entries available.</p>
                 )}
               </CardContent>
             </Card>
@@ -288,7 +281,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                 <div className="space-y-2">
                   <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
                     disabled={isPending}>
-                    {isPending ? 'Saving…' : `Issue Gatepass${fields.length > 1 ? ` (${fields.length})` : ''}`}
+                    {isPending ? 'Saving…' : 'Issue Gatepass'}
                   </Button>
                   <Button type="button" variant="outline" className="w-full min-h-[44px]"
                     onClick={() => router.back()}>
