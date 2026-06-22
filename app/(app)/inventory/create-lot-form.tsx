@@ -156,34 +156,36 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                 )}
               />
 
-              {itemTypes.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name="itemTypeId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Item Type</FormLabel>
-                      <Select
-                        value={field.value ?? '_none_'}
-                        onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
-                      >
-                        <FormControl>
-                          <SelectTrigger className="min-h-[44px]">
-                            <SelectValue placeholder="Select type…" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="_none_">No type</SelectItem>
-                          {itemTypes.map((t) => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
+              <FormField
+                control={form.control}
+                name="itemTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Type</FormLabel>
+                    <Select
+                      value={field.value ?? '_none_'}
+                      onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
+                      disabled={itemTypes.length === 0}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]">
+                          <SelectValue placeholder={itemTypes.length === 0 ? 'No types defined' : 'Select type…'} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="_none_">No type</SelectItem>
+                        {itemTypes.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {itemTypes.length === 0 && (
+                      <p className="text-xs text-muted-foreground">Add item types in Settings → Item Types</p>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
