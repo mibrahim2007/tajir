@@ -4,31 +4,49 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { formatPKTDate } from '@/lib/utils/dates'
 
-export default async function GatepassesPage() {
+export default async function GatepassesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string }>
+}) {
+  const { type } = await searchParams
+  const typeFilter = type === 'purchase' || type === 'sale' ? type : undefined
+
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const { data: rawGatepasses } = await admin
+  let query = admin
     .from('gatepasses')
     .select('id, gatepass_number, type, date, vehicle_number, driver_name, remarks')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
-    .limit(100)
+    .limit(200)
 
+  if (typeFilter) query = query.eq('type', typeFilter)
+
+  const { data: rawGatepasses } = await query
   const gatepasses = rawGatepasses ?? []
   const gpIds      = gatepasses.map(g => g.id)
 
-  /* Count items per gatepass */
+  /* Item count + total qty per gatepass */
   const itemCountMap = new Map<string, number>()
+  const totalQtyMap  = new Map<string, number>()
   if (gpIds.length > 0) {
     const { data: itemRows } = await admin
       .from('gatepass_items')
-      .select('gatepass_id')
+      .select('gatepass_id, quantity')
       .in('gatepass_id', gpIds)
     for (const r of itemRows ?? []) {
       itemCountMap.set(r.gatepass_id, (itemCountMap.get(r.gatepass_id) ?? 0) + 1)
+      totalQtyMap.set(r.gatepass_id, (totalQtyMap.get(r.gatepass_id) ?? 0) + Number(r.quantity ?? 0))
     }
   }
+
+  const tabs = [
+    { label: 'All',      href: '/gatepasses',                active: !typeFilter },
+    { label: 'Purchase', href: '/gatepasses?type=purchase',  active: typeFilter === 'purchase' },
+    { label: 'Sale',     href: '/gatepasses?type=sale',      active: typeFilter === 'sale' },
+  ]
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -37,6 +55,7 @@ export default async function GatepassesPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Gatepasses</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {gatepasses.length} record{gatepasses.length !== 1 ? 's' : ''}
+            {typeFilter ? ` · ${typeFilter}` : ''}
           </p>
         </div>
         <Link href="/gatepasses/new">
@@ -44,9 +63,26 @@ export default async function GatepassesPage() {
         </Link>
       </div>
 
+      {/* Type tabs */}
+      <div className="flex gap-1 mb-5 border-b">
+        {tabs.map(t => (
+          <Link key={t.label} href={t.href}>
+            <span className={`inline-block px-4 py-2 text-sm font-medium rounded-t-md transition-colors cursor-pointer
+              ${t.active
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+              }`}>
+              {t.label}
+            </span>
+          </Link>
+        ))}
+      </div>
+
       {gatepasses.length === 0 ? (
         <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
-          <p className="text-muted-foreground text-sm">No gatepasses yet.</p>
+          <p className="text-muted-foreground text-sm">
+            No {typeFilter ?? ''} gatepasses found.
+          </p>
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -58,9 +94,9 @@ export default async function GatepassesPage() {
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Total Qty</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Vehicle</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Driver</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Remarks</th>
                   <th className="px-4 py-3 w-20" />
                 </tr>
               </thead>
@@ -78,12 +114,12 @@ export default async function GatepassesPage() {
                         {g.type === 'purchase' ? 'Purchase' : 'Sale'}
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">{itemCountMap.get(g.id) ?? 0}</td>
                     <td className="px-4 py-3 text-right tabular-nums font-medium">
-                      {itemCountMap.get(g.id) ?? 0}
+                      {(totalQtyMap.get(g.id) ?? 0).toLocaleString(undefined, { maximumFractionDigits: 3 })}
                     </td>
                     <td className="px-4 py-3">{g.vehicle_number ?? '—'}</td>
                     <td className="px-4 py-3">{g.driver_name ?? '—'}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{g.remarks ?? '—'}</td>
                     <td className="px-4 py-3">
                       <Link href={`/gatepasses/${g.id}/print`}>
                         <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
