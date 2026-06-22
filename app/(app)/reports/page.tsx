@@ -1,8 +1,10 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 
 const reports = [
+  { href: '/reports/pending-balance', label: 'Pending Balance', description: 'Purchase and sale orders not yet fully received or dispatched via gatepass. Shows order qty, received qty, and remaining balance.', icon: ClipboardList },
+  { href: '/reports/item-ledger', label: 'Item Ledger', description: 'All movements (purchases, sales, returns) for a selected stock item between dates, with running balance.', icon: BookMarked },
   { href: '/reports/purchases-sales', label: 'Purchase & Sales', description: 'Date-range report of all purchases and sales with totals and gross profit. Printable and exportable.', icon: ArrowLeftRight },
   { href: '/reports/stock-summary', label: 'Stock Summary', description: 'All stock items with current quantities. Filterable and exportable.', icon: Package },
   { href: '/reports/location-stock', label: 'Location-wise Stock', description: 'Stock quantities per location, computed from purchases, sales, returns, and transfers. Filterable and printable.', icon: MapPin },

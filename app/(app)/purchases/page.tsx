@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -8,43 +9,71 @@ import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseAction } from '@/app/actions/delete-purchase'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
+import { PurchaseFilters } from './purchase-filters'
 
-export default async function PurchasesPage() {
+type SearchParams = Promise<Record<string, string | string[] | undefined>>
+
+export default async function PurchasesPage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams
+  const filterFrom     = typeof params.from     === 'string' ? params.from     : undefined
+  const filterTo       = typeof params.to       === 'string' ? params.to       : undefined
+  const filterSupplier = typeof params.supplier === 'string' ? params.supplier : undefined
+  const filterItem     = typeof params.item     === 'string' ? params.item     : undefined
+
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
+  let query = admin.from('purchase_orders')
+    .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
+    .eq('tenant_id', tenantId)
+    .order('date', { ascending: false })
+    .limit(500)
+
+  if (filterFrom)     query = query.gte('date', filterFrom)
+  if (filterTo)       query = query.lte('date', filterTo)
+  if (filterSupplier) query = query.eq('supplier_id', filterSupplier)
+  if (filterItem)     query = query.eq('stock_item_id', filterItem)
+
   const [{ data: rawOrders }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
-    admin.from('purchase_orders')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: false })
-      .limit(100),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId),
+    query,
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const orders = rawOrders ?? []
+  const orders      = rawOrders ?? []
   const supplierList = rawSuppliers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
+  const lotList      = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
 
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
-  const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
+  const lotMap      = new Map(lotList.map((l) => [l.id, l.name]))
+
+  const hasFilters = filterFrom || filterTo || filterSupplier || filterItem
+  const totalQty   = orders.reduce((s, o) => s + parseFloat(o.quantity), 0)
+  const totalPKR   = orders.reduce((s, o) => s + parseFloat(o.pkr_equivalent), 0)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Purchases</h1>
-          <p className="text-sm text-muted-foreground mt-1">{orders.length} record{orders.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {orders.length} record{orders.length !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''}
+          </p>
         </div>
         <Link href="/purchases/new">
           <Button className="min-h-[44px]">New Purchase</Button>
         </Link>
       </div>
 
+      <Suspense>
+        <PurchaseFilters suppliers={supplierList} lots={lotList} />
+      </Suspense>
+
       {orders.length === 0 ? (
         <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
-          <p className="text-muted-foreground text-sm">No purchases yet.</p>
+          <p className="text-muted-foreground text-sm">
+            {hasFilters ? 'No purchases match your filters.' : 'No purchases yet.'}
+          </p>
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -67,8 +96,8 @@ export default async function PurchasesPage() {
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(o.date))}</td>
                     <td className="px-4 py-3">{supplierMap.get(o.supplier_id) ?? '—'}</td>
                     <td className="px-4 py-3">{lotMap.get(o.stock_item_id) ?? '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{o.quantity}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{o.currency_code} {o.rate}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{parseFloat(o.quantity).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{o.currency_code} {parseFloat(o.rate).toLocaleString()}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
@@ -88,6 +117,15 @@ export default async function PurchasesPage() {
                   </tr>
                 ))}
               </tbody>
+              <tfoot className="border-t-2 bg-muted/30">
+                <tr>
+                  <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+                  <td />
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
+                  <td />
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>
