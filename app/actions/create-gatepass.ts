@@ -12,13 +12,12 @@ const lineSchema = z.object({
 })
 
 const schema = z.object({
-  gateppassNumber: z.string().min(1, 'Gatepass number is required'),
-  type:            z.enum(['purchase', 'sale']),
-  date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid gatepass date'),
-  vehicleNumber:   z.string().optional(),
-  driverName:      z.string().optional(),
-  remarks:         z.string().optional(),
-  lines:           z.array(lineSchema).min(1, 'Add at least one entry'),
+  type:          z.enum(['purchase', 'sale']),
+  date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid gatepass date'),
+  vehicleNumber: z.string().optional(),
+  driverName:    z.string().optional(),
+  remarks:       z.string().optional(),
+  lines:         z.array(lineSchema).min(1, 'Add at least one entry'),
 })
 
 export type CreateGatepassInput = z.infer<typeof schema>
@@ -31,8 +30,16 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { gateppassNumber, type, date, vehicleNumber, driverName, remarks, lines } = parsed.data
+  const { type, date, vehicleNumber, driverName, remarks, lines } = parsed.data
   const admin = createAdminClient()
+
+  /* Auto-generate next GP number for this tenant */
+  const { count: gpCount } = await admin
+    .from('gatepasses')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+  const gateppassNumber = `GP-${String((gpCount ?? 0) + 1).padStart(4, '0')}`
+
   const orderIds = lines.map(l => l.orderId)
 
   /* Look up entry dates from the linked orders */

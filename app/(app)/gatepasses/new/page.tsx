@@ -13,6 +13,7 @@ export default async function NewGatepassPage() {
     { data: rawSuppliers },
     { data: rawCustomers },
     { data: rawLots },
+    { count: gpCount },
   ] = await Promise.all([
     admin.from('purchase_orders')
       .select('id, date, quantity, supplier_id, stock_item_id')
@@ -27,11 +28,14 @@ export default async function NewGatepassPage() {
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('gatepasses').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
   ])
 
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
   const lotMap     = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+
+  const nextGpNumber = `GP-${String((gpCount ?? 0) + 1).padStart(4, '0')}`
 
   const purchaseOrders = (rawPurchases ?? []).map((o) => ({
     id:            o.id,
@@ -55,7 +59,7 @@ export default async function NewGatepassPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Gatepass</h1>
         <p className="text-sm text-muted-foreground mt-1">Issue a gatepass linked to a purchase or sale entry.</p>
       </div>
-      <CreateGatepassForm today={today} purchaseOrders={purchaseOrders} salesOrders={salesOrders} />
+      <CreateGatepassForm today={today} nextGpNumber={nextGpNumber} purchaseOrders={purchaseOrders} salesOrders={salesOrders} />
     </div>
   )
 }

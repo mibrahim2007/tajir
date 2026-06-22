@@ -20,13 +20,12 @@ const lineSchema = z.object({
 })
 
 const schema = z.object({
-  gateppassNumber: z.string().min(1, 'Gatepass number is required'),
-  type:            z.enum(['purchase', 'sale']),
-  date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  vehicleNumber:   z.string().optional(),
-  driverName:      z.string().optional(),
-  remarks:         z.string().optional(),
-  lines:           z.array(lineSchema).min(1, 'Add at least one entry'),
+  type:          z.enum(['purchase', 'sale']),
+  date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  vehicleNumber: z.string().optional(),
+  driverName:    z.string().optional(),
+  remarks:       z.string().optional(),
+  lines:         z.array(lineSchema).min(1, 'Add at least one entry'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -36,11 +35,12 @@ export type SalesOrderOption    = { id: string; customerName: string; stockItemN
 
 type Props = {
   today:          string
+  nextGpNumber:   string
   purchaseOrders: PurchaseOrderOption[]
   salesOrders:    SalesOrderOption[]
 }
 
-export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props) {
+export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesOrders }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -48,7 +48,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
-      gateppassNumber: '', type: 'purchase', date: today,
+      type: 'purchase', date: today,
       vehicleNumber: '', driverName: '', remarks: '',
       lines: [{ orderId: '' }],
     },
@@ -56,10 +56,9 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
 
-  const watchType       = form.watch('type')
-  const watchedLines    = form.watch('lines')
-  const watchedGPNumber = form.watch('gateppassNumber')
-  const watchedDate     = form.watch('date')
+  const watchType    = form.watch('type')
+  const watchedLines = form.watch('lines')
+  const watchedDate  = form.watch('date')
   const watchedVehicle  = form.watch('vehicleNumber')
   const watchedDriver   = form.watch('driverName')
 
@@ -93,13 +92,12 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
     startTransition(async () => {
       setServerError(null)
       const result = await createGatepassAction({
-        gateppassNumber: values.gateppassNumber,
-        type:            values.type,
-        date:            values.date,
-        vehicleNumber:   values.vehicleNumber,
-        driverName:      values.driverName,
-        remarks:         values.remarks,
-        lines:           values.lines,
+        type:          values.type,
+        date:          values.date,
+        vehicleNumber: values.vehicleNumber,
+        driverName:    values.driverName,
+        remarks:       values.remarks,
+        lines:         values.lines,
       })
       if (!result.success) { setServerError(result.error); return }
       router.push('/gatepasses')
@@ -120,13 +118,14 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                 <CardTitle className="text-base">Gatepass Details</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
-                <FormField control={form.control} name="gateppassNumber" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Gatepass No. <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input placeholder="e.g. GP-001" className="min-h-[44px]" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                {/* Auto-generated GP number — read only */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-sm font-medium">Gatepass No.</span>
+                  <div className="min-h-[44px] flex items-center px-3 rounded-md border bg-muted/50 font-mono text-sm font-semibold tracking-wide text-foreground">
+                    {nextGpNumber}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Auto-assigned on save</p>
+                </div>
 
                 <FormField control={form.control} name="type" render={({ field }) => (
                   <FormItem>
@@ -245,7 +244,7 @@ export function CreateGatepassForm({ today, purchaseOrders, salesOrders }: Props
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">No.</span>
-                    <span className="font-medium tabular-nums">{watchedGPNumber || '—'}</span>
+                    <span className="font-mono font-semibold text-primary">{nextGpNumber}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Type</span>
