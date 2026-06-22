@@ -16,7 +16,7 @@ import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
 const schema = z.object({
   name:       z.string().min(1, 'Name is required'),
   code:       z.string().optional(),
-  count:      z.string().min(1, 'Count is required'),
+  count:      z.string().optional(),
   itemTypeId: z.string().uuid().optional(),
   fiber:      z.string().optional(),
   lot:        z.string().optional(),
@@ -88,7 +88,7 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
             )} />
             <FormField control={form.control} name="count" render={({ field }) => (
               <FormItem>
-                <FormLabel>Count <span className="text-destructive">*</span></FormLabel>
+                <FormLabel>Count</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
                 <FormMessage />
               </FormItem>

@@ -147,7 +147,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                 name="count"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Count <span className="text-destructive">*</span></FormLabel>
+                    <FormLabel>Count</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. 30s" {...field} />
                     </FormControl>
