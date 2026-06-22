@@ -46,6 +46,13 @@ export async function createSaleOrderAction(input: unknown): Promise<
 
   const admin = createAdminClient()
 
+  /* Block if chart of accounts has not been configured */
+  const { count: coaCount } = await admin
+    .from('chart_of_accounts').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+  if (!coaCount) {
+    return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it before recording sales.', code: 'COA_NOT_CONFIGURED' }
+  }
+
   // Check available stock
   const { data: lot } = await admin
     .from('inventory_lots')

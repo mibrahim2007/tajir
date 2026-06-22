@@ -44,6 +44,13 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
 
   const admin = createAdminClient()
 
+  /* Block if chart of accounts has not been configured */
+  const { count: coaCount } = await admin
+    .from('chart_of_accounts').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+  if (!coaCount) {
+    return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it before recording sale returns.', code: 'COA_NOT_CONFIGURED' }
+  }
+
   const { data: ret, error: insertError } = await admin
     .from('sale_returns')
     .insert({

@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SeedAccountsButton } from './seed-accounts-button'
+import { UploadCoaButton } from './upload-coa-button'
 
 const TYPE_LABELS: Record<string, string> = {
   asset:     'Asset',
@@ -67,8 +68,11 @@ export default async function AccountsPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Chart of Accounts</h1>
           <p className="text-sm text-muted-foreground mt-1">Pakistani standard CoA (ICAP/SECP) — {accounts.length} accounts</p>
         </div>
-        {role === 'owner' && accounts.length === 0 && (
-          <SeedAccountsButton />
+        {role === 'owner' && (
+          <div className="flex items-center gap-2">
+            <UploadCoaButton />
+            {accounts.length === 0 && <SeedAccountsButton />}
+          </div>
         )}
       </div>
 

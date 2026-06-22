@@ -43,6 +43,13 @@ export async function createPurchaseAction(input: unknown): Promise<ActionResult
 
   const admin = createAdminClient()
 
+  /* Block if chart of accounts has not been configured */
+  const { count: coaCount } = await admin
+    .from('chart_of_accounts').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
+  if (!coaCount) {
+    return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it before recording purchases.', code: 'COA_NOT_CONFIGURED' }
+  }
+
   const { data: order, error: insertError } = await admin
     .from('purchase_orders')
     .insert({
