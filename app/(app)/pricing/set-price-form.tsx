@@ -10,16 +10,17 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateCustomer, QuickCreateLot } from '@/components/quick-create-forms'
 import { setPricingRuleAction } from '@/app/actions/set-pricing-rule'
 
-type Customer = { id: string; name: string }
+type Customer  = { id: string; name: string }
 type StockItem = { id: string; name: string }
 
 const schema = z.object({
-  customerId: z.string().uuid('Select a customer'),
+  customerId:  z.string().uuid('Select a customer'),
   stockItemId: z.string().uuid('Select a stock item'),
-  rate: z.number().positive('Rate must be positive'),
+  rate:        z.number().positive('Rate must be positive'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -30,8 +31,12 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
 
-  const customerPickerItems = customers.map((c) => ({ id: c.id, name: c.name }))
-  const stockPickerItems = stockItems.map((s) => ({ id: s.id, name: s.name }))
+  const [customerList, setCustomerList] = useState<PickerItem[]>(
+    customers.map((c) => ({ id: c.id, name: c.name }))
+  )
+  const [lotList, setLotList] = useState<PickerItem[]>(
+    stockItems.map((s) => ({ id: s.id, name: s.name }))
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -66,12 +71,16 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
                 <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <ItemPickerDialog
-                    items={customerPickerItems}
+                    items={customerList}
                     value={field.value}
                     onSelect={field.onChange}
                     placeholder="Select customer…"
                     title="Select Customer"
-                    disabled={customers.length === 0}
+                    createLabel="New Customer"
+                    onCreateSuccess={(item) => setCustomerList((prev) => [...prev, item])}
+                    quickCreate={(onSuccess, onCancel) => (
+                      <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -83,12 +92,16 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <ItemPickerDialog
-                    items={stockPickerItems}
+                    items={lotList}
                     value={field.value}
                     onSelect={field.onChange}
                     placeholder="Select stock item…"
                     title="Select Stock Item"
-                    disabled={stockItems.length === 0}
+                    createLabel="New Stock Item"
+                    onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
+                    quickCreate={(onSuccess, onCancel) => (
+                      <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                    )}
                   />
                 </FormControl>
                 <FormMessage />
@@ -99,14 +112,8 @@ export function SetPriceForm({ customers, stockItems }: { customers: Customer[];
               <FormItem>
                 <FormLabel>Rate (PKR / unit) <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    {...field}
-                    onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                  />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00"
+                    {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

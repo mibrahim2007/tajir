@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
 import { createSupplierAction } from '@/app/actions/create-supplier'
+import { createCustomerAction } from '@/app/actions/create-customer'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import type { PickerItem } from '@/components/item-picker-dialog'
 
@@ -52,6 +53,50 @@ export function QuickCreateSupplier({ onSuccess, onCancel }: QuickCreateProps) {
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
         <Button type="button" size="sm" disabled={isPending} onClick={submit}>
           {isPending ? 'Creating…' : 'Create Supplier'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ── Customer ──────────────────────────────────────────────────────────────────
+
+export function QuickCreateCustomer({ onSuccess, onCancel }: QuickCreateProps) {
+  const [name, setName]       = useState('')
+  const [isPending, start]    = useTransition()
+  const [error, setError]     = useState<string | null>(null)
+
+  const submit = () => {
+    if (!name.trim()) { setError('Name is required'); return }
+    start(async () => {
+      setError(null)
+      const result = await createCustomerAction({
+        name: name.trim(), openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1,
+      })
+      if (!result.success) { setError(result.error); return }
+      onSuccess({ id: result.data.id, name: name.trim() })
+    })
+  }
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <label className="text-sm font-medium">Customer Name <span className="text-destructive">*</span></label>
+        <input
+          autoFocus
+          className={inputCls}
+          placeholder="e.g. Raza Fabrics"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
+        />
+      </div>
+      <p className="text-xs text-muted-foreground">Opening balance can be set later from the Customers page.</p>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex gap-2 justify-end pt-1">
+        <Button type="button" variant="outline" size="sm" onClick={onCancel}>Cancel</Button>
+        <Button type="button" size="sm" disabled={isPending} onClick={submit}>
+          {isPending ? 'Creating…' : 'Create Customer'}
         </Button>
       </div>
     </div>

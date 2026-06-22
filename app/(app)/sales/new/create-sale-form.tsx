@@ -14,7 +14,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateCustomer, QuickCreateLot } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { createSaleOrderAction } from '@/app/actions/create-sale-order'
 
@@ -68,6 +69,14 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
 
   const requireLocation = locations.length > 0
 
+  // Local state so newly created items appear immediately
+  const [customerList, setCustomerList] = useState<PickerItem[]>(
+    customers.map((c) => ({ id: c.id, name: c.name }))
+  )
+  const [lotList, setLotList] = useState<PickerItem[]>(
+    stockItems.map((s) => ({ id: s.id, name: s.name, meta: `${parseFloat(s.currentQuantity).toLocaleString()} avail.` }))
+  )
+
   const formSchema = useMemo(
     () => requireLocation
       ? baseSchema.refine(d => !!d.locationId, { message: 'Select a location', path: ['locationId'] })
@@ -75,7 +84,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
     [requireLocation],
   )
 
-  const customerPickerItems = customers.map((c) => ({ id: c.id, name: c.name }))
+  const customerPickerItems = customerList
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema) as Resolver<FormValues>,
@@ -113,16 +122,23 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   }, [watchedLocation, locationStock])
 
   const stockPickerItems = useMemo(() => {
-    return stockItems
-      .filter(s => !locStockMap || (locStockMap[s.id] ?? 0) > 0)
-      .map(s => ({
-        id: s.id,
-        name: s.name,
-        meta: locStockMap
-          ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
-          : `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
-      }))
-  }, [stockItems, locStockMap])
+    return lotList
+      .filter(s => {
+        if (!locStockMap) return true
+        const qty = locStockMap[s.id] ?? 0
+        return qty > 0
+      })
+      .map(s => {
+        const si = stockItems.find(x => x.id === s.id)
+        return {
+          id: s.id,
+          name: s.name,
+          meta: locStockMap
+            ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
+            : si ? `${parseFloat(si.currentQuantity).toLocaleString()} avail.` : undefined,
+        }
+      })
+  }, [lotList, stockItems, locStockMap])
 
   const getPricedRate = (customerId: string, stockItemId: string) => {
     const rule = pricingRules.find((r) => r.customerId === customerId && r.stockItemId === stockItemId)
@@ -222,7 +238,11 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                           onSelect={field.onChange}
                           placeholder="Select customer…"
                           title="Select Customer"
-                          disabled={customers.length === 0}
+                          createLabel="New Customer"
+                          onCreateSuccess={(item) => setCustomerList((prev) => [...prev, item])}
+                          quickCreate={(onSuccess, onCancel) => (
+                            <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
+                          )}
                         />
                       </FormControl>
                       <FormMessage />
@@ -366,6 +386,11 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                                           }}
                                           placeholder="Select item…"
                                           title="Select Stock Item"
+                                          createLabel="New Stock Item"
+                                          onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
+                                          quickCreate={(onSuccess, onCancel) => (
+                                            <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                                          )}
                                         />
                                         {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
                                         {avail !== null && (

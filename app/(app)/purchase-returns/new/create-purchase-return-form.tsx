@@ -12,7 +12,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseReturnAction } from '@/app/actions/create-purchase-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
@@ -95,8 +96,14 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
     }
   }
 
-  const supplierPickerItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
-  const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  const [supplierList, setSupplierList] = useState<PickerItem[]>(
+    suppliers.map((s) => ({ id: s.id, name: s.name }))
+  )
+  const [lotList, setLotList] = useState<PickerItem[]>(
+    lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  )
+  const supplierPickerItems = supplierList
+  const lotPickerItems = lotList
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -167,6 +174,11 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
                         onSelect={field.onChange}
                         placeholder="Select supplier…"
                         title="Select Supplier"
+                        createLabel="New Supplier"
+                        onCreateSuccess={(item) => setSupplierList((prev) => [...prev, item])}
+                        quickCreate={(onSuccess, onCancel) => (
+                          <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
+                        )}
                       />
                     </FormControl>
                     <FormMessage />
@@ -280,6 +292,11 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
                                         onSelect={f.onChange}
                                         placeholder="Select item…"
                                         title="Select Stock Item"
+                                        createLabel="New Stock Item"
+                                        onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
+                                        quickCreate={(onSuccess, onCancel) => (
+                                          <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                                        )}
                                       />
                                       {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
                                     </div>
