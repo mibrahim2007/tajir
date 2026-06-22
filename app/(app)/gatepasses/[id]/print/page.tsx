@@ -22,64 +22,22 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
 
   const { data: rawItems } = await admin
     .from('gatepass_items')
-    .select('id, purchase_order_id, sales_order_id, entry_date')
+    .select('id, stock_item_id, quantity')
     .eq('gatepass_id', id)
     .order('created_at')
 
   const items = rawItems ?? []
 
-  /* Collect all order IDs and resolve in one batch */
-  const purchaseIds = items.map(i => i.purchase_order_id).filter(Boolean) as string[]
-  const saleIds     = items.map(i => i.sales_order_id).filter(Boolean) as string[]
+  /* Resolve stock item names in one batch */
+  const stockItemIds = [...new Set(items.map(i => i.stock_item_id).filter(Boolean))] as string[]
+  const { data: rawLots } = stockItemIds.length > 0
+    ? await admin.from('inventory_lots').select('id, name').in('id', stockItemIds)
+    : { data: [] }
 
-  const [
-    { data: rawSuppliers },
-    { data: rawCustomers },
-    { data: rawLots },
-    { data: rawPurchases },
-    { data: rawSales },
-  ] = await Promise.all([
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
-    purchaseIds.length > 0
-      ? admin.from('purchase_orders').select('id, supplier_id, stock_item_id, quantity').in('id', purchaseIds)
-      : Promise.resolve({ data: [] }),
-    saleIds.length > 0
-      ? admin.from('sales_orders').select('id, customer_id, stock_item_id, quantity').in('id', saleIds)
-      : Promise.resolve({ data: [] }),
-  ])
+  const lotMap = new Map((rawLots ?? []).map(l => [l.id, l.name]))
 
-  const supplierMap  = new Map((rawSuppliers  ?? []).map(s => [s.id, s.name]))
-  const customerMap  = new Map((rawCustomers  ?? []).map(c => [c.id, c.name]))
-  const lotMap       = new Map((rawLots       ?? []).map(l => [l.id, l.name]))
-  const purchaseMap  = new Map((rawPurchases  ?? []).map(o => [o.id, o]))
-  const saleMap      = new Map((rawSales      ?? []).map(o => [o.id, o]))
-
-  const partyLabel = gatepass.type === 'purchase' ? 'Supplier' : 'Customer'
-  const gpNumber   = gatepass.gatepass_number || gatepass.id.slice(0, 8).toUpperCase()
-
-  /* Resolve each item's display values */
-  const resolvedItems = items.map(item => {
-    if (gatepass.type === 'purchase' && item.purchase_order_id) {
-      const po = purchaseMap.get(item.purchase_order_id)
-      return {
-        party:     po ? (supplierMap.get(po.supplier_id) ?? '—') : '—',
-        itemName:  po ? (lotMap.get(po.stock_item_id)  ?? '—') : '—',
-        quantity:  po ? String(po.quantity) : '—',
-        entryDate: item.entry_date,
-      }
-    } else if (gatepass.type === 'sale' && item.sales_order_id) {
-      const so = saleMap.get(item.sales_order_id)
-      return {
-        party:     so ? (customerMap.get(so.customer_id) ?? '—') : '—',
-        itemName:  so ? (lotMap.get(so.stock_item_id)   ?? '—') : '—',
-        quantity:  so ? String(so.quantity) : '—',
-        entryDate: item.entry_date,
-      }
-    }
-    return { party: '—', itemName: '—', quantity: '—', entryDate: null }
-  })
+  const gpNumber = gatepass.gatepass_number || gatepass.id.slice(0, 8).toUpperCase()
+  const totalQty = items.reduce((s, i) => s + Number(i.quantity ?? 0), 0)
 
   return (
     <div className="min-h-screen bg-white">
@@ -112,7 +70,9 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
           </div>
           <div>
             <span className="text-muted-foreground print:text-gray-500">Type: </span>
-            <span className="font-semibold capitalize">{gatepass.type}</span>
+            <span className="font-semibold capitalize">
+              {gatepass.type === 'purchase' ? 'Inward (Purchase)' : 'Outward (Sale)'}
+            </span>
           </div>
         </div>
 
@@ -132,23 +92,31 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
           <thead className="bg-gray-50 print:bg-gray-100">
             <tr>
               <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-8">#</th>
-              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">{partyLabel}</th>
               <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Stock Item</th>
-              <th className="text-right px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Qty</th>
-              <th className="text-left px-3 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Entry Date</th>
+              <th className="text-right px-3 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-28">Quantity</th>
             </tr>
           </thead>
           <tbody>
-            {resolvedItems.map((item, i) => (
-              <tr key={i} className="border-b border-gray-200 last:border-0">
+            {items.map((item, i) => (
+              <tr key={item.id} className="border-b border-gray-200 last:border-0">
                 <td className="px-3 py-2.5 border-r border-gray-200 text-muted-foreground print:text-gray-500 tabular-nums">{i + 1}</td>
-                <td className="px-3 py-2.5 border-r border-gray-200">{item.party}</td>
-                <td className="px-3 py-2.5 border-r border-gray-200">{item.itemName}</td>
-                <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{item.quantity}</td>
-                <td className="px-3 py-2.5">{item.entryDate ? formatPKTDate(new Date(item.entryDate)) : '—'}</td>
+                <td className="px-3 py-2.5 border-r border-gray-200">
+                  {item.stock_item_id ? (lotMap.get(item.stock_item_id) ?? '—') : '—'}
+                </td>
+                <td className="px-3 py-2.5 text-right tabular-nums">
+                  {item.quantity != null ? Number(item.quantity).toLocaleString(undefined, { maximumFractionDigits: 3 }) : '—'}
+                </td>
               </tr>
             ))}
           </tbody>
+          <tfoot className="border-t-2 border-gray-300 bg-gray-50 print:bg-gray-100">
+            <tr>
+              <td colSpan={2} className="px-3 py-2 text-right font-semibold text-[11px] uppercase tracking-wide border-r border-gray-300">Total</td>
+              <td className="px-3 py-2 text-right font-bold tabular-nums">
+                {totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}
+              </td>
+            </tr>
+          </tfoot>
         </table>
 
         {/* Signature section */}

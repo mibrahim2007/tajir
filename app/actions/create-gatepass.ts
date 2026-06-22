@@ -8,7 +8,8 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
-  orderId: z.string().uuid('Invalid order'),
+  stockItemId: z.string().uuid('Select a stock item'),
+  quantity:    z.coerce.number().positive('Quantity must be positive'),
 })
 
 const schema = z.object({
@@ -17,7 +18,7 @@ const schema = z.object({
   vehicleNumber: z.string().optional(),
   driverName:    z.string().optional(),
   remarks:       z.string().optional(),
-  lines:         z.array(lineSchema).min(1, 'Add at least one entry'),
+  lines:         z.array(lineSchema).min(1, 'Add at least one item'),
 })
 
 export type CreateGatepassInput = z.infer<typeof schema>
@@ -40,22 +41,6 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
     .eq('tenant_id', tenantId)
   const gateppassNumber = `GP-${String((gpCount ?? 0) + 1).padStart(4, '0')}`
 
-  const orderIds = lines.map(l => l.orderId)
-
-  /* Look up entry dates from the linked orders */
-  const entryDateMap: Record<string, string> = {}
-  if (type === 'purchase') {
-    const { data: orders } = await admin
-      .from('purchase_orders').select('id, date')
-      .in('id', orderIds).eq('tenant_id', tenantId)
-    for (const o of orders ?? []) entryDateMap[o.id] = o.date
-  } else {
-    const { data: orders } = await admin
-      .from('sales_orders').select('id, date')
-      .in('id', orderIds).eq('tenant_id', tenantId)
-    for (const o of orders ?? []) entryDateMap[o.id] = o.date
-  }
-
   /* Insert master */
   const { data: gatepass, error: masterErr } = await admin
     .from('gatepasses')
@@ -75,10 +60,9 @@ export async function createGatepassAction(input: unknown): Promise<ActionResult
 
   /* Insert detail items */
   const itemRows = lines.map(l => ({
-    gatepass_id:       gatepass.id,
-    purchase_order_id: type === 'purchase' ? l.orderId : null,
-    sales_order_id:    type === 'sale'     ? l.orderId : null,
-    entry_date:        entryDateMap[l.orderId] ?? null,
+    gatepass_id:   gatepass.id,
+    stock_item_id: l.stockItemId,
+    quantity:      l.quantity,
   }))
 
   const { error: itemsErr } = await admin.from('gatepass_items').insert(itemRows)

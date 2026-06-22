@@ -13,11 +13,13 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateLot } from '@/components/quick-create-forms'
 import { createGatepassAction } from '@/app/actions/create-gatepass'
 
 const lineSchema = z.object({
-  orderId: z.string().min(1, 'Select an entry'),
+  stockItemId: z.string().uuid('Select a stock item'),
+  quantity:    z.number().positive('Enter quantity'),
 })
 
 const schema = z.object({
@@ -26,80 +28,48 @@ const schema = z.object({
   vehicleNumber: z.string().optional(),
   driverName:    z.string().optional(),
   remarks:       z.string().optional(),
-  lines:         z.array(lineSchema).min(1, 'Add at least one entry'),
+  lines:         z.array(lineSchema).min(1, 'Add at least one item'),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export type PurchaseOrderOption = { id: string; supplierName: string; stockItemName: string; quantity: string; date: string }
-export type SalesOrderOption    = { id: string; customerName: string; stockItemName: string; quantity: string; date: string }
-
 type Props = {
-  today:          string
-  nextGpNumber:   string
-  purchaseOrders: PurchaseOrderOption[]
-  salesOrders:    SalesOrderOption[]
+  today:        string
+  nextGpNumber: string
+  lots:         { id: string; name: string; count: string }[]
 }
 
-export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesOrders }: Props) {
+export function CreateGatepassForm({ today, nextGpNumber, lots }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [lotList, setLotList] = useState<PickerItem[]>(
+    lots.map((l) => ({ id: l.id, name: l.name, meta: `Stock: ${l.count}` }))
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       type: 'purchase', date: today,
       vehicleNumber: '', driverName: '', remarks: '',
-      lines: [{ orderId: '' }],
+      lines: [{ stockItemId: '', quantity: 0 }],
     },
   })
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
 
-  const watchType    = form.watch('type')
-  const watchedLines = form.watch('lines')
-  const watchedDate  = form.watch('date')
-  const watchedVehicle  = form.watch('vehicleNumber')
-  const watchedDriver   = form.watch('driverName')
+  const watchType        = form.watch('type')
+  const watchedLines     = form.watch('lines')
+  const watchedDate      = form.watch('date')
+  const watchedVehicle   = form.watch('vehicleNumber')
+  const watchedDriver    = form.watch('driverName')
 
-  const purchasePickerItems = purchaseOrders.map((o) => ({
-    id: o.id, name: `${o.supplierName} — ${o.stockItemName}`, badge: o.date, meta: `Qty: ${o.quantity}`,
-  }))
-  const salesPickerItems = salesOrders.map((o) => ({
-    id: o.id, name: `${o.customerName} — ${o.stockItemName}`, badge: o.date, meta: `Qty: ${o.quantity}`,
-  }))
-
-  const pickerItems       = watchType === 'purchase' ? purchasePickerItems : salesPickerItems
-  const pickerTitle       = watchType === 'purchase' ? 'Select Purchase Entry' : 'Select Sale Entry'
-  const pickerPlaceholder = watchType === 'purchase' ? 'Select purchase entry…' : 'Select sale entry…'
-  const ordersEmpty       = watchType === 'purchase' ? purchaseOrders.length === 0 : salesOrders.length === 0
-
-  const handleTypeChange = (value: string) => {
-    form.setValue('type', value as 'purchase' | 'sale')
-    form.setValue('lines', [{ orderId: '' }])
-  }
-
-  const getOrderLabel = (orderId: string) => {
-    if (watchType === 'purchase') {
-      const o = purchaseOrders.find((p) => p.id === orderId)
-      return o ? `${o.date} · ${o.supplierName} · ${o.stockItemName} (${o.quantity})` : orderId
-    }
-    const o = salesOrders.find((s) => s.id === orderId)
-    return o ? `${o.date} · ${o.customerName} · ${o.stockItemName} (${o.quantity})` : orderId
-  }
+  const totalQty = watchedLines.reduce((sum, l) => sum + (l.quantity || 0), 0)
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createGatepassAction({
-        type:          values.type,
-        date:          values.date,
-        vehicleNumber: values.vehicleNumber,
-        driverName:    values.driverName,
-        remarks:       values.remarks,
-        lines:         values.lines,
-      })
+      const result = await createGatepassAction(values)
       if (!result.success) { setServerError(result.error); return }
       router.push('/gatepasses')
     })
@@ -119,7 +89,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 <CardTitle className="text-base">Gatepass Details</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
-                {/* Auto-generated GP number — read only */}
+
                 <div className="flex flex-col gap-1.5">
                   <span className="text-sm font-medium">Gatepass No.</span>
                   <div className="min-h-[44px] flex items-center px-3 rounded-md border bg-muted/50 font-mono text-sm font-semibold tracking-wide text-foreground">
@@ -131,13 +101,13 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 <FormField control={form.control} name="type" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
-                    <Select value={field.value} onValueChange={handleTypeChange}>
+                    <Select value={field.value} onValueChange={(v) => form.setValue('type', v as 'purchase' | 'sale')}>
                       <FormControl>
                         <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="purchase">Purchase</SelectItem>
-                        <SelectItem value="sale">Sale</SelectItem>
+                        <SelectItem value="purchase">Purchase (Inward)</SelectItem>
+                        <SelectItem value="sale">Sale (Outward)</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -175,63 +145,92 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                     <FormMessage />
                   </FormItem>
                 )} />
+
               </CardContent>
             </Card>
 
-            {/* Detail lines card */}
+            {/* Line items card */}
             <Card>
               <CardHeader className="pb-2 pt-5 px-5">
-                <CardTitle className="text-base">
-                  {watchType === 'purchase' ? 'Purchase' : 'Sale'} Entries
-                </CardTitle>
+                <CardTitle className="text-base">Items</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5">
-                <div className="space-y-2">
-                  {fields.map((field, index) => {
-                    const orderId = watchedLines[index]?.orderId ?? ''
-                    return (
-                      <div key={field.id} className="flex items-start gap-2">
-                        <span className="text-xs text-muted-foreground pt-3 w-5 shrink-0 tabular-nums">{index + 1}</span>
-                        <div className="flex-1">
-                          <Controller
-                            control={form.control}
-                            name={`lines.${index}.orderId`}
-                            render={({ field: f, fieldState }) => (
-                              <div>
-                                <ItemPickerDialog
-                                  items={pickerItems}
-                                  value={f.value}
-                                  onSelect={f.onChange}
-                                  placeholder={pickerPlaceholder}
-                                  title={pickerTitle}
-                                  disabled={ordersEmpty}
-                                />
-                                {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
-                                {orderId && (
-                                  <p className="text-xs text-muted-foreground mt-0.5">{getOrderLabel(orderId)}</p>
-                                )}
-                              </div>
+
+                <div className="overflow-x-auto -mx-5">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="w-8 px-3 py-2 text-left text-xs text-muted-foreground font-medium" />
+                        <th className="px-3 py-2 text-left text-xs text-muted-foreground font-medium">Stock Item</th>
+                        <th className="px-3 py-2 text-right text-xs text-muted-foreground font-medium w-32">Quantity</th>
+                        <th className="w-10" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {fields.map((field, index) => (
+                        <tr key={field.id} className="align-top">
+                          <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
+                          <td className="px-3 py-2 min-w-[180px]">
+                            <Controller
+                              control={form.control}
+                              name={`lines.${index}.stockItemId`}
+                              render={({ field: f, fieldState }) => (
+                                <div>
+                                  <ItemPickerDialog
+                                    items={lotList}
+                                    value={f.value}
+                                    onSelect={f.onChange}
+                                    placeholder="Select item…"
+                                    title="Select Stock Item"
+                                    createLabel="New Stock Item"
+                                    onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
+                                    quickCreate={(onSuccess, onCancel) => (
+                                      <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                                    )}
+                                  />
+                                  {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
+                                </div>
+                              )}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input
+                              type="number" min={0} step="0.001" placeholder="0"
+                              className="text-right"
+                              {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })}
+                            />
+                            {form.formState.errors.lines?.[index]?.quantity && (
+                              <p className="text-xs text-destructive mt-1">
+                                {form.formState.errors.lines[index]?.quantity?.message}
+                              </p>
                             )}
-                          />
-                        </div>
-                        <Button type="button" variant="ghost" size="icon-sm"
-                          onClick={() => remove(index)} disabled={fields.length === 1}
-                          className="text-muted-foreground hover:text-destructive mt-1 shrink-0">
-                          <Trash2 className="size-4" />
-                        </Button>
-                      </div>
-                    )
-                  })}
+                          </td>
+                          <td className="px-1 py-2 pt-2">
+                            <Button
+                              type="button" variant="ghost" size="icon-sm"
+                              onClick={() => remove(index)} disabled={fields.length === 1}
+                              className="text-muted-foreground hover:text-destructive">
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
-                <Button type="button" variant="outline" size="sm"
-                  onClick={() => append({ orderId: '' })}
-                  className="mt-3 gap-1.5" disabled={ordersEmpty}>
-                  <Plus className="size-4" /> Add Entry
-                </Button>
-                {ordersEmpty && (
-                  <p className="text-xs text-muted-foreground mt-2">No {watchType} entries available.</p>
-                )}
+                <div className="px-3 pt-3">
+                  <Button
+                    type="button" variant="outline" size="sm"
+                    onClick={() => append({ stockItemId: '', quantity: 0 })}
+                    className="gap-1.5">
+                    <Plus className="size-4" /> Add Item
+                  </Button>
+                  {form.formState.errors.lines?.root && (
+                    <p className="text-xs text-destructive mt-2">{form.formState.errors.lines.root.message}</p>
+                  )}
+                </div>
+
               </CardContent>
             </Card>
           </div>
@@ -254,7 +253,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                         ? 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-400'
                         : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
                     }`}>
-                      {watchType === 'purchase' ? 'Purchase' : 'Sale'}
+                      {watchType === 'purchase' ? 'Inward' : 'Outward'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -273,13 +272,23 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
 
                 <Separator className="my-4" />
 
-                <div className="flex justify-between items-center mb-5">
-                  <span className="font-bold text-sm">Entries</span>
-                  <span className="text-xl font-extrabold tabular-nums tracking-tight">{fields.length}</span>
+                <div className="space-y-1.5 mb-5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Items</span>
+                    <span className="font-bold tabular-nums">{fields.length}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Qty</span>
+                    <span className="text-xl font-extrabold tabular-nums tracking-tight">
+                      {totalQty > 0 ? totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 }) : '—'}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
+                  <Button
+                    type="submit"
+                    className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
                     disabled={isPending}>
                     {isPending ? 'Saving…' : 'Issue Gatepass'}
                   </Button>
