@@ -14,11 +14,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               Tajir Admin
             </Link>
             <nav className="flex items-center gap-1">
-              <Link
-                href="/admin/tenants"
-                className="text-sm px-3 py-2 rounded-md hover:bg-accent whitespace-nowrap"
-              >
+              <Link href="/admin/tenants" className="text-sm px-3 py-2 rounded-md hover:bg-accent whitespace-nowrap">
                 Tenants
+              </Link>
+              <Link href="/admin/activity" className="text-sm px-3 py-2 rounded-md hover:bg-accent whitespace-nowrap">
+                Activity
               </Link>
             </nav>
           </div>
