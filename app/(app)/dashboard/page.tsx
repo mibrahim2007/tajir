@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   Package, ShoppingCart, ShoppingBag, ClipboardList,
   ArrowDownLeft, ArrowUpRight, ArrowDownRight,
-  Receipt, PenLine, TrendingUp, Landmark, BarChart2,
+  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy,
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -365,6 +365,7 @@ export default async function DashboardPage({
     { href: '/expenses/new',   label: 'New Expense',  icon: Receipt },
     { href: '/inventory',      label: 'Inventory',    icon: Package },
     { href: '/reports',        label: 'Reports',      icon: BarChart2 },
+    { href: '/support',        label: 'Support',      icon: LifeBuoy },
     ...(isOwner ? [{ href: '/vouchers/new', label: 'New Voucher', icon: PenLine }] : []),
   ]
 
