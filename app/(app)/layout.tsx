@@ -20,9 +20,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <CommandPalette role={role} />
       <SubscriptionLockedBanner status={tenant.subscriptionStatus} />
       <div className="flex min-h-screen">
-        <DesktopSidebar {...sidebarProps} />
+        <div className="print:hidden"><DesktopSidebar {...sidebarProps} /></div>
         <div className="flex-1 flex flex-col min-w-0">
-          <MobileHeader {...sidebarProps} />
+          <div className="print:hidden"><MobileHeader {...sidebarProps} /></div>
           <main className="flex-1">{children}</main>
         </div>
       </div>

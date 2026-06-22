@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Send } from 'lucide-react'
+import { ArrowLeft, Send, Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { addTicketMessageAction } from '@/app/actions/add-ticket-message'
@@ -70,9 +70,19 @@ export function TicketThread({
               Opened {new Date(ticket.createdAt).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
             </p>
           </div>
-          <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLOR[ticket.status]}`}>
-            {STATUS_LABEL[ticket.status]}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full border ${STATUS_COLOR[ticket.status]}`}>
+              {STATUS_LABEL[ticket.status]}
+            </span>
+            <a
+              href={`/support/${ticket.id}/print`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+            >
+              <Printer className="h-3 w-3" /> Print
+            </a>
+          </div>
         </div>
       </div>
 
