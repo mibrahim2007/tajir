@@ -30,6 +30,7 @@ import {
   MapPin,
   ArrowLeftRight,
   Layers,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -92,6 +93,12 @@ const ownerGroups: NavGroup[] = [
       { href: "/audit", label: "Audit Log", icon: Search },
     ],
   },
+  {
+    title: "Help",
+    links: [
+      { href: "/support", label: "Support", icon: LifeBuoy },
+    ],
+  },
 ];
 
 const assistantGroups: NavGroup[] = [
@@ -109,6 +116,12 @@ const assistantGroups: NavGroup[] = [
       { href: "/sale-returns", label: "Sale Returns", icon: RefreshCcw },
       { href: "/gatepasses", label: "Gatepasses", icon: ClipboardList },
       { href: "/stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight },
+    ],
+  },
+  {
+    title: "Help",
+    links: [
+      { href: "/support", label: "Support", icon: LifeBuoy },
     ],
   },
 ];
