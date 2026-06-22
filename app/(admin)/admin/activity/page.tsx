@@ -14,19 +14,27 @@ function pktToday(): string {
 }
 
 function prevDate(d: string) {
-  const dt = new Date(d + 'T00:00:00')
-  dt.setDate(dt.getDate() - 1)
+  const [y, m, day] = d.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, day - 1))
   return dt.toISOString().slice(0, 10)
 }
 
 function nextDate(d: string) {
-  const dt = new Date(d + 'T00:00:00')
-  dt.setDate(dt.getDate() + 1)
+  const [y, m, day] = d.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, day + 1))
   return dt.toISOString().slice(0, 10)
 }
 
+/** PKT midnight expressed as UTC ISO string (PKT = UTC+5) */
+function pktMidnightUTC(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d, 0, 0, 0) - 5 * 3600 * 1000).toISOString()
+}
+
 function fmtDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-PK', {
+  const [y, m, day] = d.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, day)).toLocaleDateString('en-PK', {
+    timeZone: 'UTC',
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   })
 }
@@ -38,66 +46,72 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 const ENTITY_LABELS: Record<string, string> = {
-  purchase_orders:    'Purchases',
-  sales_orders:       'Sales',
-  inventory_lots:     'Inventory',
-  suppliers:          'Suppliers',
-  tajir_customers:    'Customers',
-  ap_payments:        'Payments',
-  ar_receipts:        'Receipts',
-  gatepasses:         'Gatepasses',
-  vouchers:           'Vouchers',
+  purchase_orders:      'Purchases',
+  sales_orders:         'Sales',
+  inventory_lots:       'Inventory',
+  suppliers:            'Suppliers',
+  tajir_customers:      'Customers',
+  ap_payments:          'Payments',
+  ar_receipts:          'Receipts',
+  gatepasses:           'Gatepasses',
+  vouchers:             'Vouchers',
   customer_price_lists: 'Pricing',
-  tenant_users:       'Users',
-  tenants:            'Tenants',
-  sale_returns:       'Sale Returns',
-  purchase_returns:   'Purchase Returns',
-  stock_transfers:    'Stock Transfers',
-  expenses:           'Expenses',
+  tenant_users:         'Users',
+  tenants:              'Tenants',
+  sale_returns:         'Sale Returns',
+  purchase_returns:     'Purchase Returns',
+  stock_transfers:      'Stock Transfers',
+  expenses:             'Expenses',
 }
 
 /* ─── page ────────────────────────────────────────────────────────────── */
 
 export default async function ActivityPage({ searchParams }: { searchParams: SearchParams }) {
   await requireAdmin()
-  const params   = await searchParams
-  const date     = typeof params.date === 'string' ? params.date : pktToday()
-  const today    = pktToday()
-  const isToday  = date === today
+  const params  = await searchParams
+  const date    = typeof params.date === 'string' ? params.date : pktToday()
+  const today   = pktToday()
+  const isToday = date === today
 
   const admin = createAdminClient()
 
-  /* Raw activity rows for the selected PKT date */
+  /* 1. Audit rows — no join, plain fields only */
+  const startUTC = pktMidnightUTC(date)
+  const endUTC   = pktMidnightUTC(nextDate(date))
+
   const { data: rows } = await admin
     .from('audit_log')
-    .select(`
-      id, action, entity, created_at, user_id, tenant_id,
-      tenants!inner ( name )
-    `)
-    .gte('created_at', `${date}T00:00:00+05:00`)
-    .lt('created_at',  `${nextDate(date)}T00:00:00+05:00`)
+    .select('id, action, entity, created_at, user_id, tenant_id')
+    .gte('created_at', startUTC)
+    .lt('created_at',  endUTC)
     .order('created_at', { ascending: false })
 
   const entries = rows ?? []
 
-  /* Collect unique user_ids then fetch emails */
-  const userIds = [...new Set(entries.map((e) => e.user_id).filter(Boolean))]
-  const emailMap: Record<string, string> = {}
-  if (userIds.length > 0) {
-    const { data: users } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    for (const u of users?.users ?? []) {
-      emailMap[u.id] = u.email ?? u.id
-    }
+  /* 2. Tenant names — separate query, no FK join needed */
+  const tenantIds = [...new Set(entries.map((e) => e.tenant_id).filter(Boolean))]
+  const tenantNameMap: Record<string, string> = {}
+  if (tenantIds.length > 0) {
+    const { data: tenantRows } = await admin
+      .from('tenants')
+      .select('id, name')
+      .in('id', tenantIds)
+    for (const t of tenantRows ?? []) tenantNameMap[t.id] = t.name
   }
+
+  /* 3. User emails — fetch all once */
+  const emailMap: Record<string, string> = {}
+  const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
+  for (const u of authData?.users ?? []) emailMap[u.id] = u.email ?? u.id
 
   /* ── Aggregate ───────────────────────────────────────────────────────── */
   type UserSummary = {
-    userId:     string
-    email:      string
-    actions:    { action: string; entity: string; count: number }[]
-    total:      number
-    firstAt:    string
-    lastAt:     string
+    userId:  string
+    email:   string
+    actions: { action: string; entity: string; count: number }[]
+    total:   number
+    firstAt: string
+    lastAt:  string
   }
   type TenantSummary = {
     tenantId:   string
@@ -109,9 +123,9 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
   const tenantMap = new Map<string, TenantSummary>()
 
   for (const row of entries) {
-    const tId   = row.tenant_id
-    const tName = (row.tenants as unknown as { name: string } | null)?.name ?? tId
-    const uId   = row.user_id ?? 'unknown'
+    const tId   = row.tenant_id ?? 'unknown'
+    const tName = tenantNameMap[tId] ?? tId.slice(0, 8) + '…'
+    const uId   = row.user_id   ?? 'unknown'
     const email = emailMap[uId] ?? uId
 
     if (!tenantMap.has(tId)) {
@@ -121,8 +135,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
 
     if (!tenant.users.has(uId)) {
       tenant.users.set(uId, {
-        userId: uId, email,
-        actions: [], total: 0,
+        userId: uId, email, actions: [], total: 0,
         firstAt: row.created_at, lastAt: row.created_at,
       })
     }
@@ -137,8 +150,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
     tenant.total++
   }
 
-  const tenants = [...tenantMap.values()].sort((a, b) => b.total - a.total)
-
+  const tenants     = [...tenantMap.values()].sort((a, b) => b.total - a.total)
   const totalActions  = entries.length
   const activeTenants = tenantMap.size
   const activeUsers   = new Set(entries.map((e) => e.user_id)).size
@@ -187,7 +199,7 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
         {[
           { label: 'Total Actions', value: totalActions },
           { label: 'Active Tenants', value: activeTenants },
-          { label: 'Active Users', value: activeUsers },
+          { label: 'Active Users',   value: activeUsers   },
         ].map((s) => (
           <div key={s.label} className="rounded-lg border bg-card p-4">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{s.label}</p>
@@ -227,12 +239,12 @@ export default async function ActivityPage({ searchParams }: { searchParams: Sea
                           {user.firstAt !== user.lastAt && <> — {formatPKTDateTime(new Date(user.lastAt))}</>}
                         </p>
                       </div>
-                      <span className="text-sm font-semibold tabular-nums text-right">
+                      <span className="text-sm font-semibold tabular-nums">
                         {user.total} action{user.total !== 1 ? 's' : ''}
                       </span>
                     </div>
 
-                    {/* Action breakdown */}
+                    {/* Action breakdown badges */}
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {user.actions
                         .sort((a, b) => b.count - a.count)
