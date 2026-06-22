@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
-import { QuickCreateCustomer, QuickCreateLot } from '@/components/quick-create-forms'
+import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { createSaleOrderAction } from '@/app/actions/create-sale-order'
 
@@ -73,10 +73,6 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const [customerList, setCustomerList] = useState<PickerItem[]>(
     customers.map((c) => ({ id: c.id, name: c.name }))
   )
-  const [lotList, setLotList] = useState<PickerItem[]>(
-    stockItems.map((s) => ({ id: s.id, name: s.name, meta: `${parseFloat(s.currentQuantity).toLocaleString()} avail.` }))
-  )
-
   const formSchema = useMemo(
     () => requireLocation
       ? baseSchema.refine(d => !!d.locationId, { message: 'Select a location', path: ['locationId'] })
@@ -122,23 +118,19 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   }, [watchedLocation, locationStock])
 
   const stockPickerItems = useMemo(() => {
-    return lotList
+    return stockItems
       .filter(s => {
         if (!locStockMap) return true
-        const qty = locStockMap[s.id] ?? 0
-        return qty > 0
+        return (locStockMap[s.id] ?? 0) > 0
       })
-      .map(s => {
-        const si = stockItems.find(x => x.id === s.id)
-        return {
-          id: s.id,
-          name: s.name,
-          meta: locStockMap
-            ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
-            : si ? `${parseFloat(si.currentQuantity).toLocaleString()} avail.` : undefined,
-        }
-      })
-  }, [lotList, stockItems, locStockMap])
+      .map(s => ({
+        id: s.id,
+        name: s.name,
+        meta: locStockMap
+          ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
+          : `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
+      }))
+  }, [stockItems, locStockMap])
 
   const getPricedRate = (customerId: string, stockItemId: string) => {
     const rule = pricingRules.find((r) => r.customerId === customerId && r.stockItemId === stockItemId)
@@ -386,11 +378,6 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                                           }}
                                           placeholder="Select item…"
                                           title="Select Stock Item"
-                                          createLabel="New Stock Item"
-                                          onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
-                                          quickCreate={(onSuccess, onCancel) => (
-                                            <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
-                                          )}
                                         />
                                         {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
                                         {avail !== null && (

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition, useMemo } from 'react'
+
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -11,8 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
-import { QuickCreateLot } from '@/components/quick-create-forms'
+import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { createStockTransferAction } from '@/app/actions/create-stock-transfer'
 
 const schema = z.object({
@@ -42,10 +42,6 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
-  const [lotList, setLotList] = useState<PickerItem[]>(
-    items.map((i) => ({ id: i.id, name: i.name, badge: i.count }))
-  )
-
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -72,15 +68,15 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
   // Filter items to those with stock at from-location; show their available qty
   const itemPickerItems = useMemo(() => {
     const filtered = watchedFrom
-      ? lotList.filter(i => (fromLocMap[i.id] ?? 0) > 0)
-      : lotList
+      ? items.filter(i => (fromLocMap[i.id] ?? 0) > 0)
+      : items
     return filtered.map(i => ({
       id: i.id,
       name: i.name,
-      badge: i.badge,
+      badge: i.count,
       meta: watchedFrom ? `${(fromLocMap[i.id] ?? 0).toLocaleString()} avail.` : undefined,
     }))
-  }, [watchedFrom, lotList, fromLocMap])
+  }, [watchedFrom, items, fromLocMap])
 
   // When from-location changes, clear stockItemId if no longer available there;
   // also clear toLocationId if it matches the new from-location
@@ -160,11 +156,6 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
                     onSelect={field.onChange}
                     placeholder={watchedFrom ? 'Select item with stock at this location…' : 'Select from-location first…'}
                     title="Select Stock Item"
-                    createLabel="New Stock Item"
-                    onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
-                    quickCreate={(onSuccess, onCancel) => (
-                      <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
-                    )}
                   />
                 </FormControl>
                 {availableQty !== null && (

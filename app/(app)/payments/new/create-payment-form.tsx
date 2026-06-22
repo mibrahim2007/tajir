@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateSupplier } from '@/components/quick-create-forms'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -49,6 +51,12 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier, banks
   const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
 
+  const [supplierFull, setSupplierFull] = useState<Supplier[]>(suppliers)
+  const supplierPickerItems: PickerItem[] = supplierFull.map((s) => ({
+    id: s.id, name: s.name,
+    meta: s.outstanding > 0 ? `${formatPKR(s.outstanding)} outstanding` : undefined,
+  }))
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: { supplierId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '' },
@@ -59,7 +67,7 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier, banks
   const watchedCurrency     = form.watch('currencyCode')
   const watchedExchangeRate = form.watch('exchangeRate')
 
-  const selectedSupplier   = suppliers.find((s) => s.id === selectedSupplierId)
+  const selectedSupplier   = supplierFull.find((s) => s.id === selectedSupplierId)
   const supplierPurchases  = selectedSupplierId ? (purchasesBySupplier[selectedSupplierId] ?? []) : []
   const er                 = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountPkr          = (watchedAmount || 0) * er
@@ -96,21 +104,18 @@ export function CreatePaymentForm({ today, suppliers, purchasesBySupplier, banks
                     name="supplierId"
                     render={({ field, fieldState }) => (
                       <>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="min-h-[44px]">
-                            <SelectValue placeholder="Select supplier…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.name}
-                                {s.outstanding > 0 && (
-                                  <span className="ml-2 text-xs text-muted-foreground">({formatPKR(s.outstanding)} outstanding)</span>
-                                )}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <ItemPickerDialog
+                          items={supplierPickerItems}
+                          value={field.value}
+                          onSelect={field.onChange}
+                          placeholder="Select supplier…"
+                          title="Select Supplier"
+                          createLabel="New Supplier"
+                          onCreateSuccess={(item) => setSupplierFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
+                          quickCreate={(onSuccess, onCancel) => (
+                            <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
+                          )}
+                        />
                         {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
                       </>
                     )}

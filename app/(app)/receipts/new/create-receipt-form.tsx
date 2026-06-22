@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
+import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -49,6 +51,12 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
   const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
 
+  const [customerFull, setCustomerFull] = useState<Customer[]>(customers)
+  const customerPickerItems: PickerItem[] = customerFull.map((c) => ({
+    id: c.id, name: c.name,
+    meta: c.outstanding > 0 ? `${formatPKR(c.outstanding)} outstanding` : undefined,
+  }))
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '' },
@@ -59,7 +67,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
   const watchedCurrency      = form.watch('currencyCode')
   const watchedExchangeRate  = form.watch('exchangeRate')
 
-  const selectedCustomer    = customers.find((c) => c.id === selectedCustomerId)
+  const selectedCustomer    = customerFull.find((c) => c.id === selectedCustomerId)
   const customerSales       = selectedCustomerId ? (salesByCustomer[selectedCustomerId] ?? []) : []
   const er                  = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountPkr           = (watchedAmount || 0) * er
@@ -96,21 +104,18 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
                     name="customerId"
                     render={({ field, fieldState }) => (
                       <>
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="min-h-[44px]">
-                            <SelectValue placeholder="Select customer…" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {customers.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>
-                                {c.name}
-                                {c.outstanding > 0 && (
-                                  <span className="ml-2 text-xs text-muted-foreground">({formatPKR(c.outstanding)} outstanding)</span>
-                                )}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <ItemPickerDialog
+                          items={customerPickerItems}
+                          value={field.value}
+                          onSelect={field.onChange}
+                          placeholder="Select customer…"
+                          title="Select Customer"
+                          createLabel="New Customer"
+                          onCreateSuccess={(item) => setCustomerFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
+                          quickCreate={(onSuccess, onCancel) => (
+                            <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
+                          )}
+                        />
                         {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
                       </>
                     )}
