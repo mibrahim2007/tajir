@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -380,10 +381,11 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                     disabled={!canSubmit}>
                     {isPending ? 'Saving…' : `Confirm Purchase${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
                   </Button>
-                  <Button type="button" variant="outline" className="w-full min-h-[44px]"
-                    onClick={() => router.back()}>
-                    Cancel
-                  </Button>
+                  <ExitButton
+                    isDirty={form.formState.isDirty}
+                    onExit={() => router.back()}
+                    className="w-full min-h-[44px]"
+                  />
                 </div>
 
                 {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
