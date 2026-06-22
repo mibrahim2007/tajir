@@ -3,6 +3,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SubscriptionLockedBanner } from '@/components/subscription-locked-banner'
 import { DesktopSidebar, MobileHeader } from '@/components/sidebar'
+import { CommandPalette } from '@/components/command-palette'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, role, tenantId } = await requireAuth()
@@ -16,6 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <AuthProvider value={{ userId: user.id, role, tenantId }}>
+      <CommandPalette role={role} />
       <SubscriptionLockedBanner status={tenant.subscriptionStatus} />
       <div className="flex min-h-screen">
         <DesktopSidebar {...sidebarProps} />

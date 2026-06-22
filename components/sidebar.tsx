@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
+import { CommandPaletteTrigger } from "./command-palette";
 import {
   Sheet,
   SheetContent,
@@ -186,6 +187,11 @@ function SidebarContent({
         </Link>
       </div>
 
+      {/* Search trigger */}
+      <div className="px-3 pb-2 shrink-0">
+        <CommandPaletteTrigger />
+      </div>
+
       {/* Nav */}
       <NavItems groups={groups} onNavigate={onNavigate} />
 
@@ -235,7 +241,14 @@ export function MobileHeader(props: SidebarBaseProps) {
       <Link href="/dashboard" className="font-extrabold text-sm tracking-tight">
         {props.tenantName}<span className="text-primary">.</span>
       </Link>
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-1">
+        <button
+          onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
+          className="p-2 rounded-lg hover:bg-secondary transition-colors"
+          aria-label="Quick search"
+        >
+          <Search className="h-5 w-5 text-muted-foreground" />
+        </button>
         <LogoutButton />
       </div>
     </header>
