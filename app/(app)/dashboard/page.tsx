@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   Package, ShoppingCart, ShoppingBag, ClipboardList,
   ArrowDownLeft, ArrowUpRight, ArrowDownRight,
-  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy,
+  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy, Bell,
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -186,8 +186,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ period?: string }>
 }) {
-  const { tenantId, role } = await requireAuth()
-  const [tenant] = await Promise.all([getTenant(tenantId)])
+  const { user, tenantId, role } = await requireAuth()
   const admin   = createAdminClient()
   const isOwner = role === 'owner'
 
@@ -224,6 +223,13 @@ export default async function DashboardPage({
     periodLabel = `${monthName} ${year}`
   }
 
+  let supportQ = admin
+    .from('support_tickets')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
+    .in('status', ['open', 'in_progress'])
+  if (!isOwner) supportQ = supportQ.eq('user_id', user.id)
+
   const [
     { data: mtdSalesData },
     { data: mtdPurchasesData },
@@ -237,6 +243,8 @@ export default async function DashboardPage({
     { data: inventoryData },
     { data: chartSalesData },
     { data: chartPurchasesData },
+    tenant,
+    { count: rawSupportCount },
   ] = await Promise.all([
     admin.from('sales_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
     admin.from('purchase_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
@@ -252,7 +260,10 @@ export default async function DashboardPage({
       .eq('tenant_id', tenantId),
     admin.from('sales_orders').select('date, pkr_equivalent').eq('tenant_id', tenantId).gte('date', sixMonAgo),
     admin.from('purchase_orders').select('date, pkr_equivalent').eq('tenant_id', tenantId).gte('date', sixMonAgo),
+    getTenant(tenantId),
+    supportQ,
   ])
+  const supportCount = rawSupportCount ?? 0
 
   const parse = (v: unknown) => parseFloat((v as string) || '0') || 0
 
@@ -382,6 +393,22 @@ export default async function DashboardPage({
           <ShoppingBag className="h-4 w-4" /> New Sale
         </Link>
       </div>
+
+      {/* Support notification banner */}
+      {supportCount > 0 && (
+        <Link
+          href="/support"
+          className="flex items-center gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 hover:opacity-90 transition-opacity"
+        >
+          <Bell className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 flex-1">
+            {supportCount === 1
+              ? 'You have 1 open support ticket'
+              : `You have ${supportCount} open support tickets`}
+          </p>
+          <span className="text-xs font-medium text-amber-600 dark:text-amber-400 shrink-0">View →</span>
+        </Link>
+      )}
 
       {/* Base KPIs — all users */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

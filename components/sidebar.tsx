@@ -31,6 +31,7 @@ import {
   ArrowLeftRight,
   Layers,
   LifeBuoy,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -130,13 +131,14 @@ type SidebarBaseProps = {
   role: string;
   userEmail: string;
   tenantName: string;
+  supportCount?: number;
 };
 
 function initials(name: string) {
   return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
-function NavItems({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () => void }) {
+function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]; onNavigate?: () => void; supportCount?: number }) {
   const pathname = usePathname();
 
   return (
@@ -148,6 +150,7 @@ function NavItems({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () 
           </p>
           {group.links.map((link) => {
             const active = pathname === link.href || pathname.startsWith(link.href + "/");
+            const showBadge = link.href === '/support' && supportCount > 0;
             return (
               <Link
                 key={link.href}
@@ -164,7 +167,12 @@ function NavItems({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () 
                   <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary" />
                 )}
                 <link.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "opacity-100" : "opacity-75")} />
-                <span className="truncate">{link.label}</span>
+                <span className="truncate flex-1">{link.label}</span>
+                {showBadge && (
+                  <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1 leading-none">
+                    {supportCount > 99 ? '99+' : supportCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -178,6 +186,7 @@ function SidebarContent({
   role,
   userEmail,
   tenantName,
+  supportCount = 0,
   onNavigate,
 }: SidebarBaseProps & { onNavigate?: () => void }) {
   const groups = role === "owner" ? ownerGroups : assistantGroups;
@@ -206,7 +215,7 @@ function SidebarContent({
       </div>
 
       {/* Nav */}
-      <NavItems groups={groups} onNavigate={onNavigate} />
+      <NavItems groups={groups} onNavigate={onNavigate} supportCount={supportCount} />
 
       {/* Footer */}
       <div className="border-t border-border p-3 shrink-0">
@@ -235,6 +244,7 @@ export function DesktopSidebar(props: SidebarBaseProps) {
 
 export function MobileHeader(props: SidebarBaseProps) {
   const [open, setOpen] = useState(false);
+  const supportCount = props.supportCount ?? 0;
 
   return (
     <header className="lg:hidden sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4">
@@ -255,6 +265,18 @@ export function MobileHeader(props: SidebarBaseProps) {
         {props.tenantName}<span className="text-primary">.</span>
       </Link>
       <div className="ml-auto flex items-center gap-1">
+        <Link
+          href="/support"
+          className="relative p-2 rounded-lg hover:bg-secondary transition-colors"
+          aria-label={supportCount > 0 ? `${supportCount} support notification${supportCount !== 1 ? 's' : ''}` : 'Support'}
+        >
+          <Bell className="h-5 w-5 text-muted-foreground" />
+          {supportCount > 0 && (
+            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-1 leading-none">
+              {supportCount > 99 ? '99+' : supportCount}
+            </span>
+          )}
+        </Link>
         <button
           onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
           className="p-2 rounded-lg hover:bg-secondary transition-colors"
