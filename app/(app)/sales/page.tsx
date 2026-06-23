@@ -98,7 +98,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Due</th>
-                  <th className="px-4 py-3 w-24" />
+                  <th className="px-4 py-3 w-32" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -127,8 +127,11 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                         {dueDate ? formatPKTDate(dueDate) : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <RoleGate allowedRoles={['owner']}>
-                          <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1">
+                          <Link href={`/sales/${o.id}/print`}>
+                            <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
+                          </Link>
+                          <RoleGate allowedRoles={['owner']}>
                             <EditSaleForm
                               sale={{ id: o.id, customerId: o.customer_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, date: o.date, paymentDueDate: o.payment_due_date }}
                               customers={customers}
@@ -139,8 +142,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                               description="Delete this sale order? Stock quantity will be restored."
                               onDelete={deleteSaleAction.bind(null, { id: o.id })}
                             />
-                          </div>
-                        </RoleGate>
+                          </RoleGate>
+                        </div>
                       </td>
                     </tr>
                   )

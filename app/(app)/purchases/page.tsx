@@ -87,7 +87,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
-                  <th className="px-4 py-3 w-24" />
+                  <th className="px-4 py-3 w-32" />
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -105,8 +105,11 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                     <td className="px-4 py-3 text-right tabular-nums">{o.currency_code} {parseFloat(o.rate).toLocaleString()}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
                     <td className="px-4 py-3">
-                      <RoleGate allowedRoles={['owner']}>
-                        <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1">
+                        <Link href={`/purchases/${o.id}/print`}>
+                          <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
+                        </Link>
+                        <RoleGate allowedRoles={['owner']}>
                           <EditPurchaseForm
                             purchase={{ id: o.id, supplierId: o.supplier_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, advancePaid: o.advance_paid, date: o.date }}
                             suppliers={supplierList}
@@ -116,8 +119,8 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                             description="Delete this purchase? Stock quantity will be reversed."
                             onDelete={deletePurchaseAction.bind(null, { id: o.id })}
                           />
-                        </div>
-                      </RoleGate>
+                        </RoleGate>
+                      </div>
                     </td>
                   </tr>
                 ))}
