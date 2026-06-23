@@ -25,7 +25,7 @@ const VIDEOS: VideoCard[] = [
     category: 'Getting Started',
     categoryUr: 'شروعات',
     duration: '4 min',
-    embedUrl: 'https://www.youtube.com/embed/zTC7DVha3yU',
+    embedUrl: 'https://www.youtube.com/embed/8JbrH_zWhvM',
     gradient: 'from-teal-500 to-emerald-600',
   },
   {
