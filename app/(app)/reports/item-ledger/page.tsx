@@ -74,32 +74,32 @@ export default async function ItemLedgerPage({ searchParams }: { searchParams: S
     { data: purchaseReturns },
     { data: saleReturns },
   ] = await Promise.all([
-    admin.from('purchase_orders').select('id, date, quantity, supplier_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
-    admin.from('sales_orders').select('id, date, quantity, customer_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
-    admin.from('purchase_returns').select('id, date, quantity, supplier_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
-    admin.from('sale_returns').select('id, date, quantity, customer_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
+    admin.from('purchase_orders').select('id, date, created_at, quantity, supplier_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
+    admin.from('sales_orders').select('id, date, created_at, quantity, customer_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
+    admin.from('purchase_returns').select('id, date, created_at, quantity, supplier_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
+    admin.from('sale_returns').select('id, date, created_at, quantity, customer_id').eq('tenant_id', tenantId).eq('stock_item_id', itemId).gte('date', fromDate).lte('date', toDate),
   ])
 
   type LedgerRow = { date: string; sortKey: string; type: string; party: string; qtyIn: number; qtyOut: number }
 
   const ledgerRows: LedgerRow[] = [
     ...(purchases ?? []).map(r => ({
-      date: r.date, sortKey: r.date + r.id,
+      date: r.date, sortKey: r.date + '|' + (r.created_at ?? '') + '|' + r.id,
       type: 'Purchase', party: supplierMap.get(r.supplier_id) ?? '—',
       qtyIn: Number(r.quantity), qtyOut: 0,
     })),
     ...(sales ?? []).map(r => ({
-      date: r.date, sortKey: r.date + r.id,
+      date: r.date, sortKey: r.date + '|' + (r.created_at ?? '') + '|' + r.id,
       type: 'Sale', party: customerMap.get(r.customer_id) ?? '—',
       qtyIn: 0, qtyOut: Number(r.quantity),
     })),
     ...(purchaseReturns ?? []).map(r => ({
-      date: r.date, sortKey: r.date + r.id,
+      date: r.date, sortKey: r.date + '|' + (r.created_at ?? '') + '|' + r.id,
       type: 'Purchase Return', party: supplierMap.get(r.supplier_id) ?? '—',
       qtyIn: 0, qtyOut: Number(r.quantity),
     })),
     ...(saleReturns ?? []).map(r => ({
-      date: r.date, sortKey: r.date + r.id,
+      date: r.date, sortKey: r.date + '|' + (r.created_at ?? '') + '|' + r.id,
       type: 'Sale Return', party: customerMap.get(r.customer_id) ?? '—',
       qtyIn: Number(r.quantity), qtyOut: 0,
     })),
