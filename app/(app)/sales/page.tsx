@@ -11,6 +11,7 @@ import { deleteSaleAction } from '@/app/actions/delete-sale'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { SaleFilters } from './sale-filters'
+import { AlertTriangle } from 'lucide-react'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
@@ -35,15 +36,23 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   if (filterCustomer) query = query.eq('customer_id', filterCustomer)
   if (filterItem)     query = query.eq('stock_item_id', filterItem)
 
-  const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }, { data: rawPurchases }] = await Promise.all([
     query,
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity')
+      .eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
   ])
 
   const orders    = rawOrders ?? []
   const customers = rawCustomers ?? []
   const lots      = rawLots ?? []
+
+  const costMap: Record<string, number> = {}
+  for (const p of rawPurchases ?? []) {
+    if (!costMap[p.stock_item_id])
+      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+  }
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]))
   const lotMap      = new Map(lots.map((l) => [l.id, l.name]))
@@ -94,15 +103,25 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
               </thead>
               <tbody className="divide-y">
                 {orders.map((o) => {
-                  const dueDate  = o.payment_due_date ? new Date(o.payment_due_date) : null
+                  const dueDate   = o.payment_due_date ? new Date(o.payment_due_date) : null
                   const isOverdue = dueDate && dueDate < new Date()
+                  const ratePKR   = parseFloat(o.rate) * parseFloat(o.exchange_rate)
+                  const cost      = costMap[o.stock_item_id]
+                  const belowCost = cost !== undefined && ratePKR < cost
                   return (
                     <tr key={o.id} className="hover:bg-secondary/50 transition-colors">
                       <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(o.date))}</td>
                       <td className="px-4 py-3 font-medium">{customerMap.get(o.customer_id) ?? '—'}</td>
                       <td className="px-4 py-3 text-muted-foreground">{lotMap.get(o.stock_item_id) ?? '—'}</td>
                       <td className="px-4 py-3 text-right tabular-nums">{parseFloat(o.quantity).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">{o.currency_code} {parseFloat(o.rate).toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap">
+                        <span>{o.currency_code} {parseFloat(o.rate).toLocaleString()}</span>
+                        {belowCost && (
+                          <span className="ml-1.5 inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400 text-[11px]" title={`Below cost (Rs ${Math.round(cost).toLocaleString()})`}>
+                            <AlertTriangle className="h-3 w-3" />
+                          </span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
                       <td className={`px-4 py-3 text-right whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                         {dueDate ? formatPKTDate(dueDate) : '—'}
@@ -114,6 +133,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                               sale={{ id: o.id, customerId: o.customer_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, date: o.date, paymentDueDate: o.payment_due_date }}
                               customers={customers}
                               lots={lots}
+                              costMap={costMap}
                             />
                             <DeleteButton
                               description="Delete this sale order? Stock quantity will be restored."

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil } from 'lucide-react'
+import { Pencil, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -42,9 +42,10 @@ type Props = {
   sale: Sale
   customers: { id: string; name: string }[]
   lots: { id: string; name: string }[]
+  costMap: Record<string, number>
 }
 
-export function EditSaleForm({ sale, customers, lots }: Props) {
+export function EditSaleForm({ sale, customers, lots, costMap }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -63,6 +64,12 @@ export function EditSaleForm({ sale, customers, lots }: Props) {
       paymentDueDate: sale.paymentDueDate ?? undefined,
     },
   })
+
+  const watchedStockItemId = form.watch('stockItemId')
+  const watchedRate        = form.watch('rate')
+  const watchedER          = form.watch('exchangeRate')
+  const cost               = costMap[watchedStockItemId]
+  const belowCost          = cost !== undefined && watchedRate > 0 && (watchedRate * (watchedER || 1)) < cost
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -128,6 +135,12 @@ export function EditSaleForm({ sale, customers, lots }: Props) {
               label="Rate per Unit"
               required
             />
+            {belowCost && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2 flex items-center gap-1">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                Below purchase cost (Rs {Math.round(cost!).toLocaleString()})
+              </p>
+            )}
 
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem>
