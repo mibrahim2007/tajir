@@ -16,7 +16,7 @@ export default async function SupportPage() {
 
   let query = admin
     .from('support_tickets')
-    .select('id, subject, status, created_at, updated_at, user_email')
+    .select('id, subject, status, created_at, updated_at, user_email, closed_reviewed')
     .eq('tenant_id', tenantId)
     .order('updated_at', { ascending: false })
     .limit(50)
@@ -66,9 +66,16 @@ export default async function SupportPage() {
                     {new Date(ticket.updated_at as string).toLocaleDateString('en-PK', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </p>
                 </div>
-                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border shrink-0 ${meta.color}`}>
-                  <Icon className="h-3 w-3" /> {meta.label}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {ticket.status === 'closed' && !ticket.closed_reviewed && (
+                    <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-destructive text-destructive-foreground">
+                      New Reply
+                    </span>
+                  )}
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${meta.color}`}>
+                    <Icon className="h-3 w-3" /> {meta.label}
+                  </span>
+                </div>
               </Link>
             )
           })}

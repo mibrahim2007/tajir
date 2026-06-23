@@ -14,7 +14,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .from('support_tickets')
     .select('id', { count: 'exact', head: true })
     .eq('tenant_id', tenantId)
-    .in('status', ['open', 'in_progress'])
+    .or('status.in.(open,in_progress),and(status.eq.closed,closed_reviewed.eq.false)')
   if (role !== 'owner') supportQ = supportQ.eq('user_id', user.id)
 
   const [tenant, { count: rawSupportCount }] = await Promise.all([

@@ -10,7 +10,7 @@ export default async function SupportTicketPage({ params }: { params: Promise<{ 
 
   const { data: ticket } = await admin
     .from('support_tickets')
-    .select('id, subject, status, created_at, user_email, tenant_name, user_id')
+    .select('id, subject, status, created_at, user_email, tenant_name, user_id, closed_reviewed')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -19,6 +19,11 @@ export default async function SupportTicketPage({ params }: { params: Promise<{ 
 
   /* Non-owners can only see their own tickets */
   if (role !== 'owner' && ticket.user_id !== user.id) notFound()
+
+  /* Mark closed ticket as reviewed the moment the user opens it */
+  if (ticket.status === 'closed' && !ticket.closed_reviewed) {
+    await admin.from('support_tickets').update({ closed_reviewed: true }).eq('id', id)
+  }
 
   const { data: messages } = await admin
     .from('ticket_messages')
