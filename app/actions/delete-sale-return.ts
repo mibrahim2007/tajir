@@ -32,6 +32,23 @@ export async function deleteSaleReturnAction(input: unknown): Promise<ActionResu
     return { success: false, error: 'Sale return not found', code: 'NOT_FOUND' }
   }
 
+  /* Guard: deleting a sale return removes the returned goods from stock */
+  const { data: lot } = await admin
+    .from('inventory_lots')
+    .select('current_quantity')
+    .eq('id', ret.stock_item_id)
+    .eq('tenant_id', tenantId)
+    .single()
+  const available = parseFloat(lot?.current_quantity ?? '0')
+  const returnQty = parseFloat(ret.quantity)
+  if (available - returnQty < 0) {
+    return {
+      success: false,
+      error: `Cannot delete sale return: current stock is ${available.toLocaleString()} units. Removing this return (${returnQty.toLocaleString()} units) would result in negative stock.`,
+      code: 'INSUFFICIENT_STOCK',
+    }
+  }
+
   // Reverse GL entry
   const { data: glEntry } = await admin
     .from('tajir_journal_entries')

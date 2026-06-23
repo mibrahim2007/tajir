@@ -47,6 +47,24 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
   // positive delta means selling more → decrease inventory by delta
   const qtyDelta = quantity - oldQty
 
+  // Guard: increasing sale qty removes more stock — block if it would go negative
+  if (qtyDelta > 0) {
+    const { data: lot } = await admin
+      .from('inventory_lots')
+      .select('current_quantity')
+      .eq('id', stockItemId)
+      .eq('tenant_id', tenantId)
+      .single()
+    const available = parseFloat(lot?.current_quantity ?? '0')
+    if (available - qtyDelta < 0) {
+      return {
+        success: false,
+        error: `Insufficient stock: only ${available.toLocaleString()} units available. Increasing this sale by ${qtyDelta.toLocaleString()} units would result in negative stock.`,
+        code: 'INSUFFICIENT_STOCK',
+      }
+    }
+  }
+
   const { error } = await admin
     .from('sales_orders')
     .update({

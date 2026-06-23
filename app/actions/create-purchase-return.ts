@@ -51,6 +51,22 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it before recording purchase returns.', code: 'COA_NOT_CONFIGURED' }
   }
 
+  /* Guard: purchase return removes goods from stock — block if it would go negative */
+  const { data: lot } = await admin
+    .from('inventory_lots')
+    .select('current_quantity')
+    .eq('id', stockItemId)
+    .eq('tenant_id', tenantId)
+    .single()
+  const available = parseFloat(lot?.current_quantity ?? '0')
+  if (available - quantity < 0) {
+    return {
+      success: false,
+      error: `Insufficient stock: only ${available.toLocaleString()} units available. Cannot return ${quantity.toLocaleString()} units — this would result in negative stock.`,
+      code: 'INSUFFICIENT_STOCK',
+    }
+  }
+
   const { data: ret, error: insertError } = await admin
     .from('purchase_returns')
     .insert({

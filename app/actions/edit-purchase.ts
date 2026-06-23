@@ -46,6 +46,24 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
   const oldQty = parseFloat(existing.quantity)
   const qtyDelta = quantity - oldQty
 
+  // Guard: reducing purchase qty removes stock — block if it would go negative
+  if (qtyDelta < 0) {
+    const { data: lot } = await admin
+      .from('inventory_lots')
+      .select('current_quantity')
+      .eq('id', stockItemId)
+      .eq('tenant_id', tenantId)
+      .single()
+    const available = parseFloat(lot?.current_quantity ?? '0')
+    if (available + qtyDelta < 0) {
+      return {
+        success: false,
+        error: `Cannot reduce purchase quantity: current stock is ${available.toLocaleString()} units. Reducing by ${Math.abs(qtyDelta).toLocaleString()} would result in negative stock.`,
+        code: 'INSUFFICIENT_STOCK',
+      }
+    }
+  }
+
   const { error } = await admin
     .from('purchase_orders')
     .update({
