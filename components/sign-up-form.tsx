@@ -28,7 +28,7 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
-const SETUP_VIDEO = 'https://www.youtube.com/embed/zTC7DVha3yU'
+const SETUP_VIDEO = 'https://www.youtube.com/embed/8JbrH_zWhvM'
 
 export function SignUpForm() {
   const router = useRouter()
