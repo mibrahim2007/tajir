@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   Package, ShoppingCart, ShoppingBag, ClipboardList,
   ArrowDownLeft, ArrowUpRight, ArrowDownRight,
-  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy, Bell, BookOpen,
+  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy, Bell, BookOpen, Video,
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -377,6 +377,7 @@ export default async function DashboardPage({
     { href: '/inventory',      label: 'Inventory',    icon: Package },
     { href: '/reports',        label: 'Reports',      icon: BarChart2 },
     { href: '/support',        label: 'Support',      icon: LifeBuoy },
+    { href: '/help',           label: 'Help Videos',  icon: Video },
     { href: '/user-guide',     label: 'User Guide',   icon: BookOpen },
     ...(isOwner ? [{ href: '/vouchers/new', label: 'New Voucher', icon: PenLine }] : []),
   ]
@@ -585,18 +586,31 @@ export default async function DashboardPage({
         </div>
       )}
 
-      {/* User Guide card */}
-      <Link href="/user-guide"
-        className="flex items-center gap-4 bg-card border border-border rounded-2xl px-5 py-4 hover:border-primary/40 hover:bg-secondary/30 transition-all group shadow-sm">
-        <span className="h-10 w-10 rounded-xl bg-accent text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-          <BookOpen className="h-5 w-5" />
-        </span>
-        <div className="flex-1 min-w-0">
-          <p className="font-bold text-foreground">User Guide <span className="text-muted-foreground font-normal">/ صارف راہنما</span></p>
-          <p className="text-xs text-muted-foreground mt-0.5">Step-by-step instructions for all features, in English and Urdu. Print or save as PDF.</p>
-        </div>
-        <span className="text-xs font-semibold text-muted-foreground shrink-0 group-hover:text-primary transition-colors">Open →</span>
-      </Link>
+      {/* Help & Guide cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Link href="/help"
+          className="flex items-center gap-4 bg-card border border-border rounded-2xl px-5 py-4 hover:border-primary/40 hover:bg-secondary/30 transition-all group shadow-sm">
+          <span className="h-10 w-10 rounded-xl bg-accent text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <Video className="h-5 w-5" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-foreground">Video Tutorials <span className="text-muted-foreground font-normal">/ ویڈیو راہنما</span></p>
+            <p className="text-xs text-muted-foreground mt-0.5">Step-by-step screen recordings for every business process.</p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground shrink-0 group-hover:text-primary transition-colors">Open →</span>
+        </Link>
+        <Link href="/user-guide"
+          className="flex items-center gap-4 bg-card border border-border rounded-2xl px-5 py-4 hover:border-primary/40 hover:bg-secondary/30 transition-all group shadow-sm">
+          <span className="h-10 w-10 rounded-xl bg-accent text-primary flex items-center justify-center shrink-0 group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+            <BookOpen className="h-5 w-5" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-foreground">User Guide <span className="text-muted-foreground font-normal">/ صارف راہنما</span></p>
+            <p className="text-xs text-muted-foreground mt-0.5">Full written guide in English and Urdu — printable as PDF.</p>
+          </div>
+          <span className="text-xs font-semibold text-muted-foreground shrink-0 group-hover:text-primary transition-colors">Open →</span>
+        </Link>
+      </div>
     </div>
   )
 }

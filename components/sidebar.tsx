@@ -19,6 +19,7 @@ import {
   Tag,
   Receipt,
   BookOpen,
+  Video,
   PenLine,
   BarChart2,
   UsersRound,
@@ -97,7 +98,9 @@ const ownerGroups: NavGroup[] = [
   {
     title: "Help",
     links: [
-      { href: "/support", label: "Support", icon: LifeBuoy },
+      { href: "/support",    label: "Support",    icon: LifeBuoy },
+      { href: "/help",       label: "Help Videos", icon: Video },
+      { href: "/user-guide", label: "User Guide",  icon: BookOpen },
     ],
   },
 ];
@@ -122,7 +125,9 @@ const assistantGroups: NavGroup[] = [
   {
     title: "Help",
     links: [
-      { href: "/support", label: "Support", icon: LifeBuoy },
+      { href: "/support",    label: "Support",    icon: LifeBuoy },
+      { href: "/help",       label: "Help Videos", icon: Video },
+      { href: "/user-guide", label: "User Guide",  icon: BookOpen },
     ],
   },
 ];
