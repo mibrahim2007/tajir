@@ -415,7 +415,7 @@ export default async function DashboardPage({
         <KpiCard label="Sales (MTD)"     value={shortPKR(mtdSales)}     sub={`${monthName} ${year}`} />
         <KpiCard label="Purchases (MTD)" value={shortPKR(mtdPurchases)} sub={`${monthName} ${year}`} />
         <KpiCard label="Receivables"     value={shortPKR(receivables)}  sub={receivables > 0 ? 'Outstanding from customers' : 'All settled'} />
-        <KpiCard label="Inventory"       value={totalInventoryUnits > 0 ? totalInventoryUnits.toLocaleString('en-IN') + ' units' : (inventoryData?.length ?? 0) + ' lots'} sub="Stock on hand" />
+        <KpiCard label="Inventory"       value={totalInventoryUnits > 0 ? totalInventoryUnits.toLocaleString('en-IN') + ' units' : (inventoryData?.length ?? 0) + ' items'} sub="Stock on hand" />
       </div>
 
       {/* Owner: Sales KPIs */}
