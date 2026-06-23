@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import Link from 'next/link'
+import { Play, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -27,9 +28,12 @@ const schema = z
 
 type FormValues = z.infer<typeof schema>
 
+const SETUP_VIDEO = 'https://www.youtube.com/embed/zTC7DVha3yU'
+
 export function SignUpForm() {
   const router = useRouter()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [showVideo, setShowVideo] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -53,10 +57,53 @@ export function SignUpForm() {
   }
 
   return (
+    <>
+      {/* Video modal */}
+      {showVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+          onClick={() => setShowVideo(false)}
+        >
+          <div
+            className="bg-white dark:bg-zinc-900 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <p className="font-bold text-sm">How to create your account &amp; set up Tajir</p>
+              <button
+                onClick={() => setShowVideo(false)}
+                className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="aspect-video bg-black">
+              <iframe
+                src={`${SETUP_VIDEO}?autoplay=1`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="w-full h-full"
+                title="How to create your Tajir account"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     <Card>
       <CardHeader>
         <CardTitle className="text-2xl">Create your Tajir account</CardTitle>
-        <CardDescription>Start tracking your yarn trading business</CardDescription>
+        <CardDescription>
+          Start tracking your trading business.{' '}
+          <button
+            type="button"
+            onClick={() => setShowVideo(true)}
+            className="inline-flex items-center gap-1 text-primary font-semibold hover:underline underline-offset-4"
+          >
+            <Play className="h-3 w-3 fill-primary" />
+            Watch setup guide
+          </button>
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -144,5 +191,6 @@ export function SignUpForm() {
         </Form>
       </CardContent>
     </Card>
+    </>
   )
 }
