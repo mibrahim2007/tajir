@@ -8,7 +8,7 @@ import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseAction } from '@/app/actions/delete-purchase'
 import { formatPKR } from '@/lib/utils/currency'
-import { formatPKTDate } from '@/lib/utils/dates'
+import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
 import { PurchaseFilters } from './purchase-filters'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
@@ -24,7 +24,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const admin = createAdminClient()
 
   let query = admin.from('purchase_orders')
-    .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
+    .select('id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .limit(500)
@@ -93,7 +93,12 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
               <tbody className="divide-y">
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-secondary/50 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(o.date))}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="block">{formatPKTDate(new Date(o.date))}</span>
+                      <span className="block text-[11px] text-muted-foreground tabular-nums">
+                        {formatPKTDateTime(new Date(o.created_at)).split(', ')[1]}
+                      </span>
+                    </td>
                     <td className="px-4 py-3">{supplierMap.get(o.supplier_id) ?? '—'}</td>
                     <td className="px-4 py-3">{lotMap.get(o.stock_item_id) ?? '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{parseFloat(o.quantity).toLocaleString()}</td>

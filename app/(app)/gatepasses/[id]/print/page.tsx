@@ -76,6 +76,9 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
 
   const totalQty = resolvedItems.reduce((s, i) => s + i.quantity, 0)
 
+  const uniqueParties = [...new Set(resolvedItems.map(i => i.partyName).filter(n => n !== '—'))]
+  const partyDisplay  = uniqueParties.length > 0 ? uniqueParties.join(', ') : '—'
+
   return (
     <div className="min-h-screen bg-white">
       <div className="print:hidden flex items-center gap-3 px-6 py-4 border-b bg-background sticky top-0">
@@ -83,6 +86,9 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
           <Button variant="ghost" size="sm">← Back</Button>
         </Link>
         <span className="text-sm text-muted-foreground flex-1">Gatepass #{gpNumber}</span>
+        <Link href={`/gatepasses/${gatepass.id}/edit`}>
+          <Button variant="outline" size="sm">Edit</Button>
+        </Link>
         <PrintButton />
       </div>
 
@@ -92,7 +98,7 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
           <h1 className="text-3xl font-bold tracking-widest uppercase">Gatepass</h1>
         </div>
 
-        <div className="flex justify-between mb-6 text-sm flex-wrap gap-2">
+        <div className="flex justify-between mb-4 text-sm flex-wrap gap-2">
           <div>
             <span className="text-muted-foreground print:text-gray-500">No: </span>
             <span className="font-mono font-semibold">{gpNumber}</span>
@@ -107,6 +113,11 @@ export default async function PrintGatepassPage({ params }: { params: Promise<{ 
               {gatepass.type === 'purchase' ? 'Inward (Purchase)' : 'Outward (Sale)'}
             </span>
           </div>
+        </div>
+
+        <div className="mb-6 text-sm">
+          <span className="text-muted-foreground print:text-gray-500">{partyLabel}: </span>
+          <span className="font-semibold">{partyDisplay}</span>
         </div>
 
         {(gatepass.vehicle_number || gatepass.driver_name || gatepass.remarks) && (

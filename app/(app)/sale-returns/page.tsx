@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteSaleReturnAction } from '@/app/actions/delete-sale-return'
+import { EditSaleReturnForm } from './edit-sale-return-form'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -14,12 +15,12 @@ export default async function SaleReturnsPage() {
 
   const [{ data: rawReturns }, { data: rawCustomers }, { data: rawLots }] = await Promise.all([
     admin.from('sale_returns')
-      .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, sale_order_id, reason')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, customer_id, stock_item_id, sale_order_id, reason')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
@@ -70,10 +71,17 @@ export default async function SaleReturnsPage() {
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
-                        <DeleteButton
-                          description="Delete this sale return? Stock quantity will be reversed."
-                          onDelete={deleteSaleReturnAction.bind(null, { id: r.id })}
-                        />
+                        <div className="flex items-center gap-1">
+                          <EditSaleReturnForm
+                            ret={{ id: r.id, customerId: r.customer_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null }}
+                            customers={rawCustomers ?? []}
+                            lots={rawLots ?? []}
+                          />
+                          <DeleteButton
+                            description="Delete this sale return? Stock quantity will be reversed."
+                            onDelete={deleteSaleReturnAction.bind(null, { id: r.id })}
+                          />
+                        </div>
                       </RoleGate>
                     </td>
                   </tr>

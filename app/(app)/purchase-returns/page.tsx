@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseReturnAction } from '@/app/actions/delete-purchase-return'
+import { EditPurchaseReturnForm } from './edit-purchase-return-form'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -14,12 +15,12 @@ export default async function PurchaseReturnsPage() {
 
   const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, date, quantity, rate, currency_code, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
@@ -70,10 +71,17 @@ export default async function PurchaseReturnsPage() {
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
-                        <DeleteButton
-                          description="Delete this purchase return? Stock quantity will be restored."
-                          onDelete={deletePurchaseReturnAction.bind(null, { id: r.id })}
-                        />
+                        <div className="flex items-center gap-1">
+                          <EditPurchaseReturnForm
+                            ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null }}
+                            suppliers={rawSuppliers ?? []}
+                            lots={rawLots ?? []}
+                          />
+                          <DeleteButton
+                            description="Delete this purchase return? Stock quantity will be restored."
+                            onDelete={deletePurchaseReturnAction.bind(null, { id: r.id })}
+                          />
+                        </div>
                       </RoleGate>
                     </td>
                   </tr>

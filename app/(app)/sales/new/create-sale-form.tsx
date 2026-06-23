@@ -6,7 +6,8 @@ import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Barcode, X, Plus, Trash2 } from 'lucide-react'
+import { Barcode, X, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import { NumericInput } from '@/components/numeric-input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -49,7 +50,7 @@ const baseSchema = z.object({
 type FormValues   = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap }: {
   today: string
   customers:    Customer[]
   stockItems:   StockItem[]
@@ -57,6 +58,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   isOwner:      boolean
   locations:    { id: string; name: string }[]
   locationStock: LocationStock[]
+  costMap:      Record<string, number>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -88,7 +90,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
     defaultValues: {
       customerId: '', date: today, paymentDueDate: '', notes: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: 0, rate: 0, discountPct: 0 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
     },
   })
 
@@ -353,9 +355,12 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                         </thead>
                         <tbody className="divide-y">
                           {fields.map((field, index) => {
-                            const line   = watchedLines[index] ?? {}
-                            const amount = (line.quantity || 0) * (line.rate || 0) * er * (1 - (line.discountPct || 0) / 100)
-                            const item   = stockItems.find((s) => s.id === line.stockItemId)
+                            const line      = watchedLines[index] ?? {}
+                            const amount    = (line.quantity || 0) * (line.rate || 0) * er * (1 - (line.discountPct || 0) / 100)
+                            const item      = stockItems.find((s) => s.id === line.stockItemId)
+                            const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
+                            const ratePKR   = (line.rate || 0) * er
+                            const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
                             const avail  = item
                               ? (locStockMap ? (locStockMap[item.id] ?? 0) : parseFloat(item.currentQuantity))
                               : null
@@ -391,21 +396,27 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                                   />
                                 </td>
                                 <td className="px-3 py-2">
-                                  <Input type="number" min={0} step="0.001" placeholder="0" className="text-right"
+                                  <NumericInput min={0} step="0.001" placeholder="" className="text-right"
                                     {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
                                   {form.formState.errors.lines?.[index]?.quantity && (
                                     <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
                                   )}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <Input type="number" min={0} step="0.01" placeholder="0.00" className="text-right"
+                                  <NumericInput min={0} step="0.01" placeholder="" className={`text-right ${belowCost ? 'border-amber-400 focus-visible:ring-amber-400' : ''}`}
                                     {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
                                   {form.formState.errors.lines?.[index]?.rate && (
                                     <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.rate?.message}</p>
                                   )}
+                                  {belowCost && (
+                                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-0.5">
+                                      <AlertTriangle className="h-3 w-3 shrink-0" />
+                                      Below cost (Rs {Math.round(cost!).toLocaleString()})
+                                    </p>
+                                  )}
                                 </td>
                                 <td className="px-3 py-2">
-                                  <Input type="number" min={0} max={100} step="0.1" placeholder="0" className="text-right"
+                                  <NumericInput min={0} max={100} step="0.1" placeholder="0" className="text-right"
                                     {...form.register(`lines.${index}.discountPct`, { valueAsNumber: true })} />
                                 </td>
                                 <td className="px-3 py-2 text-right tabular-nums pt-3 font-medium">

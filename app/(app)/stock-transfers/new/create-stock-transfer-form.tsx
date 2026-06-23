@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { NumericInput } from '@/components/numeric-input'
 import { createStockTransferAction } from '@/app/actions/create-stock-transfer'
 
 const schema = z.object({
@@ -46,7 +47,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
     resolver: zodResolver(schema),
     defaultValues: {
       fromLocationId: '', toLocationId: '', stockItemId: '',
-      quantity: 0, date: today, notes: '',
+      quantity: NaN, date: today, notes: '',
     },
   })
 
@@ -174,7 +175,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
               <FormItem>
                 <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <Input type="number" min={0.001} step="0.001" placeholder="0"
+                  <NumericInput min={0.001} step="0.001" placeholder=""
                     {...form.register('quantity', { valueAsNumber: true })} />
                 </FormControl>
                 <FormMessage />

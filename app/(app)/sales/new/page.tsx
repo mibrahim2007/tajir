@@ -6,13 +6,22 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }] = await Promise.all([
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId),
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
+    admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity').eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
   ])
+
+  // Latest PKR cost per unit for each stock item (first row per item = most recent purchase)
+  const costMap: Record<string, number> = {}
+  for (const p of rawPurchases ?? []) {
+    if (!costMap[p.stock_item_id]) {
+      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+    }
+  }
 
   const customers = rawCustomers ?? []
   const stockItems = (rawItems ?? []).map((l) => ({
@@ -49,6 +58,7 @@ export default async function NewSalePage() {
         isOwner={role === 'owner'}
         locations={locations}
         locationStock={locationStock}
+        costMap={costMap}
       />
     </div>
   )

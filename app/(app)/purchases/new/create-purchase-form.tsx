@@ -7,6 +7,7 @@ import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-fo
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Plus, Trash2 } from 'lucide-react'
+import { NumericInput } from '@/components/numeric-input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -71,7 +72,7 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
     defaultValues: {
       supplierId: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: 0, rate: 0, discountPct: 0 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
     },
   })
 
@@ -272,21 +273,21 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                                 />
                               </td>
                               <td className="px-3 py-2">
-                                <Input type="number" min={0} step="0.001" placeholder="0" className="text-right"
+                                <NumericInput min={0} step="0.001" placeholder="" className="text-right"
                                   {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.quantity && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
                                 )}
                               </td>
                               <td className="px-3 py-2">
-                                <Input type="number" min={0} step="0.01" placeholder="0.00" className="text-right"
+                                <NumericInput min={0} step="0.01" placeholder="" className="text-right"
                                   {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.rate && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.rate?.message}</p>
                                 )}
                               </td>
                               <td className="px-3 py-2">
-                                <Input type="number" min={0} max={100} step="0.1" placeholder="0" className="text-right"
+                                <NumericInput min={0} max={100} step="0.1" placeholder="0" className="text-right"
                                   {...form.register(`lines.${index}.discountPct`, { valueAsNumber: true })} />
                               </td>
                               <td className="px-3 py-2 text-right tabular-nums pt-3 font-medium">
@@ -369,7 +370,7 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
                   <FormItem className="mb-4">
                     <FormLabel>Advance Paid (PKR)</FormLabel>
                     <FormControl>
-                      <Input type="number" step="0.01" min="0" placeholder="0"
+                      <NumericInput step="0.01" min="0" placeholder="0"
                         {...form.register('advancePaid', { valueAsNumber: true })} />
                     </FormControl>
                     <FormMessage />
