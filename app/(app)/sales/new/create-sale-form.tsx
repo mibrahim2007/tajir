@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
-import { createSaleOrderAction } from '@/app/actions/create-sale-order'
+import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 
 type Customer    = { id: string; name: string }
 type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null }
@@ -162,40 +162,40 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const runSubmit = (values: FormValues, allowOversell: boolean) => {
     startTransition(async () => {
       setServerError(null)
-      const newOversells: OversellError[] = []
-      let firstEntryId: string | null = null
 
-      for (let i = 0; i < values.lines.length; i++) {
-        const line = values.lines[i]
-        const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
-        const result = await createSaleOrderAction({
-          customerId:     values.customerId,
-          stockItemId:    line.stockItemId,
-          quantity:       line.quantity,
-          rate:           effectiveRate,
-          currencyCode:   values.currencyCode,
-          exchangeRate:   values.exchangeRate,
-          date:           values.date,
-          paymentDueDate: values.paymentDueDate || undefined,
-          allowOversell,
-          locationId:     values.locationId || undefined,
-        })
+      const result = await createSaleInvoiceAction({
+        customerId:     values.customerId,
+        date:           values.date,
+        paymentDueDate: values.paymentDueDate || undefined,
+        currencyCode:   values.currencyCode,
+        exchangeRate:   values.exchangeRate,
+        locationId:     values.locationId || undefined,
+        notes:          values.notes,
+        allowOversell,
+        lines: values.lines.map((l) => ({
+          stockItemId: l.stockItemId,
+          quantity:    l.quantity,
+          rate:        l.rate,
+          discountPct: l.discountPct,
+        })),
+      })
 
-        if (!result.success) {
-          if (result.code === 'OVERSELL' && 'available' in result) {
-            const item = stockItems.find((s) => s.id === line.stockItemId)
-            newOversells.push({ lineIndex: i, itemName: item?.name ?? `Item ${i + 1}`, available: result.available, requested: result.requested })
-            continue
-          }
-          if ('error' in result) { setServerError(`Line ${i + 1}: ${result.error}`); return }
-        } else if (i === 0) {
-          firstEntryId = result.data?.id ?? null
+      if (!result.success) {
+        if (result.code === 'OVERSELL' && 'oversells' in result) {
+          const newOversells: OversellError[] = result.oversells.map((o) => {
+            const lineIndex = values.lines.findIndex((l) => l.stockItemId === o.stockItemId)
+            const item = stockItems.find((s) => s.id === o.stockItemId)
+            return { lineIndex: lineIndex >= 0 ? lineIndex : 0, itemName: item?.name ?? o.stockItemId, available: o.available, requested: o.requested }
+          })
+          setPendingValues(values)
+          setOversellErrors(newOversells)
+          return
         }
+        if ('error' in result) { setServerError(result.error); return }
+      } else {
+        await uploaderRef.current?.uploadFiles(result.data.invoiceId, 'sale_order')
+        router.push('/sales')
       }
-
-      if (newOversells.length > 0) { setPendingValues(values); setOversellErrors(newOversells); return }
-      if (firstEntryId) await uploaderRef.current?.uploadFiles(firstEntryId, 'sale_order')
-      router.push('/sales')
     })
   }
 

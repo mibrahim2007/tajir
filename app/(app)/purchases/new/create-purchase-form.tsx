@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
-import { createPurchaseAction } from '@/app/actions/create-purchase'
+import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 
 const lineSchema = z.object({
@@ -95,26 +95,23 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      let firstEntryId: string | null = null
-      for (let i = 0; i < values.lines.length; i++) {
-        const line = values.lines[i]
-        // bake discount into the saved rate
-        const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
-        const result = await createPurchaseAction({
-          supplierId:   values.supplierId,
-          stockItemId:  line.stockItemId,
-          quantity:     line.quantity,
-          rate:         effectiveRate,
-          currencyCode: values.currencyCode,
-          exchangeRate: values.exchangeRate,
-          date:         values.date,
-          advancePaid:  i === 0 ? values.advancePaid : 0,
-          locationId:   values.locationId || undefined,
-        })
-        if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
-        if (i === 0) firstEntryId = result.data.id
-      }
-      if (firstEntryId) await uploaderRef.current?.uploadFiles(firstEntryId, 'purchase_order')
+      const result = await createPurchaseInvoiceAction({
+        supplierId:   values.supplierId,
+        date:         values.date,
+        currencyCode: values.currencyCode,
+        exchangeRate: values.exchangeRate,
+        advancePaid:  values.advancePaid,
+        locationId:   values.locationId,
+        notes:        values.notes,
+        lines: values.lines.map((l) => ({
+          stockItemId: l.stockItemId,
+          quantity:    l.quantity,
+          rate:        l.rate,
+          discountPct: l.discountPct,
+        })),
+      })
+      if (!result.success) { setServerError(result.error); return }
+      await uploaderRef.current?.uploadFiles(result.data.invoiceId, 'purchase_order')
       router.push('/purchases')
     })
   }

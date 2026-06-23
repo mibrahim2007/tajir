@@ -7,6 +7,7 @@ import { EditPurchaseForm } from './edit-purchase-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseAction } from '@/app/actions/delete-purchase'
+import { deletePurchaseInvoiceAction } from '@/app/actions/delete-purchase-invoice'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
 import { PurchaseFilters } from './purchase-filters'
@@ -20,14 +21,15 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const filterSupplier = typeof params.supplier === 'string' ? params.supplier : undefined
   const filterItem     = typeof params.item     === 'string' ? params.item     : undefined
 
-  const { tenantId, role } = await requireAuth()
+  const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
   let query = admin.from('purchase_orders')
-    .select('id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
+    .select('id, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
-    .limit(500)
+    .order('created_at', { ascending: false })
+    .limit(1000)
 
   if (filterFrom)     query = query.gte('date', filterFrom)
   if (filterTo)       query = query.lte('date', filterTo)
@@ -47,9 +49,84 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
   const lotMap      = new Map(lotList.map((l) => [l.id, l.name]))
 
+  // Group by invoice_id; solo orders (no invoice_id) kept individually
+  type OrderRow = typeof orders[0]
+  const invoiceMap = new Map<string, OrderRow[]>()
+  const soloOrders: OrderRow[] = []
+
+  for (const o of orders) {
+    if (o.invoice_id) {
+      const existing = invoiceMap.get(o.invoice_id) ?? []
+      existing.push(o)
+      invoiceMap.set(o.invoice_id, existing)
+    } else {
+      soloOrders.push(o)
+    }
+  }
+
+  type DisplayItem = {
+    key: string
+    type: 'invoice' | 'solo'
+    invoiceId?: string
+    date: string
+    createdAt: string
+    supplierId: string
+    stockItemIds: string[]
+    itemCount: number
+    totalQty: number
+    totalPKR: number
+    advancePaid: number
+    currencyCode: string
+    exchangeRate: string
+    soloOrder?: OrderRow
+  }
+
+  const displayItems: DisplayItem[] = []
+
+  for (const [invoiceId, lines] of invoiceMap) {
+    displayItems.push({
+      key: invoiceId,
+      type: 'invoice',
+      invoiceId,
+      date:        lines[0].date,
+      createdAt:   lines[0].created_at,
+      supplierId:  lines[0].supplier_id,
+      stockItemIds: lines.map((l) => l.stock_item_id),
+      itemCount:   lines.length,
+      totalQty:    lines.reduce((s, l) => s + parseFloat(l.quantity), 0),
+      totalPKR:    lines.reduce((s, l) => s + parseFloat(l.pkr_equivalent), 0),
+      advancePaid: lines.reduce((s, l) => s + parseFloat(l.advance_paid ?? '0'), 0),
+      currencyCode: lines[0].currency_code,
+      exchangeRate: lines[0].exchange_rate,
+    })
+  }
+
+  for (const o of soloOrders) {
+    displayItems.push({
+      key:         o.id,
+      type:        'solo',
+      date:        o.date,
+      createdAt:   o.created_at,
+      supplierId:  o.supplier_id,
+      stockItemIds: [o.stock_item_id],
+      itemCount:   1,
+      totalQty:    parseFloat(o.quantity),
+      totalPKR:    parseFloat(o.pkr_equivalent),
+      advancePaid: parseFloat(o.advance_paid ?? '0'),
+      currencyCode: o.currency_code,
+      exchangeRate: o.exchange_rate,
+      soloOrder:   o,
+    })
+  }
+
+  displayItems.sort((a, b) => {
+    if (b.date !== a.date) return b.date.localeCompare(a.date)
+    return b.createdAt.localeCompare(a.createdAt)
+  })
+
   const hasFilters = filterFrom || filterTo || filterSupplier || filterItem
-  const totalQty   = orders.reduce((s, o) => s + parseFloat(o.quantity), 0)
-  const totalPKR   = orders.reduce((s, o) => s + parseFloat(o.pkr_equivalent), 0)
+  const totalQty   = displayItems.reduce((s, i) => s + i.totalQty, 0)
+  const totalPKR   = displayItems.reduce((s, i) => s + i.totalPKR, 0)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -57,7 +134,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Purchases</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            {orders.length} record{orders.length !== 1 ? 's' : ''}{hasFilters ? ' (filtered)' : ''}
+            {displayItems.length} entr{displayItems.length !== 1 ? 'ies' : 'y'}{hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
         <Link href="/purchases/new">
@@ -69,7 +146,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
         <PurchaseFilters suppliers={supplierList} lots={lotList} />
       </Suspense>
 
-      {orders.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div className="bg-card rounded-2xl border border-dashed py-16 text-center shadow-sm">
           <p className="text-muted-foreground text-sm">
             {hasFilters ? 'No purchases match your filters.' : 'No purchases yet.'}
@@ -83,41 +160,55 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                 <tr>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
-                  <th className="px-4 py-3 w-32" />
+                  <th className="px-4 py-3 w-36" />
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-secondary/50 transition-colors">
+                {displayItems.map((item) => (
+                  <tr key={item.key} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className="block">{formatPKTDate(new Date(o.date))}</span>
+                      <span className="block">{formatPKTDate(new Date(item.date))}</span>
                       <span className="block text-[11px] text-muted-foreground tabular-nums">
-                        {formatPKTDateTime(new Date(o.created_at)).split(', ')[1]}
+                        {formatPKTDateTime(new Date(item.createdAt)).split(', ')[1]}
                       </span>
                     </td>
-                    <td className="px-4 py-3">{supplierMap.get(o.supplier_id) ?? '—'}</td>
-                    <td className="px-4 py-3">{lotMap.get(o.stock_item_id) ?? '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{parseFloat(o.quantity).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{o.currency_code} {parseFloat(o.rate).toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(o.pkr_equivalent))}</td>
+                    <td className="px-4 py-3">{supplierMap.get(item.supplierId) ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      {item.type === 'invoice'
+                        ? (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground">
+                            <span className="font-medium text-foreground">{item.itemCount} items</span>
+                            <span className="text-xs">({item.stockItemIds.map((id) => lotMap.get(id) ?? '?').join(', ')})</span>
+                          </span>
+                        )
+                        : <span>{lotMap.get(item.stockItemIds[0]) ?? '—'}</span>
+                      }
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">{item.totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(item.totalPKR)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <Link href={`/purchases/${o.id}/print`}>
+                        <Link href={item.type === 'invoice' ? `/purchases/invoice/${item.invoiceId}/print` : `/purchases/${item.soloOrder!.id}/print`}>
                           <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
                         </Link>
                         <RoleGate allowedRoles={['owner']}>
-                          <EditPurchaseForm
-                            purchase={{ id: o.id, supplierId: o.supplier_id, stockItemId: o.stock_item_id, quantity: o.quantity, rate: o.rate, currencyCode: o.currency_code, exchangeRate: o.exchange_rate, advancePaid: o.advance_paid, date: o.date }}
-                            suppliers={supplierList}
-                            lots={lotList}
-                          />
+                          {item.type === 'solo' && item.soloOrder && (
+                            <EditPurchaseForm
+                              purchase={{ id: item.soloOrder.id, supplierId: item.soloOrder.supplier_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, advancePaid: item.soloOrder.advance_paid, date: item.soloOrder.date }}
+                              suppliers={supplierList}
+                              lots={lotList}
+                            />
+                          )}
                           <DeleteButton
-                            description="Delete this purchase? Stock quantity will be reversed."
-                            onDelete={deletePurchaseAction.bind(null, { id: o.id })}
+                            description={item.type === 'invoice'
+                              ? `Delete this invoice (${item.itemCount} items)? Stock quantities will be reversed.`
+                              : 'Delete this purchase? Stock quantity will be restored.'}
+                            onDelete={item.type === 'invoice'
+                              ? deletePurchaseInvoiceAction.bind(null, { invoiceId: item.invoiceId! })
+                              : deletePurchaseAction.bind(null, { id: item.soloOrder!.id })}
                           />
                         </RoleGate>
                       </div>
@@ -129,7 +220,6 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                  <td />
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
                   <td />
                 </tr>
