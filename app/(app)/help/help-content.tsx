@@ -25,7 +25,7 @@ const VIDEOS: VideoCard[] = [
     category: 'Getting Started',
     categoryUr: 'شروعات',
     duration: '4 min',
-    embedUrl: null,
+    embedUrl: 'https://www.youtube.com/embed/zTC7DVha3yU',
     gradient: 'from-teal-500 to-emerald-600',
   },
   {
@@ -109,11 +109,10 @@ const VIDEOS: VideoCard[] = [
 
 const CATEGORY_ORDER = ['Getting Started', 'Purchases & Sales', 'Finance', 'Reports', 'Accounting']
 
-function PlayPlaceholder({ gradient }: { gradient: string }) {
+function PlayPlaceholder({ gradient, hasVideo }: { gradient: string; hasVideo: boolean }) {
   return (
     <div className={`relative w-full aspect-video bg-gradient-to-br ${gradient} flex items-center justify-center rounded-t-xl overflow-hidden`}>
       <div className="absolute inset-0 bg-black/10" />
-      {/* grid lines decoration */}
       <svg className="absolute inset-0 w-full h-full opacity-10" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <pattern id={`grid-${gradient}`} width="24" height="24" patternUnits="userSpaceOnUse">
@@ -125,9 +124,11 @@ function PlayPlaceholder({ gradient }: { gradient: string }) {
       <div className="relative h-14 w-14 rounded-full bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shadow-xl">
         <Play className="h-6 w-6 text-white fill-white ml-0.5" />
       </div>
-      <div className="absolute bottom-2.5 right-3 bg-black/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
-        Coming Soon
-      </div>
+      {!hasVideo && (
+        <div className="absolute bottom-2.5 right-3 bg-black/50 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
+          Coming Soon
+        </div>
+      )}
     </div>
   )
 }
@@ -263,7 +264,7 @@ export function HelpContent() {
                     onClick={() => setActiveVideo(video)}
                     className="text-left bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 hover:shadow-md transition-all group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
-                    <PlayPlaceholder gradient={video.gradient} />
+                    <PlayPlaceholder gradient={video.gradient} hasVideo={!!video.embedUrl} />
 
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-1.5">
