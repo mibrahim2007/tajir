@@ -14,7 +14,7 @@ export default async function OpeningBalancesPage() {
   const admin = createAdminClient()
 
   const [{ data: rawLots }, { data: rawCustomers }, { data: rawSuppliers }] = await Promise.all([
-    admin.from('inventory_lots').select('id, name, current_quantity').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, current_quantity, opening_rate').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
   ])
@@ -23,6 +23,7 @@ export default async function OpeningBalancesPage() {
     id: l.id,
     name: l.name,
     currentQuantity: l.current_quantity,
+    openingRate: l.opening_rate ?? '0',
   }))
 
   const customers = (rawCustomers ?? []).map((c) => ({

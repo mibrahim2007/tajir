@@ -10,6 +10,7 @@ import type { ActionResult } from '@/lib/types'
 const stockSchema = z.object({
   lotId:    z.string().uuid(),
   quantity: z.coerce.number().min(0, 'Quantity must be 0 or greater'),
+  rate:     z.coerce.number().min(0, 'Rate must be 0 or greater').default(0),
 })
 
 const customerSchema = z.object({
@@ -36,13 +37,13 @@ export async function setStockOpeningBalance(input: unknown): Promise<ActionResu
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { lotId, quantity } = parsed.data
+  const { lotId, quantity, rate } = parsed.data
 
   const admin = createAdminClient()
 
   const { data: lot } = await admin
     .from('inventory_lots')
-    .select('current_quantity')
+    .select('current_quantity, opening_rate')
     .eq('id', lotId)
     .eq('tenant_id', tenantId)
     .single()
@@ -51,13 +52,13 @@ export async function setStockOpeningBalance(input: unknown): Promise<ActionResu
 
   const { error } = await admin
     .from('inventory_lots')
-    .update({ current_quantity: String(quantity) })
+    .update({ current_quantity: String(quantity), opening_rate: String(rate) })
     .eq('id', lotId)
     .eq('tenant_id', tenantId)
 
   if (error) return { success: false, error: 'Failed to update stock quantity', code: 'INTERNAL_ERROR' }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'set_opening_balance', entity: 'inventory_lots', entityId: lotId, before: { currentQuantity: lot.current_quantity }, after: { currentQuantity: quantity } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'set_opening_balance', entity: 'inventory_lots', entityId: lotId, before: { currentQuantity: lot.current_quantity, openingRate: lot.opening_rate }, after: { currentQuantity: quantity, openingRate: rate } })
 
   return { success: true, data: undefined }
 }
