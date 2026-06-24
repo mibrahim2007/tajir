@@ -4,10 +4,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { RecordPaymentForm } from '@/app/(app)/suppliers/record-payment-form'
 import { EditApPaymentForm } from '@/app/(app)/suppliers/edit-ap-payment-form'
 import { ExportButton } from '@/components/export-button'
-import { DeleteButton } from '@/components/delete-button'
+import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
-import { deleteApPaymentAction } from '@/app/actions/delete-ap-payment'
-import { deletePurchaseAction } from '@/app/actions/delete-purchase'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -29,7 +27,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   if (!supplierRow) notFound()
 
-  const [{ data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawLots }] = await Promise.all([
     admin.from('purchase_orders')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid')
       .eq('supplier_id', id)
@@ -45,17 +43,23 @@ export default async function SupplierLedgerPage({ params }: Props) {
       .eq('supplier_id', id)
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
+    admin.from('debit_notes')
+      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, reason, reference')
+      .eq('supplier_id', id)
+      .eq('tenant_id', tenantId)
+      .order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const purchases = rawPurchases ?? []
   const payments = rawPayments ?? []
   const purchaseReturns = rawReturns ?? []
+  const debitNotes = rawDebitNotes ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
 
   type LedgerRow = {
     id: string
-    kind: 'opening' | 'purchase' | 'payment' | 'purchase_return'
+    kind: 'opening' | 'purchase' | 'payment' | 'purchase_return' | 'debit_note'
     date: string
     description: string
     debit: number
@@ -77,11 +81,13 @@ export default async function SupplierLedgerPage({ params }: Props) {
     | { kind: 'purchase'; date: string; entry: typeof purchases[0] }
     | { kind: 'payment'; date: string; entry: typeof payments[0] }
     | { kind: 'purchase_return'; date: string; entry: typeof purchaseReturns[0] }
+    | { kind: 'debit_note'; date: string; entry: typeof debitNotes[0] }
 
   const entries: RawEntry[] = [
     ...purchases.map((e) => ({ kind: 'purchase' as const, date: e.date, entry: e })),
     ...payments.map((e) => ({ kind: 'payment' as const, date: e.date, entry: e })),
     ...purchaseReturns.map((e) => ({ kind: 'purchase_return' as const, date: e.date, entry: e })),
+    ...debitNotes.map((e) => ({ kind: 'debit_note' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -95,6 +101,11 @@ export default async function SupplierLedgerPage({ params }: Props) {
       runningBalance -= amount
       const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
       rows.push({ id: item.entry.id, kind: 'purchase_return', date: item.date, description: `Purchase Return — ${itemName} (${item.entry.quantity} units${item.entry.reason ? ` — ${item.entry.reason}` : ''})`, debit: 0, credit: amount, balance: runningBalance })
+    } else if (item.kind === 'debit_note') {
+      const amount = parseFloat(item.entry.pkr_equivalent)
+      runningBalance -= amount
+      const desc = `Debit Note${item.entry.reason ? ` — ${item.entry.reason}` : ''}${item.entry.reference ? ` (Ref: ${item.entry.reference})` : ''}`
+      rows.push({ id: item.entry.id, kind: 'debit_note', date: item.date, description: desc, debit: 0, credit: amount, balance: runningBalance })
     } else {
       const paid = parseFloat(item.entry.pkr_equivalent)
       runningBalance -= paid
@@ -126,6 +137,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
           <p className="text-sm text-muted-foreground mt-1">Supplier Ledger</p>
         </div>
         <div className="flex gap-2">
+          <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
           <RecordPaymentForm supplierId={id} today={today} />
         </div>
@@ -167,17 +179,9 @@ export default async function SupplierLedgerPage({ params }: Props) {
                       {formatPKR(row.balance)}
                     </td>
                     <td className="px-4 py-3">
-                      {row.kind !== 'opening' && (
+                      {row.kind === 'payment' && row.rawPayment && (
                         <RoleGate allowedRoles={['owner']}>
-                          <div className="flex items-center gap-1">
-                            {row.kind === 'payment' && row.rawPayment && (
-                              <EditApPaymentForm payment={row.rawPayment} />
-                            )}
-                            <DeleteButton
-                              description={row.kind === 'purchase' ? 'Delete this purchase? Stock will be reversed.' : 'Delete this payment?'}
-                              onDelete={row.kind === 'purchase' ? deletePurchaseAction.bind(null, { id: row.id }) : deleteApPaymentAction.bind(null, { id: row.id })}
-                            />
-                          </div>
+                          <EditApPaymentForm payment={row.rawPayment} />
                         </RoleGate>
                       )}
                     </td>

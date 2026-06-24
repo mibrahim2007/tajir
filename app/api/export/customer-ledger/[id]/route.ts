@@ -14,10 +14,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const admin = createAdminClient()
 
-  const [{ data: customer }, { data: rawSales }, { data: rawReceipts }, { data: rawLots }] = await Promise.all([
+  const [{ data: customer }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawLots }] = await Promise.all([
     admin.from('tajir_customers').select('name, opening_balance_pkr_equivalent, created_at').eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('sales_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ar_receipts').select('id, date, pkr_equivalent, payment_method_note').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('sale_returns').select('id, date, stock_item_id, quantity, pkr_equivalent, reason').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
+    admin.from('credit_notes').select('id, date, pkr_equivalent, reason, reference').eq('customer_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
@@ -47,10 +49,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   type Entry =
     | { kind: 'sale'; date: string; entry: NonNullable<typeof rawSales>[0] }
     | { kind: 'receipt'; date: string; entry: NonNullable<typeof rawReceipts>[0] }
+    | { kind: 'sale_return'; date: string; entry: NonNullable<typeof rawReturns>[0] }
+    | { kind: 'credit_note'; date: string; entry: NonNullable<typeof rawCreditNotes>[0] }
 
   const entries: Entry[] = [
     ...(rawSales ?? []).map((e) => ({ kind: 'sale' as const, date: e.date, entry: e })),
     ...(rawReceipts ?? []).map((e) => ({ kind: 'receipt' as const, date: e.date, entry: e })),
+    ...(rawReturns ?? []).map((e) => ({ kind: 'sale_return' as const, date: e.date, entry: e })),
+    ...(rawCreditNotes ?? []).map((e) => ({ kind: 'credit_note' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -59,6 +65,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       const amt = parseFloat(e.pkr_equivalent)
       balance += amt
       sheet.addRow({ date: item.date, desc: `Sale — ${lotMap.get(e.stock_item_id) ?? '?'} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: Math.round(amt * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
+    } else if (item.kind === 'sale_return') {
+      const e = item.entry as NonNullable<typeof rawReturns>[0]
+      const amt = parseFloat(e.pkr_equivalent)
+      balance -= amt
+      const itemName = lotMap.get(e.stock_item_id) ?? '?'
+      sheet.addRow({ date: item.date, desc: `Sale Return — ${itemName} (${e.quantity} units${e.reason ? ` — ${e.reason}` : ''})`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
+    } else if (item.kind === 'credit_note') {
+      const e = item.entry as NonNullable<typeof rawCreditNotes>[0]
+      const amt = parseFloat(e.pkr_equivalent)
+      balance -= amt
+      const desc = `Credit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`
+      sheet.addRow({ date: item.date, desc, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     } else {
       const e = item.entry as NonNullable<typeof rawReceipts>[0]
       const amt = parseFloat(e.pkr_equivalent)
