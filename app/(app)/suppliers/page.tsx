@@ -12,15 +12,19 @@ export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }] = await Promise.all([
+  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }] = await Promise.all([
     admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
     admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('debit_notes').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const suppliers = allSuppliers ?? []
   const purchases = allPurchases ?? []
   const payments = allPayments ?? []
+  const returns = allReturns ?? []
+  const debitNotes = allDebitNotes ?? []
 
   const outstandingBySupplier = new Map<string, number>()
   for (const s of suppliers) {
@@ -31,7 +35,13 @@ export default async function SuppliersPage() {
     const paid = payments
       .filter((p) => p.supplier_id === s.id)
       .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
-    outstandingBySupplier.set(s.id, openingBalance + purchased - paid)
+    const returned = returns
+      .filter((r) => r.supplier_id === s.id)
+      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+    const debited = debitNotes
+      .filter((n) => n.supplier_id === s.id)
+      .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+    outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited)
   }
 
   return (
