@@ -16,6 +16,8 @@ const SOURCE_LABELS: Record<string, string> = {
   ap_payment:       'Supplier Payment',
   sale_return:      'Sale Return',
   purchase_return:  'Purchase Return',
+  credit_note:      'Credit Note',
+  debit_note:       'Debit Note',
 }
 
 export default async function VouchersPage() {

@@ -33,6 +33,8 @@ import {
   Layers,
   LifeBuoy,
   Bell,
+  FileMinus,
+  FilePlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -71,8 +73,10 @@ const ownerGroups: NavGroup[] = [
     links: [
       { href: "/customers", label: "Customers", icon: Users },
       { href: "/receipts", label: "Receipts", icon: ArrowDownLeft },
+      { href: "/credit-notes", label: "Credit Notes", icon: FileMinus },
       { href: "/suppliers", label: "Suppliers", icon: Truck },
       { href: "/payments", label: "Payments", icon: ArrowUpRight },
+      { href: "/debit-notes", label: "Debit Notes", icon: FilePlus },
       { href: "/pricing", label: "Pricing", icon: Tag },
       { href: "/expenses", label: "Expenses", icon: Receipt },
     ],
