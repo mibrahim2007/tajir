@@ -75,8 +75,17 @@ export default async function CustomersPage() {
                 return (
                   <tr key={c.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium">{c.name}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
-                      {formatPKR(outstanding)}
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {outstanding < 0 ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400">Credit</span>
+                          <span className="text-emerald-700 dark:text-emerald-400 font-medium">{formatPKR(Math.abs(outstanding))}</span>
+                        </span>
+                      ) : (
+                        <span className={outstanding > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}>
+                          {formatPKR(outstanding)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link

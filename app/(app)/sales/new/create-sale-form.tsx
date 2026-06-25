@@ -50,15 +50,16 @@ const baseSchema = z.object({
 type FormValues   = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerCreditMap = {} }: {
   today: string
-  customers:    Customer[]
-  stockItems:   StockItem[]
-  pricingRules: PricingRule[]
-  isOwner:      boolean
-  locations:    { id: string; name: string }[]
-  locationStock: LocationStock[]
-  costMap:      Record<string, number>
+  customers:         Customer[]
+  stockItems:        StockItem[]
+  pricingRules:      PricingRule[]
+  isOwner:           boolean
+  locations:         { id: string; name: string }[]
+  locationStock:     LocationStock[]
+  costMap:           Record<string, number>
+  customerCreditMap?: Record<string, number>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -244,6 +245,12 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                     </FormItem>
                   )} />
 
+                  {watchedCustomer && customerCreditMap[watchedCustomer] !== undefined && (
+                    <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
+                      <span className="font-semibold">Credit available:</span> This customer has <span className="font-semibold">PKR {customerCreditMap[watchedCustomer].toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> in credit from previous returns. The balance will offset their next outstanding amount automatically.
+                    </div>
+                  )}
+
                   <FormField control={form.control} name="date" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Sale Date <span className="text-destructive">*</span></FormLabel>
@@ -346,7 +353,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                           <tr>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-24">Qty</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Rate</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>

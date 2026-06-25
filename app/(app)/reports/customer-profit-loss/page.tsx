@@ -378,8 +378,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
                 </thead>
                 <tbody className="divide-y">
                   {summaries.map((row, i) => (
-                    <tr key={row.id} className="hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => {}} /* handled via Link below */>
+                    <tr key={row.id} className="hover:bg-muted/30 transition-colors cursor-pointer">
                       <td className="px-4 py-3 text-xs text-muted-foreground tabular-nums">{i + 1}</td>
                       <td className="px-4 py-3 font-semibold">
                         <Link

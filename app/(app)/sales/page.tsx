@@ -220,6 +220,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                             <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
                           </Link>
                           <RoleGate allowedRoles={['owner']}>
+                            <Link href={item.type === 'solo' ? `/sale-returns/new?so=${item.soloOrder!.id}` : `/sale-returns/new`}>
+                              <Button variant="ghost" size="sm" className="min-h-[36px] text-muted-foreground">Return</Button>
+                            </Link>
                             {item.type === 'solo' && item.soloOrder && (
                               <EditSaleForm
                                 sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date }}

@@ -1,9 +1,11 @@
+import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSaleReturnForm } from './create-sale-return-form'
 
-export default async function NewSaleReturnPage() {
-  const { tenantId } = await requireAuth()
+export default async function NewSaleReturnPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const { tenantId, role } = await requireAuth()
+  if (role !== 'owner') redirect('/sale-returns')
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
@@ -30,6 +32,8 @@ export default async function NewSaleReturnPage() {
     currencyCode: o.currency_code,
   }))
   const locations = rawLocs ?? []
+  const sp = await searchParams
+  const defaultSaleOrderId = sp.so ?? ''
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -43,6 +47,7 @@ export default async function NewSaleReturnPage() {
         lots={lotList}
         saleOrders={saleOrderList}
         locations={locations}
+        defaultSaleOrderId={defaultSaleOrderId}
       />
     </div>
   )

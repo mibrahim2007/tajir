@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition, useMemo } from 'react'
+import { useRef, useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -45,14 +45,15 @@ type FormValues = z.infer<typeof schema>
 type SaleOrder = { id: string; date: string; customerId: string; stockItemId: string; quantity: string; rate: string; currencyCode: string }
 
 type Props = {
-  today:      string
-  customers:  { id: string; name: string }[]
-  lots:       { id: string; name: string; count: string }[]
-  saleOrders: SaleOrder[]
-  locations:  { id: string; name: string }[]
+  today:              string
+  customers:          { id: string; name: string }[]
+  lots:               { id: string; name: string; count: string }[]
+  saleOrders:         SaleOrder[]
+  locations:          { id: string; name: string }[]
+  defaultSaleOrderId?: string
 }
 
-export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locations }: Props) {
+export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locations, defaultSaleOrderId = '' }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -61,11 +62,17 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locat
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
-      saleOrderId: '', customerId: '', date: today, reason: '',
+      saleOrderId: defaultSaleOrderId, customerId: '', date: today, reason: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
     },
   })
+
+  // Pre-fill customer and first line when arriving with a ?so= param
+  useEffect(() => {
+    if (defaultSaleOrderId) handleSoSelect(defaultSaleOrderId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' })
 
@@ -265,7 +272,7 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locat
                         <tr>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-24">Qty</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Rate</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>

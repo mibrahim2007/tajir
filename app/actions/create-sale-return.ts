@@ -32,7 +32,11 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
   }
 
-  const { user, tenantId } = await requireAuth()
+  const { user, role, tenantId } = await requireAuth()
+
+  if (role !== 'owner') {
+    return { success: false, error: 'Permission denied', code: 'UNAUTHORIZED' }
+  }
 
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') {
@@ -43,6 +47,36 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
   const admin = createAdminClient()
+
+  /* Validate quantity does not exceed original sale if saleOrderId is provided */
+  if (saleOrderId) {
+    const { data: originalSale } = await admin
+      .from('sales_orders')
+      .select('quantity')
+      .eq('id', saleOrderId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (originalSale) {
+      const { data: existingReturns } = await admin
+        .from('sale_returns')
+        .select('quantity')
+        .eq('sale_order_id', saleOrderId)
+        .eq('tenant_id', tenantId)
+
+      const alreadyReturned = (existingReturns ?? []).reduce((s, r) => s + parseFloat(r.quantity), 0)
+      const originalQty = parseFloat(originalSale.quantity)
+
+      if (alreadyReturned + quantity > originalQty) {
+        const available = originalQty - alreadyReturned
+        return {
+          success: false,
+          error: `Cannot return more than ${available.toLocaleString()} units — ${alreadyReturned.toLocaleString()} already returned against this sale`,
+          code: 'OVER_RETURN',
+        }
+      }
+    }
+  }
 
   /* Block if chart of accounts has not been configured */
   const { count: coaCount } = await admin

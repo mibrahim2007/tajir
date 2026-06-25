@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus } from 'lucide-react'
+import { Plus, Printer } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -74,9 +74,16 @@ export default async function ReceiptsPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <RoleGate allowedRoles={['owner']}>
-                      <DeleteReceiptButton id={r.id} />
-                    </RoleGate>
+                    <div className="flex items-center justify-end gap-1">
+                      <Link href={`/receipts/${r.id}/print`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <RoleGate allowedRoles={['owner']}>
+                        <DeleteReceiptButton id={r.id} />
+                      </RoleGate>
+                    </div>
                   </td>
                 </tr>
               ))}

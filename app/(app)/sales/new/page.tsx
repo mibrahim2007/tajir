@@ -6,13 +6,17 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }] = await Promise.all([
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
     admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity').eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
+    admin.from('sales_orders').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   // Latest PKR cost per unit for each stock item (first row per item = most recent purchase)
@@ -23,7 +27,19 @@ export default async function NewSalePage() {
     }
   }
 
-  const customers = rawCustomers ?? []
+  // Build per-customer credit map (negative balance = customer has credit)
+  const customerCreditMap: Record<string, number> = {}
+  for (const c of rawCustomers ?? []) {
+    const ob      = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
+    const billed  = (rawSales ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const paid    = (rawReceipts ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ret     = (rawReturns ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const cn      = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
+    const balance = ob + billed - paid - ret - cn
+    if (balance < 0) customerCreditMap[c.id] = Math.abs(balance)
+  }
+
+  const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
     id: l.id,
     name: l.name,
@@ -59,6 +75,7 @@ export default async function NewSalePage() {
         locations={locations}
         locationStock={locationStock}
         costMap={costMap}
+        customerCreditMap={customerCreditMap}
       />
     </div>
   )
