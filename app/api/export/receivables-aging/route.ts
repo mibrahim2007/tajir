@@ -19,12 +19,13 @@ export async function GET() {
 
   const admin = createAdminClient()
 
-  const [{ data: allCustomers }, { data: allSales }, { data: allReceiptsData }, { data: allReturnsData }, { data: allCreditNotesData }] = await Promise.all([
+  const [{ data: allCustomers }, { data: allSales }, { data: allReceiptsData }, { data: allReturnsData }, { data: allCreditNotesData }, { data: allRefundsData }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
     admin.from('sales_orders').select('customer_id, pkr_equivalent, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('customer_refunds').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const workbook = new ExcelJS.Workbook()
@@ -49,13 +50,14 @@ export async function GET() {
     const totalReceived = (allReceiptsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
     const totalReturned = (allReturnsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
     const totalCredited = (allCreditNotesData ?? []).filter((n) => n.customer_id === c.id).reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+    const totalRefunded = (allRefundsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
 
     const lineItems = [
       ...(parseFloat(c.opening_balance_pkr_equivalent) > 0 ? [{ date: c.created_at.split('T')[0], amount: parseFloat(c.opening_balance_pkr_equivalent) }] : []),
       ...cSales,
     ].sort((a, b) => a.date.localeCompare(b.date))
 
-    let remaining = totalReceived + totalReturned + totalCredited
+    let remaining = totalReceived + totalReturned + totalCredited - totalRefunded
     let total = 0, b0 = 0, b31 = 0, b61 = 0, b90plus = 0
     let oldest: string | null = null
 

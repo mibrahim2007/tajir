@@ -25,12 +25,13 @@ export default async function ReceivablesAgingPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
     admin.from('sales_orders').select('customer_id, pkr_equivalent, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('customer_refunds').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const allCustomers = rawCustomers ?? []
@@ -38,6 +39,7 @@ export default async function ReceivablesAgingPage() {
   const allReceipts = rawReceipts ?? []
   const allReturns = rawReturns ?? []
   const allCreditNotes = rawCreditNotes ?? []
+  const allRefunds = rawRefunds ?? []
 
   const rows: AgingRow[] = []
 
@@ -58,7 +60,12 @@ export default async function ReceivablesAgingPage() {
       .filter((n) => n.customer_id === c.id)
       .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
 
-    const totalCredits = totalReceived + totalReturned + totalCredited
+    const totalRefunded = allRefunds
+      .filter((r) => r.customer_id === c.id)
+      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+
+    // Refunds consume the customer's credit balance, so they reduce net credits
+    const totalCredits = totalReceived + totalReturned + totalCredited - totalRefunded
 
     const lineItems: { date: string; amount: number }[] = [
       ...(parseFloat(c.opening_balance_pkr_equivalent) > 0
