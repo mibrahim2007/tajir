@@ -25,15 +25,19 @@ export default async function ReceivablesAgingPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
     admin.from('sales_orders').select('customer_id, pkr_equivalent, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   const allCustomers = rawCustomers ?? []
   const allSales = rawSales ?? []
   const allReceipts = rawReceipts ?? []
+  const allReturns = rawReturns ?? []
+  const allCreditNotes = rawCreditNotes ?? []
 
   const rows: AgingRow[] = []
 
@@ -46,6 +50,16 @@ export default async function ReceivablesAgingPage() {
       .filter((r) => r.customer_id === c.id)
       .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
 
+    const totalReturned = allReturns
+      .filter((r) => r.customer_id === c.id)
+      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+
+    const totalCredited = allCreditNotes
+      .filter((n) => n.customer_id === c.id)
+      .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+
+    const totalCredits = totalReceived + totalReturned + totalCredited
+
     const lineItems: { date: string; amount: number }[] = [
       ...(parseFloat(c.opening_balance_pkr_equivalent) > 0
         ? [{ date: c.created_at.split('T')[0], amount: parseFloat(c.opening_balance_pkr_equivalent) }]
@@ -53,7 +67,7 @@ export default async function ReceivablesAgingPage() {
       ...cSales,
     ].sort((a, b) => a.date.localeCompare(b.date))
 
-    let remainingReceipt = totalReceived
+    let remainingReceipt = totalCredits
     let totalOutstanding = 0
     let bucket0_30 = 0, bucket31_60 = 0, bucket61_90 = 0, bucket90plus = 0
     let oldestDate: string | null = null
