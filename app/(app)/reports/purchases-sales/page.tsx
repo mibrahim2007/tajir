@@ -32,10 +32,11 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     { data: rawSuppliers },
     { data: rawCustomers },
     { data: rawLots },
+    { data: rawLocs },
   ] = await Promise.all([
     type !== 'sales'
       ? admin.from('purchase_orders')
-          .select('id, date, quantity, rate, currency_code, pkr_equivalent, supplier_id, stock_item_id')
+          .select('id, date, quantity, rate, currency_code, pkr_equivalent, supplier_id, stock_item_id, location_id')
           .eq('tenant_id', tenantId)
           .gte('date', from)
           .lte('date', to)
@@ -43,7 +44,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
       : Promise.resolve({ data: [] }),
     type !== 'purchases'
       ? admin.from('sales_orders')
-          .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id')
+          .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id')
           .eq('tenant_id', tenantId)
           .gte('date', from)
           .lte('date', to)
@@ -52,11 +53,13 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, `${l.name} (${l.count})`]))
+  const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
 
   type Row = {
     id: string
@@ -64,6 +67,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     kind: 'purchase' | 'sale'
     party: string
     item: string
+    location: string
     quantity: number
     rate: number
     currencyCode: string
@@ -76,6 +80,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     kind: 'purchase',
     party: supplierMap.get(p.supplier_id) ?? '—',
     item: lotMap.get(p.stock_item_id) ?? '—',
+    location: p.location_id ? (locationMap.get(p.location_id) ?? '—') : '—',
     quantity: parseFloat(p.quantity),
     rate: parseFloat(p.rate),
     currencyCode: p.currency_code,
@@ -88,6 +93,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     kind: 'sale',
     party: customerMap.get(s.customer_id) ?? '—',
     item: lotMap.get(s.stock_item_id) ?? '—',
+    location: s.location_id ? (locationMap.get(s.location_id) ?? '—') : '—',
     quantity: parseFloat(s.quantity),
     rate: parseFloat(s.rate),
     currencyCode: s.currency_code,
@@ -166,6 +172,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Party</th>
                   <th className="text-left px-4 py-3 font-medium">Item</th>
+                  <th className="text-left px-4 py-3 font-medium">Location</th>
                   <th className="text-right px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Rate</th>
                   <th className="text-right px-4 py-3 font-medium">PKR Total</th>
@@ -186,6 +193,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
                     </td>
                     <td className="px-4 py-2.5">{row.party}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{row.item}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{row.location}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{row.quantity.toLocaleString()}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
                       {row.currencyCode} {row.rate.toLocaleString()}
@@ -196,7 +204,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
               </tbody>
               <tfoot className="border-t bg-muted/30">
                 <tr>
-                  <td colSpan={6} className="px-4 py-3 font-medium text-right">
+                  <td colSpan={7} className="px-4 py-3 font-medium text-right">
                     {type === 'all' ? 'Total' : type === 'purchases' ? 'Total Purchases' : 'Total Sales'}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-semibold">

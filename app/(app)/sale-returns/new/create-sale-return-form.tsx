@@ -6,7 +6,7 @@ import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { NumericInput } from '@/components/numeric-input'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -111,6 +111,19 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locat
   const customerPickerItems = customerList
   const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
 
+  const saleOrderPickerItems = useMemo<PickerItem[]>(() =>
+    saleOrders.map((o) => {
+      const customer = customers.find((c) => c.id === o.customerId)
+      const lot = lots.find((l) => l.id === o.stockItemId)
+      return {
+        id: o.id,
+        name: `${o.date} — ${customer?.name ?? '?'} — ${lot?.name ?? '?'}`,
+        badge: `${o.quantity} units`,
+      }
+    }),
+    [saleOrders, customers, lots]
+  )
+
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
@@ -154,20 +167,28 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locat
               <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
                 <FormItem className="sm:col-span-2">
                   <FormLabel>Against Sale Order (optional)</FormLabel>
-                  <Select onValueChange={handleSoSelect} value={selectedSoId}>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select sale order…" /></SelectTrigger>
-                    <SelectContent>
-                      {saleOrders.map((o) => {
-                        const customer = customers.find((c) => c.id === o.customerId)
-                        const lot = lots.find((l) => l.id === o.stockItemId)
-                        return (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.date} — {customer?.name ?? '?'} — {lot?.name ?? '?'} ({o.quantity} units)
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1">
+                      <ItemPickerDialog
+                        items={saleOrderPickerItems}
+                        value={selectedSoId ?? ''}
+                        onSelect={handleSoSelect}
+                        placeholder="Select sale order…"
+                        title="Select Sale Order"
+                      />
+                    </div>
+                    {selectedSoId && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0 h-11 w-11 text-muted-foreground hover:text-foreground"
+                        onClick={() => form.setValue('saleOrderId', '')}
+                      >
+                        <X className="size-4" />
+                      </Button>
+                    )}
+                  </div>
                 </FormItem>
 
                 <FormField control={form.control} name="customerId" render={({ field }) => (

@@ -13,19 +13,21 @@ export default async function SaleReturnsPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawReturns }, { data: rawCustomers }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawReturns }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('sale_returns')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, customer_id, stock_item_id, sale_order_id, reason')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, customer_id, stock_item_id, sale_order_id, reason, location_id')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -55,6 +57,7 @@ export default async function SaleReturnsPage() {
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
@@ -68,6 +71,7 @@ export default async function SaleReturnsPage() {
                     <td className="px-4 py-3 text-right tabular-nums">{r.quantity}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r.currency_code} {r.rate}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(r.pkr_equivalent))}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
