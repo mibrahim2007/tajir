@@ -47,7 +47,7 @@ export async function inviteAssistantAction(
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
-    app_metadata: { role: memberRole, tenant_id: tenantId },
+    app_metadata: { role: memberRole, tenant_id: tenantId, must_change_password: true },
     email_confirm: true,
   })
 

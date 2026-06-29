@@ -23,6 +23,10 @@ export async function requireAuth(): Promise<AuthContext> {
     redirect('/auth/login')
   }
 
+  if (user.app_metadata?.must_change_password === true) {
+    redirect('/auth/change-password')
+  }
+
   return {
     user: { id: user.id, email: user.email },
     role,

@@ -32,7 +32,7 @@ export async function loginAction(formData: FormData) {
       return { success: false, error: 'Invalid username or password' }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email: user.email, password })
+    const { data: { user: signedIn }, error } = await supabase.auth.signInWithPassword({ email: user.email, password })
     if (error) {
       if (error.message.toLowerCase().includes('ban')) {
         return { success: false, error: 'Your account has been deactivated. Contact your account owner.' }
@@ -40,6 +40,9 @@ export async function loginAction(formData: FormData) {
       return { success: false, error: 'Invalid username or password' }
     }
 
+    if (signedIn?.app_metadata?.must_change_password) {
+      redirect('/auth/change-password')
+    }
     redirect('/dashboard')
   }
 
@@ -58,6 +61,9 @@ export async function loginAction(formData: FormData) {
   }
 
   if (user.app_metadata?.tenant_id && user.app_metadata?.role) {
+    if (user.app_metadata?.must_change_password) {
+      redirect('/auth/change-password')
+    }
     redirect('/dashboard')
   }
 
