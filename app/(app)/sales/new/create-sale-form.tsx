@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useCallback, useMemo } from 'react'
+import { useState, useTransition, useRef, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -20,6 +20,7 @@ import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dial
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
+import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 
 type Customer    = { id: string; name: string }
 type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null }
@@ -50,17 +51,16 @@ const baseSchema = z.object({
 type FormValues   = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerCreditMap = {}, customerOutstandingMap = {} }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerBalanceMap = {} }: {
   today: string
-  customers:              Customer[]
-  stockItems:             StockItem[]
-  pricingRules:           PricingRule[]
-  isOwner:                boolean
-  locations:              { id: string; name: string }[]
-  locationStock:          LocationStock[]
-  costMap:                Record<string, number>
-  customerCreditMap?:     Record<string, number>
-  customerOutstandingMap?: Record<string, number>
+  customers:         Customer[]
+  stockItems:        StockItem[]
+  pricingRules:      PricingRule[]
+  isOwner:           boolean
+  locations:         { id: string; name: string }[]
+  locationStock:     LocationStock[]
+  costMap:           Record<string, number>
+  customerBalanceMap?: Record<string, number>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -103,6 +103,23 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const watchedExchangeRate = form.watch('exchangeRate')
   const watchedLines        = form.watch('lines')
   const watchedLocation     = form.watch('locationId')
+
+  // Live customer balance — fetched fresh on every customer change so receipts always reflect
+  const [liveBalance, setLiveBalance] = useState<number | null>(
+    watchedCustomer ? (customerBalanceMap[watchedCustomer] ?? null) : null
+  )
+  const [balanceFetching, setBalanceFetching] = useState(false)
+
+  useEffect(() => {
+    if (!watchedCustomer) { setLiveBalance(null); return }
+    // Show pre-loaded value instantly, then refresh from server
+    setLiveBalance(customerBalanceMap[watchedCustomer] ?? null)
+    setBalanceFetching(true)
+    getCustomerBalanceAction(watchedCustomer)
+      .then((bal) => { if (bal !== null) setLiveBalance(bal) })
+      .finally(() => setBalanceFetching(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedCustomer])
 
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
 
@@ -246,15 +263,19 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                     </FormItem>
                   )} />
 
-                  {watchedCustomer && customerOutstandingMap[watchedCustomer] !== undefined && (
+                  {watchedCustomer && liveBalance !== null && liveBalance > 0 && (
                     <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-                      <span className="font-semibold">Outstanding balance:</span> This customer owes <span className="font-semibold">PKR {customerOutstandingMap[watchedCustomer].toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> from previous transactions.
+                      <span className="font-semibold">Outstanding balance:</span> This customer owes{' '}
+                      <span className="font-semibold">PKR {liveBalance.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> from previous transactions.
+                      {balanceFetching && <span className="ml-2 opacity-60 text-xs">updating…</span>}
                     </div>
                   )}
 
-                  {watchedCustomer && customerCreditMap[watchedCustomer] !== undefined && (
+                  {watchedCustomer && liveBalance !== null && liveBalance < 0 && (
                     <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
-                      <span className="font-semibold">Credit available:</span> This customer has <span className="font-semibold">PKR {customerCreditMap[watchedCustomer].toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> in credit from previous returns. The balance will offset their next outstanding amount automatically.
+                      <span className="font-semibold">Credit available:</span> This customer has{' '}
+                      <span className="font-semibold">PKR {Math.abs(liveBalance).toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> in credit from previous returns. The balance will offset their next outstanding amount automatically.
+                      {balanceFetching && <span className="ml-2 opacity-60 text-xs">updating…</span>}
                     </div>
                   )}
 

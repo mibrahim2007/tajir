@@ -27,18 +27,16 @@ export default async function NewSalePage() {
     }
   }
 
-  // Build per-customer balance maps
-  const customerCreditMap: Record<string, number> = {}
-  const customerOutstandingMap: Record<string, number> = {}
+  // Pre-compute per-customer balance (positive = owes us, negative = we owe them)
+  // This is the initial value shown immediately; the form will refresh it live on customer select.
+  const customerBalanceMap: Record<string, number> = {}
   for (const c of rawCustomers ?? []) {
     const ob      = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
-    const billed  = (rawSales ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const paid    = (rawReceipts ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const ret     = (rawReturns ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const billed  = (rawSales      ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const paid    = (rawReceipts   ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ret     = (rawReturns    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
     const cn      = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
-    const balance = ob + billed - paid - ret - cn
-    if (balance < 0) customerCreditMap[c.id] = Math.abs(balance)
-    else if (balance > 0) customerOutstandingMap[c.id] = balance
+    customerBalanceMap[c.id] = ob + billed - paid - ret - cn
   }
 
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
@@ -77,8 +75,7 @@ export default async function NewSalePage() {
         locations={locations}
         locationStock={locationStock}
         costMap={costMap}
-        customerCreditMap={customerCreditMap}
-        customerOutstandingMap={customerOutstandingMap}
+        customerBalanceMap={customerBalanceMap}
       />
     </div>
   )
