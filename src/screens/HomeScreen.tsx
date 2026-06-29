@@ -15,13 +15,14 @@ type Tile = {
 }
 
 const TILES: Tile[] = [
-  { label: 'Quick Sale',     icon: '🛒', screen: 'QuickSale',        color: '#059669' },
-  { label: 'Sale Return',    icon: '↩️',  screen: 'QuickSaleReturn',  color: '#dc2626' },
-  { label: 'Purchase',       icon: '📦', screen: 'QuickPurchase',     color: '#2563eb' },
-  { label: 'Receipt',        icon: '💳', screen: 'QuickReceipt',      color: '#7c3aed' },
-  { label: 'Payment',        icon: '💰', screen: 'QuickPayment',      color: '#c2410c' },
-  { label: 'Stock Lookup',   icon: '🔍', screen: 'StockLookup',       color: '#0891b2' },
-  { label: 'Customer Balance', icon: '👤', screen: 'CustomerBalance',  color: '#65a30d' },
+  { label: 'Quick Sale',       icon: '🛒', screen: 'QuickSale',           color: '#059669' },
+  { label: 'Sale Return',      icon: '↩️',  screen: 'QuickSaleReturn',     color: '#dc2626' },
+  { label: 'Purchase',         icon: '📦', screen: 'QuickPurchase',        color: '#2563eb' },
+  { label: 'Purchase Return',  icon: '🔄', screen: 'QuickPurchaseReturn',  color: '#d97706' },
+  { label: 'Receipt',          icon: '💳', screen: 'QuickReceipt',         color: '#7c3aed' },
+  { label: 'Payment',          icon: '💰', screen: 'QuickPayment',         color: '#c2410c' },
+  { label: 'Stock Lookup',     icon: '🔍', screen: 'StockLookup',          color: '#0891b2' },
+  { label: 'Customer Balance', icon: '👤', screen: 'CustomerBalance',      color: '#65a30d' },
 ]
 
 export function HomeScreen() {

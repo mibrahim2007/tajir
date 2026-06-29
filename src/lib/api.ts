@@ -45,6 +45,12 @@ export async function fetchStockItems(search = ''): Promise<StockItem[]> {
   return (data ?? []) as StockItem[]
 }
 
+export async function fetchLocations(): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase.from('locations').select('id, name').order('name')
+  if (error) throw error
+  return (data ?? []) as { id: string; name: string }[]
+}
+
 export async function fetchLocationStock(stockItemId: string): Promise<LocationStock[]> {
   const { data, error } = await supabase
     .from('location_stock_summary')
@@ -94,16 +100,20 @@ export async function fetchRecentSales(customerId: string) {
 
 // ── Transactions (Edge Functions) ─────────────────────────────────────────────
 export const createSale = (p: {
-  customerId: string; stockItemId: string; quantity: number; rate: number; date: string
+  customerId: string; stockItemId: string; quantity: number; rate: number; date: string; locationId?: string
 }) => callFunction('quick-sale', p)
 
 export const createSaleReturn = (p: {
-  customerId: string; stockItemId: string; quantity: number; rate: number; date: string; reason?: string
+  customerId: string; stockItemId: string; quantity: number; rate: number; date: string; reason?: string; locationId?: string
 }) => callFunction('quick-sale-return', p)
 
 export const createPurchase = (p: {
-  supplierId: string; stockItemId: string; quantity: number; rate: number; date: string
+  supplierId: string; stockItemId: string; quantity: number; rate: number; date: string; locationId?: string
 }) => callFunction('quick-purchase', p)
+
+export const createPurchaseReturn = (p: {
+  supplierId: string; stockItemId: string; quantity: number; rate: number; date: string; reason?: string; locationId?: string
+}) => callFunction('quick-purchase-return', p)
 
 export const createReceipt = (p: {
   customerId: string; amount: number; date: string; notes?: string

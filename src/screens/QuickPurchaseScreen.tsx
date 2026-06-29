@@ -5,26 +5,29 @@ import {
 } from 'react-native'
 import { PickerModal } from '../components/PickerModal'
 import { NumericInput } from '../components/NumericInput'
-import { fetchSuppliers, fetchStockItems, createPurchase } from '../lib/api'
+import { fetchSuppliers, fetchStockItems, fetchLocations, createPurchase } from '../lib/api'
 import type { Supplier, StockItem } from '../types'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
 export function QuickPurchaseScreen() {
-  const [suppliers, setSuppliers]   = useState<Supplier[]>([])
-  const [stockItems, setStockItems] = useState<StockItem[]>([])
-  const [supplier, setSupplier]     = useState<Supplier | null>(null)
-  const [item, setItem]             = useState<StockItem | null>(null)
-  const [quantity, setQuantity]     = useState(0)
-  const [rate, setRate]             = useState(0)
+  const [suppliers, setSuppliers]     = useState<Supplier[]>([])
+  const [stockItems, setStockItems]   = useState<StockItem[]>([])
+  const [locations, setLocations]     = useState<{ id: string; name: string }[]>([])
+  const [supplier, setSupplier]       = useState<Supplier | null>(null)
+  const [item, setItem]               = useState<StockItem | null>(null)
+  const [location, setLocation]       = useState<{ id: string; name: string } | null>(null)
+  const [quantity, setQuantity]       = useState(0)
+  const [rate, setRate]               = useState(0)
   const [showSupplier, setShowSupplier] = useState(false)
-  const [showItem, setShowItem]     = useState(false)
-  const [saving, setSaving]         = useState(false)
+  const [showItem, setShowItem]       = useState(false)
+  const [showLocation, setShowLocation] = useState(false)
+  const [saving, setSaving]           = useState(false)
   const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
-    Promise.all([fetchSuppliers(), fetchStockItems()])
-      .then(([s, items]) => { setSuppliers(s); setStockItems(items) })
+    Promise.all([fetchSuppliers(), fetchStockItems(), fetchLocations()])
+      .then(([s, items, locs]) => { setSuppliers(s); setStockItems(items); setLocations(locs) })
       .catch((e) => Alert.alert('Error', e.message))
       .finally(() => setLoadingData(false))
   }, [])
@@ -32,18 +35,25 @@ export function QuickPurchaseScreen() {
   const amount = quantity * rate
 
   const reset = () => {
-    setSupplier(null); setItem(null); setQuantity(0); setRate(0)
+    setSupplier(null); setItem(null); setLocation(null); setQuantity(0); setRate(0)
   }
 
   const handleSubmit = async () => {
-    if (!supplier) return Alert.alert('Required', 'Select a supplier.')
-    if (!item)     return Alert.alert('Required', 'Select a stock item.')
-    if (quantity <= 0) return Alert.alert('Required', 'Enter quantity.')
-    if (rate <= 0)     return Alert.alert('Required', 'Enter rate.')
+    if (!supplier)      return Alert.alert('Required', 'Select a supplier.')
+    if (!item)          return Alert.alert('Required', 'Select a stock item.')
+    if (quantity <= 0)  return Alert.alert('Required', 'Enter quantity.')
+    if (rate <= 0)      return Alert.alert('Required', 'Enter rate.')
 
     setSaving(true)
     try {
-      await createPurchase({ supplierId: supplier.id, stockItemId: item.id, quantity, rate, date: today() })
+      await createPurchase({
+        supplierId: supplier.id,
+        stockItemId: item.id,
+        quantity,
+        rate,
+        date: today(),
+        locationId: location?.id,
+      })
       Alert.alert('Saved', `Purchase of PKR ${amount.toLocaleString()} recorded.`, [{ text: 'OK', onPress: reset }])
     } catch (e: any) {
       Alert.alert('Error', e.message)
@@ -52,11 +62,12 @@ export function QuickPurchaseScreen() {
     }
   }
 
-  const supplierItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
-  const stockItemList = stockItems.map((s) => ({
+  const supplierItems  = suppliers.map((s) => ({ id: s.id, name: s.name }))
+  const stockItemList  = stockItems.map((s) => ({
     id: s.id, name: s.name,
     subtitle: `Qty: ${parseFloat(s.current_quantity).toFixed(0)} ${s.count ?? 'units'}`,
   }))
+  const locationItems  = locations.map((l) => ({ id: l.id, name: l.name }))
 
   if (loadingData) return <ActivityIndicator size="large" color="#2563eb" style={{ flex: 1 }} />
 
@@ -79,6 +90,15 @@ export function QuickPurchaseScreen() {
           <TouchableOpacity style={styles.picker} onPress={() => setShowItem(true)}>
             <Text style={item ? styles.pickerValue : styles.pickerPlaceholder}>
               {item?.name ?? 'Select item…'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.field}>
+          <Text style={styles.label}>Location (optional)</Text>
+          <TouchableOpacity style={styles.picker} onPress={() => setShowLocation(true)}>
+            <Text style={location ? styles.pickerValue : styles.pickerPlaceholder}>
+              {location?.name ?? 'Select location…'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -111,22 +131,25 @@ export function QuickPurchaseScreen() {
       <PickerModal visible={showItem} title="Select Stock Item" items={stockItemList}
         onSelect={(i) => { setItem(stockItems.find((s) => s.id === i.id)!); setShowItem(false) }}
         onClose={() => setShowItem(false)} />
+      <PickerModal visible={showLocation} title="Select Location" items={locationItems}
+        onSelect={(i) => { setLocation({ id: i.id, name: i.name }); setShowLocation(false) }}
+        onClose={() => setShowLocation(false)} />
     </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  container:          { padding: 20, backgroundColor: '#f9fafb', flexGrow: 1 },
-  screenTitle:        { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 20 },
-  field:              { marginBottom: 16 },
-  label:              { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
-  picker:             { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
-  pickerValue:        { fontSize: 15, color: '#111' },
-  pickerPlaceholder:  { fontSize: 15, color: '#9ca3af' },
-  amountBox:          { backgroundColor: '#eff6ff', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  amountLabel:        { fontSize: 14, color: '#1e40af', fontWeight: '600' },
-  amountValue:        { fontSize: 18, color: '#1e40af', fontWeight: '800' },
-  btn:                { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
-  btnDisabled:        { opacity: 0.6 },
-  btnText:            { color: '#fff', fontWeight: '700', fontSize: 16 },
+  container:         { padding: 20, backgroundColor: '#f9fafb', flexGrow: 1 },
+  screenTitle:       { fontSize: 20, fontWeight: '700', color: '#111', marginBottom: 20 },
+  field:             { marginBottom: 16 },
+  label:             { fontSize: 13, fontWeight: '600', color: '#374151', marginBottom: 6 },
+  picker:            { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 13 },
+  pickerValue:       { fontSize: 15, color: '#111' },
+  pickerPlaceholder: { fontSize: 15, color: '#9ca3af' },
+  amountBox:         { backgroundColor: '#eff6ff', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  amountLabel:       { fontSize: 14, color: '#1e40af', fontWeight: '600' },
+  amountValue:       { fontSize: 18, color: '#1e40af', fontWeight: '800' },
+  btn:               { backgroundColor: '#2563eb', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  btnDisabled:       { opacity: 0.6 },
+  btnText:           { color: '#fff', fontWeight: '700', fontSize: 16 },
 })

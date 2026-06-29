@@ -5,30 +5,30 @@ import {
 } from 'react-native'
 import { PickerModal } from '../components/PickerModal'
 import { NumericInput } from '../components/NumericInput'
-import { fetchCustomers, fetchStockItems, fetchLocations, createSaleReturn } from '../lib/api'
-import type { Customer, StockItem } from '../types'
+import { fetchSuppliers, fetchStockItems, fetchLocations, createPurchaseReturn } from '../lib/api'
+import type { Supplier, StockItem } from '../types'
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-export function QuickSaleReturnScreen() {
-  const [customers, setCustomers]   = useState<Customer[]>([])
+export function QuickPurchaseReturnScreen() {
+  const [suppliers, setSuppliers]   = useState<Supplier[]>([])
   const [stockItems, setStockItems] = useState<StockItem[]>([])
   const [locations, setLocations]   = useState<{ id: string; name: string }[]>([])
-  const [customer, setCustomer]     = useState<Customer | null>(null)
+  const [supplier, setSupplier]     = useState<Supplier | null>(null)
   const [item, setItem]             = useState<StockItem | null>(null)
   const [location, setLocation]     = useState<{ id: string; name: string } | null>(null)
   const [quantity, setQuantity]     = useState(0)
   const [rate, setRate]             = useState(0)
   const [reason, setReason]         = useState('')
-  const [showCustomer, setShowCustomer] = useState(false)
+  const [showSupplier, setShowSupplier] = useState(false)
   const [showItem, setShowItem]     = useState(false)
   const [showLocation, setShowLocation] = useState(false)
   const [saving, setSaving]         = useState(false)
   const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
-    Promise.all([fetchCustomers(), fetchStockItems(), fetchLocations()])
-      .then(([c, s, locs]) => { setCustomers(c); setStockItems(s); setLocations(locs) })
+    Promise.all([fetchSuppliers(), fetchStockItems(), fetchLocations()])
+      .then(([s, items, locs]) => { setSuppliers(s); setStockItems(items); setLocations(locs) })
       .catch((e) => Alert.alert('Error', e.message))
       .finally(() => setLoadingData(false))
   }, [])
@@ -36,19 +36,19 @@ export function QuickSaleReturnScreen() {
   const amount = quantity * rate
 
   const reset = () => {
-    setCustomer(null); setItem(null); setLocation(null); setQuantity(0); setRate(0); setReason('')
+    setSupplier(null); setItem(null); setLocation(null); setQuantity(0); setRate(0); setReason('')
   }
 
   const handleSubmit = async () => {
-    if (!customer)     return Alert.alert('Required', 'Select a customer.')
+    if (!supplier)     return Alert.alert('Required', 'Select a supplier.')
     if (!item)         return Alert.alert('Required', 'Select a stock item.')
     if (quantity <= 0) return Alert.alert('Required', 'Enter quantity.')
     if (rate <= 0)     return Alert.alert('Required', 'Enter rate.')
 
     setSaving(true)
     try {
-      await createSaleReturn({
-        customerId: customer.id,
+      await createPurchaseReturn({
+        supplierId: supplier.id,
         stockItemId: item.id,
         quantity,
         rate,
@@ -56,7 +56,7 @@ export function QuickSaleReturnScreen() {
         reason: reason || undefined,
         locationId: location?.id,
       })
-      Alert.alert('Saved', `Return of PKR ${amount.toLocaleString()} recorded.`, [{ text: 'OK', onPress: reset }])
+      Alert.alert('Saved', `Purchase return of PKR ${amount.toLocaleString()} recorded.`, [{ text: 'OK', onPress: reset }])
     } catch (e: any) {
       Alert.alert('Error', e.message)
     } finally {
@@ -64,25 +64,25 @@ export function QuickSaleReturnScreen() {
     }
   }
 
-  const customerItems = customers.map((c) => ({ id: c.id, name: c.name }))
+  const supplierItems = suppliers.map((s) => ({ id: s.id, name: s.name }))
   const stockItemList = stockItems.map((s) => ({
     id: s.id, name: s.name,
     subtitle: `Qty: ${parseFloat(s.current_quantity).toFixed(0)} ${s.count ?? 'units'}`,
   }))
   const locationItems = locations.map((l) => ({ id: l.id, name: l.name }))
 
-  if (loadingData) return <ActivityIndicator size="large" color="#dc2626" style={{ flex: 1 }} />
+  if (loadingData) return <ActivityIndicator size="large" color="#d97706" style={{ flex: 1 }} />
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.screenTitle}>Sale Return</Text>
+        <Text style={styles.screenTitle}>Purchase Return</Text>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Customer</Text>
-          <TouchableOpacity style={styles.picker} onPress={() => setShowCustomer(true)}>
-            <Text style={customer ? styles.pickerValue : styles.pickerPlaceholder}>
-              {customer?.name ?? 'Select customer…'}
+          <Text style={styles.label}>Supplier</Text>
+          <TouchableOpacity style={styles.picker} onPress={() => setShowSupplier(true)}>
+            <Text style={supplier ? styles.pickerValue : styles.pickerPlaceholder}>
+              {supplier?.name ?? 'Select supplier…'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -119,7 +119,7 @@ export function QuickSaleReturnScreen() {
           <Text style={styles.label}>Reason (optional)</Text>
           <TextInput
             style={styles.textInput}
-            placeholder="Quality issue, wrong item…"
+            placeholder="Defective, wrong item, over-supply…"
             value={reason}
             onChangeText={setReason}
             multiline
@@ -138,9 +138,9 @@ export function QuickSaleReturnScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      <PickerModal visible={showCustomer} title="Select Customer" items={customerItems}
-        onSelect={(i) => { setCustomer({ id: i.id, name: i.name }); setShowCustomer(false) }}
-        onClose={() => setShowCustomer(false)} />
+      <PickerModal visible={showSupplier} title="Select Supplier" items={supplierItems}
+        onSelect={(i) => { setSupplier({ id: i.id, name: i.name }); setShowSupplier(false) }}
+        onClose={() => setShowSupplier(false)} />
       <PickerModal visible={showItem} title="Select Stock Item" items={stockItemList}
         onSelect={(i) => { setItem(stockItems.find((s) => s.id === i.id)!); setShowItem(false) }}
         onClose={() => setShowItem(false)} />
@@ -160,10 +160,10 @@ const styles = StyleSheet.create({
   pickerValue:       { fontSize: 15, color: '#111' },
   pickerPlaceholder: { fontSize: 15, color: '#9ca3af' },
   textInput:         { backgroundColor: '#f9fafb', borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: '#111', minHeight: 60 },
-  amountBox:         { backgroundColor: '#fef2f2', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  amountLabel:       { fontSize: 14, color: '#991b1b', fontWeight: '600' },
-  amountValue:       { fontSize: 18, color: '#991b1b', fontWeight: '800' },
-  btn:               { backgroundColor: '#dc2626', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  amountBox:         { backgroundColor: '#fffbeb', borderRadius: 12, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  amountLabel:       { fontSize: 14, color: '#92400e', fontWeight: '600' },
+  amountValue:       { fontSize: 18, color: '#92400e', fontWeight: '800' },
+  btn:               { backgroundColor: '#d97706', borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   btnDisabled:       { opacity: 0.6 },
   btnText:           { color: '#fff', fontWeight: '700', fontSize: 16 },
 })
