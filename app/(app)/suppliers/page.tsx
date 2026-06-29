@@ -12,19 +12,21 @@ export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }] = await Promise.all([
+  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }, { data: allRefunds }] = await Promise.all([
     admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
     admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('debit_notes').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('supplier_refunds').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
-  const suppliers = allSuppliers ?? []
-  const purchases = allPurchases ?? []
-  const payments = allPayments ?? []
-  const returns = allReturns ?? []
+  const suppliers  = allSuppliers ?? []
+  const purchases  = allPurchases ?? []
+  const payments   = allPayments  ?? []
+  const returns    = allReturns   ?? []
   const debitNotes = allDebitNotes ?? []
+  const refunds    = allRefunds   ?? []
 
   const outstandingBySupplier = new Map<string, number>()
   for (const s of suppliers) {
@@ -41,7 +43,10 @@ export default async function SuppliersPage() {
     const debited = debitNotes
       .filter((n) => n.supplier_id === s.id)
       .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
-    outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited)
+    const refunded = refunds
+      .filter((r) => r.supplier_id === s.id)
+      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+    outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited + refunded)
   }
 
   return (
@@ -75,8 +80,9 @@ export default async function SuppliersPage() {
                 return (
                   <tr key={s.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium">{s.name}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                      {formatPKR(outstanding)}
+                    <td className={`px-4 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-destructive' : outstanding < 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                      {formatPKR(Math.abs(outstanding))}
+                      {outstanding < 0 && <span className="ml-1 text-xs opacity-70">CR</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <Link
