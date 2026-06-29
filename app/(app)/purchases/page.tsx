@@ -20,12 +20,13 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const filterTo       = typeof params.to       === 'string' ? params.to       : undefined
   const filterSupplier = typeof params.supplier === 'string' ? params.supplier : undefined
   const filterItem     = typeof params.item     === 'string' ? params.item     : undefined
+  const filterLocation = typeof params.location === 'string' ? params.location : undefined
 
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
   let query = admin.from('purchase_orders')
-    .select('id, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id')
+    .select('id, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -35,16 +36,19 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   if (filterTo)       query = query.lte('date', filterTo)
   if (filterSupplier) query = query.eq('supplier_id', filterSupplier)
   if (filterItem)     query = query.eq('stock_item_id', filterItem)
+  if (filterLocation) query = query.eq('location_id', filterLocation)
 
-  const [{ data: rawOrders }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawOrders }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     query,
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const orders      = rawOrders ?? []
   const supplierList = rawSuppliers ?? []
   const lotList      = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
+  const locationList = rawLocs ?? []
 
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
   const lotMap      = new Map(lotList.map((l) => [l.id, l.name]))
@@ -124,7 +128,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     return b.createdAt.localeCompare(a.createdAt)
   })
 
-  const hasFilters = filterFrom || filterTo || filterSupplier || filterItem
+  const hasFilters = filterFrom || filterTo || filterSupplier || filterItem || filterLocation
   const totalQty   = displayItems.reduce((s, i) => s + i.totalQty, 0)
   const totalPKR   = displayItems.reduce((s, i) => s + i.totalPKR, 0)
 
@@ -143,7 +147,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       </div>
 
       <Suspense>
-        <PurchaseFilters suppliers={supplierList} lots={lotList} />
+        <PurchaseFilters suppliers={supplierList} lots={lotList} locations={locationList} />
       </Suspense>
 
       {displayItems.length === 0 ? (

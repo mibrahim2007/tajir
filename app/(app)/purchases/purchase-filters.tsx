@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button'
 type Props = {
   suppliers: { id: string; name: string }[]
   lots:      { id: string; name: string }[]
+  locations: { id: string; name: string }[]
 }
 
-export function PurchaseFilters({ suppliers, lots }: Props) {
+export function PurchaseFilters({ suppliers, lots, locations }: Props) {
   const router      = useRouter()
   const pathname    = usePathname()
   const searchParams = useSearchParams()
@@ -24,7 +25,7 @@ export function PurchaseFilters({ suppliers, lots }: Props) {
   }, [router, pathname, searchParams])
 
   const hasFilters = searchParams.has('from') || searchParams.has('to') ||
-    searchParams.has('supplier') || searchParams.has('item')
+    searchParams.has('supplier') || searchParams.has('item') || searchParams.has('location')
 
   return (
     <div className="flex flex-wrap gap-2 mb-4">
@@ -60,6 +61,18 @@ export function PurchaseFilters({ suppliers, lots }: Props) {
           {lots.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
         </SelectContent>
       </Select>
+      {locations.length > 0 && (
+        <Select
+          value={searchParams.get('location') ?? 'all'}
+          onValueChange={v => set('location', v === 'all' ? '' : v)}
+        >
+          <SelectTrigger className="w-44 min-h-[44px]"><SelectValue placeholder="All Locations" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )}
       {hasFilters && (
         <Button variant="ghost" className="min-h-[44px]" onClick={() => router.push(pathname)}>
           Clear
