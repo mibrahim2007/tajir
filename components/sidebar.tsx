@@ -6,35 +6,16 @@ import { useState } from "react";
 import {
   Menu,
   LayoutDashboard,
-  Package,
-  ShoppingCart,
-  Undo2,
-  ShoppingBag,
-  RefreshCcw,
-  ClipboardList,
-  Users,
-  ArrowDownLeft,
-  Truck,
-  ArrowUpRight,
-  Tag,
-  Receipt,
-  BookOpen,
-  Video,
-  PenLine,
-  BarChart2,
   UsersRound,
   Wallet,
   Search,
   Landmark,
-  LogOut,
-  X,
-  MapPin,
-  ArrowLeftRight,
+  BookOpen,
+  Video,
   Layers,
   LifeBuoy,
   Bell,
-  FileMinus,
-  FilePlus,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -46,108 +27,60 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { MODULE_META, type ModuleKey } from "@/lib/modules";
 
 type NavLink = { href: string; label: string; icon: React.ElementType };
 type NavGroup = { title: string; links: NavLink[] };
 
-const ownerGroups: NavGroup[] = [
-  {
+function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
+  const enabled = new Set(enabledModules);
+  const groups: NavGroup[] = [];
+
+  groups.push({
     title: "Overview",
     links: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
-  },
-  {
-    title: "Trading",
-    links: [
-      { href: "/inventory", label: "Inventory", icon: Package },
-      { href: "/purchases", label: "Purchases", icon: ShoppingCart },
-      { href: "/purchase-returns", label: "Purchase Returns", icon: Undo2 },
-      { href: "/sales", label: "Sales", icon: ShoppingBag },
-      { href: "/sale-returns", label: "Sale Returns", icon: RefreshCcw },
-      { href: "/gatepasses", label: "Gatepasses", icon: ClipboardList },
-      { href: "/locations", label: "Locations", icon: MapPin },
-      { href: "/stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight },
-    ],
-  },
-  {
-    title: "Finance",
-    links: [
-      { href: "/customers", label: "Customers", icon: Users },
-      { href: "/receipts", label: "Receipts", icon: ArrowDownLeft },
-      { href: "/credit-notes", label: "Credit Notes", icon: FileMinus },
-      { href: "/suppliers", label: "Suppliers", icon: Truck },
-      { href: "/payments", label: "Payments", icon: ArrowUpRight },
-      { href: "/debit-notes", label: "Debit Notes", icon: FilePlus },
-      { href: "/pricing", label: "Pricing", icon: Tag },
-      { href: "/expenses", label: "Expenses", icon: Receipt },
-    ],
-  },
-  {
-    title: "Accounting",
-    links: [
-      { href: "/accounts", label: "Accounts", icon: BookOpen },
-      { href: "/vouchers", label: "Vouchers", icon: PenLine },
-      { href: "/reports", label: "Reports", icon: BarChart2 },
-    ],
-  },
-  {
-    title: "Settings",
-    links: [
-      { href: "/item-types", label: "Item Types", icon: Layers },
-      { href: "/settings/team", label: "Team", icon: UsersRound },
-      { href: "/settings/opening-balances", label: "Opening Balances", icon: Wallet },
-      { href: "/banks", label: "Banks", icon: Landmark },
-      { href: "/audit", label: "Audit Log", icon: Search },
-    ],
-  },
-  {
+  });
+
+  const sections = ["Trading", "Finance", "Accounting"] as const;
+  for (const section of sections) {
+    const links = (Object.entries(MODULE_META) as [ModuleKey, typeof MODULE_META[ModuleKey]][])
+      .filter(([key, m]) => m.section === section && enabled.has(key))
+      .map(([, m]) => ({ href: m.href, label: m.label, icon: m.icon }));
+    if (links.length > 0) groups.push({ title: section, links });
+  }
+
+  if (role === "owner") {
+    groups.push({
+      title: "Settings",
+      links: [
+        { href: "/item-types",                label: "Item Types",        icon: Layers },
+        { href: "/settings/team",             label: "Team",              icon: UsersRound },
+        { href: "/settings/modules",          label: "Modules",           icon: Settings },
+        { href: "/settings/opening-balances", label: "Opening Balances",  icon: Wallet },
+        { href: "/banks",                     label: "Banks",             icon: Landmark },
+        { href: "/audit",                     label: "Audit Log",         icon: Search },
+      ],
+    });
+  }
+
+  groups.push({
     title: "Help",
     links: [
-      { href: "/support",    label: "Support",    icon: LifeBuoy },
+      { href: "/support",    label: "Support",     icon: LifeBuoy },
       { href: "/help",       label: "Help Videos", icon: Video },
       { href: "/user-guide", label: "User Guide",  icon: BookOpen },
     ],
-  },
-];
+  });
 
-const assistantGroups: NavGroup[] = [
-  {
-    title: "Overview",
-    links: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
-  },
-  {
-    title: "Trading",
-    links: [
-      { href: "/inventory", label: "Inventory", icon: Package },
-      { href: "/purchases", label: "Purchases", icon: ShoppingCart },
-      { href: "/purchase-returns", label: "Purchase Returns", icon: Undo2 },
-      { href: "/sales", label: "Sales", icon: ShoppingBag },
-      { href: "/sale-returns", label: "Sale Returns", icon: RefreshCcw },
-      { href: "/gatepasses", label: "Gatepasses", icon: ClipboardList },
-      { href: "/stock-transfers", label: "Stock Transfers", icon: ArrowLeftRight },
-    ],
-  },
-  {
-    title: "Finance",
-    links: [
-      { href: "/receipts", label: "Receipts", icon: ArrowDownLeft },
-      { href: "/payments", label: "Payments", icon: ArrowUpRight },
-    ],
-  },
-  {
-    title: "Help",
-    links: [
-      { href: "/support",    label: "Support",    icon: LifeBuoy },
-      { href: "/help",       label: "Help Videos", icon: Video },
-      { href: "/user-guide", label: "User Guide",  icon: BookOpen },
-    ],
-  },
-];
+  return groups;
+}
 
-type SidebarBaseProps = {
+export type SidebarBaseProps = {
   role: string;
   userEmail: string;
   tenantName: string;
   supportCount?: number;
+  enabledModules: ModuleKey[];
 };
 
 function initials(name: string) {
@@ -203,9 +136,10 @@ function SidebarContent({
   userEmail,
   tenantName,
   supportCount = 0,
+  enabledModules,
   onNavigate,
 }: SidebarBaseProps & { onNavigate?: () => void }) {
-  const groups = role === "owner" ? ownerGroups : assistantGroups;
+  const groups = buildNavGroups(role, enabledModules);
   const ini = initials(tenantName);
 
   return (

@@ -4,16 +4,28 @@ import { InviteAssistantForm } from '@/app/settings/team/invite-assistant-form'
 import { TeamMemberList } from '@/app/settings/team/team-member-list'
 import type { TeamMember } from '@/app/settings/team/team-member-list'
 import type { Role } from '@/db/schema'
+import { parseTenantFeatures, parseUserPermissions, type ModuleKey } from '@/lib/modules'
 
 export default async function TeamSettingsPage() {
   const { user, tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const { data: rows } = await admin
-    .from('tenant_users')
-    .select('id, user_id, role, is_active')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: true })
+  const [{ data: rows }, { data: tenant }] = await Promise.all([
+    admin
+      .from('tenant_users')
+      .select('id, user_id, role, is_active, permissions')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: true }),
+    admin
+      .from('tenants')
+      .select('features')
+      .eq('id', tenantId)
+      .single(),
+  ])
+
+  const tenantModules = [
+    ...parseTenantFeatures((tenant as { features?: unknown } | null)?.features),
+  ] as ModuleKey[]
 
   const members: TeamMember[] = await Promise.all(
     (rows ?? []).map(async (row) => {
@@ -24,11 +36,13 @@ export default async function TeamSettingsPage() {
         email: authUser.user?.email ?? row.user_id,
         role: row.role as Role,
         isActive: row.is_active,
+        permissions: parseUserPermissions(row.permissions) !== null
+          ? [...(parseUserPermissions(row.permissions) ?? [])] as ModuleKey[]
+          : null,
       }
     }),
   )
 
-  // Owners first, then alphabetically
   members.sort((a, b) => {
     if (a.role !== b.role) return a.role === 'owner' ? -1 : 1
     return a.email.localeCompare(b.email)
@@ -47,7 +61,7 @@ export default async function TeamSettingsPage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
           Members ({members.length})
         </h2>
-        <TeamMemberList members={members} currentUserId={user.id} />
+        <TeamMemberList members={members} currentUserId={user.id} tenantModules={tenantModules} />
       </section>
 
       <section>
