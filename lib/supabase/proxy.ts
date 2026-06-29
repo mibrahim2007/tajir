@@ -51,6 +51,19 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = pathname.startsWith("/auth");
   const isPublicRoute = pathname === "/";
 
+  const mustChangePassword = (user as { app_metadata?: { must_change_password?: boolean } } | undefined)
+    ?.app_metadata?.must_change_password === true;
+
+  // Users with must_change_password can ONLY reach /auth/change-password
+  if (user && mustChangePassword) {
+    if (pathname !== "/auth/change-password") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/auth/change-password";
+      return NextResponse.redirect(url);
+    }
+    return supabaseResponse;
+  }
+
   if (!user && !isAuthRoute && !isPublicRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
