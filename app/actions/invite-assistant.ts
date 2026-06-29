@@ -9,6 +9,7 @@ import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
+  role: z.enum(['owner', 'assistant']).default('assistant'),
 })
 
 function generateTempPassword(): string {
@@ -21,7 +22,10 @@ function generateTempPassword(): string {
 export async function inviteAssistantAction(
   formData: FormData,
 ): Promise<ActionResult<{ email: string; tempPassword: string }>> {
-  const parsed = schema.safeParse({ email: formData.get('email') })
+  const parsed = schema.safeParse({
+    email: formData.get('email'),
+    role: formData.get('role') ?? 'assistant',
+  })
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? 'Invalid input', code: 'INVALID_INPUT' }
   }
@@ -37,50 +41,31 @@ export async function inviteAssistantAction(
   }
 
   const admin = createAdminClient()
-
-  // Block if an active assistant already exists
-  const { data: existing } = await admin
-    .from('tenant_users')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('role', 'assistant')
-    .eq('is_active', true)
-    .limit(1)
-    .single()
-
-  if (existing) {
-    return {
-      success: false,
-      error: 'An assistant already exists for this account',
-      code: 'ASSISTANT_EXISTS',
-    }
-  }
-
+  const { email, role: memberRole } = parsed.data
   const tempPassword = generateTempPassword()
-  const { email } = parsed.data
 
   const { data: newUser, error: createError } = await admin.auth.admin.createUser({
     email,
     password: tempPassword,
-    app_metadata: { role: 'assistant', tenant_id: tenantId },
+    app_metadata: { role: memberRole, tenant_id: tenantId },
     email_confirm: true,
   })
 
   if (createError || !newUser.user) {
     return {
       success: false,
-      error: createError?.message ?? 'Failed to create assistant account',
+      error: createError?.message ?? 'Failed to create account',
       code: 'CREATE_USER_ERROR',
     }
   }
 
-  const assistantUserId = newUser.user.id
+  const newUserId = newUser.user.id
 
   try {
     const { error: insertError } = await admin.from('tenant_users').insert({
       tenant_id: tenantId,
-      user_id: assistantUserId,
-      role: 'assistant',
+      user_id: newUserId,
+      role: memberRole,
     })
 
     if (insertError) throw insertError
@@ -90,13 +75,13 @@ export async function inviteAssistantAction(
       userId: user.id,
       action: 'create',
       entity: 'tenant_users',
-      entityId: assistantUserId,
-      after: { role: 'assistant', email },
+      entityId: newUserId,
+      after: { role: memberRole, email },
     })
 
     return { success: true, data: { email, tempPassword } }
   } catch {
-    await admin.auth.admin.deleteUser(assistantUserId)
-    return { success: false, error: 'Failed to save assistant. Please try again.', code: 'INTERNAL_ERROR' }
+    await admin.auth.admin.deleteUser(newUserId)
+    return { success: false, error: 'Failed to save team member. Please try again.', code: 'INTERNAL_ERROR' }
   }
 }

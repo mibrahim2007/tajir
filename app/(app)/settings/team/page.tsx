@@ -1,51 +1,61 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { InviteAssistantForm } from '@/app/settings/team/invite-assistant-form'
-import { AssistantManagement } from '@/app/settings/team/assistant-management'
+import { TeamMemberList } from '@/app/settings/team/team-member-list'
+import type { TeamMember } from '@/app/settings/team/team-member-list'
+import type { Role } from '@/db/schema'
 
 export default async function TeamSettingsPage() {
-  const { tenantId } = await requireAuth()
+  const { user, tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const { data } = await admin
+  const { data: rows } = await admin
     .from('tenant_users')
-    .select('id, user_id, role, is_active, tenant_id, username, created_at')
+    .select('id, user_id, role, is_active')
     .eq('tenant_id', tenantId)
-    .eq('role', 'assistant')
-    .limit(1)
+    .order('created_at', { ascending: true })
 
-  const assistantRow = data?.[0] ?? null
-
-  let assistantEmail = ''
-  if (assistantRow) {
-    const { data: authUser } = await admin.auth.admin.getUserById(assistantRow.user_id)
-    assistantEmail = authUser.user?.email ?? ''
-  }
-
-  const assistant = assistantRow
-    ? {
-        id: assistantRow.id,
-        tenantId: assistantRow.tenant_id,
-        userId: assistantRow.user_id,
-        username: assistantRow.username,
-        role: assistantRow.role as 'assistant',
-        isActive: assistantRow.is_active,
-        createdAt: new Date(assistantRow.created_at),
+  const members: TeamMember[] = await Promise.all(
+    (rows ?? []).map(async (row) => {
+      const { data: authUser } = await admin.auth.admin.getUserById(row.user_id)
+      return {
+        id: row.id,
+        userId: row.user_id,
+        email: authUser.user?.email ?? row.user_id,
+        role: row.role as Role,
+        isActive: row.is_active,
       }
-    : null
+    }),
+  )
+
+  // Owners first, then alphabetically
+  members.sort((a, b) => {
+    if (a.role !== b.role) return a.role === 'owner' ? -1 : 1
+    return a.email.localeCompare(b.email)
+  })
 
   return (
-    <div className="p-6 max-w-lg mx-auto">
-      <div className="mb-6">
+    <div className="p-6 max-w-lg mx-auto space-y-8">
+      <div>
         <h1 className="text-2xl font-semibold">Team</h1>
-        <p className="text-sm text-muted-foreground mt-1">Manage your assistant&apos;s access</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          Manage who has access to your account and what they can do.
+        </p>
       </div>
 
-      {assistant ? (
-        <AssistantManagement assistantEmail={assistantEmail} isActive={assistant.isActive} />
-      ) : (
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Members ({members.length})
+        </h2>
+        <TeamMemberList members={members} currentUserId={user.id} />
+      </section>
+
+      <section>
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          Add Member
+        </h2>
         <InviteAssistantForm />
-      )}
+      </section>
     </div>
   )
 }
