@@ -6,7 +6,7 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
@@ -17,6 +17,7 @@ export default async function NewSalePage() {
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('customer_refunds').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
   // Latest PKR cost per unit for each stock item (first row per item = most recent purchase)
@@ -31,12 +32,13 @@ export default async function NewSalePage() {
   // This is the initial value shown immediately; the form will refresh it live on customer select.
   const customerBalanceMap: Record<string, number> = {}
   for (const c of rawCustomers ?? []) {
-    const ob      = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
-    const billed  = (rawSales      ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const paid    = (rawReceipts   ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const ret     = (rawReturns    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const cn      = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
-    customerBalanceMap[c.id] = ob + billed - paid - ret - cn
+    const ob       = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
+    const billed   = (rawSales       ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const paid     = (rawReceipts    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ret      = (rawReturns     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const cn       = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
+    const refunded = (rawRefunds     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
