@@ -127,6 +127,13 @@ const assistantGroups: NavGroup[] = [
     ],
   },
   {
+    title: "Finance",
+    links: [
+      { href: "/receipts", label: "Receipts", icon: ArrowDownLeft },
+      { href: "/payments", label: "Payments", icon: ArrowUpRight },
+    ],
+  },
+  {
     title: "Help",
     links: [
       { href: "/support",    label: "Support",    icon: LifeBuoy },

@@ -32,11 +32,9 @@ export default async function PaymentsPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Payments</h1>
           <p className="text-sm text-muted-foreground mt-1">{payments.length} payment{payments.length !== 1 ? 's' : ''}</p>
         </div>
-        <RoleGate allowedRoles={['owner']}>
-          <Button asChild className="min-h-[44px]">
-            <Link href="/payments/new"><Plus className="h-4 w-4 mr-2" />New Payment</Link>
-          </Button>
-        </RoleGate>
+        <Button asChild className="min-h-[44px]">
+          <Link href="/payments/new"><Plus className="h-4 w-4 mr-2" />New Payment</Link>
+        </Button>
       </div>
 
       {payments.length === 0 ? (

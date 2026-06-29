@@ -25,10 +25,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
   }
 
-  const { user, role, tenantId } = await requireAuth()
-  if (role !== 'owner') {
-    return { success: false, error: 'Permission denied', code: 'UNAUTHORIZED' }
-  }
+  const { user, tenantId } = await requireAuth()
 
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') {
