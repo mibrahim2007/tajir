@@ -27,8 +27,9 @@ export default async function NewSalePage() {
     }
   }
 
-  // Build per-customer credit map (negative balance = customer has credit)
+  // Build per-customer balance maps
   const customerCreditMap: Record<string, number> = {}
+  const customerOutstandingMap: Record<string, number> = {}
   for (const c of rawCustomers ?? []) {
     const ob      = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
     const billed  = (rawSales ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
@@ -37,6 +38,7 @@ export default async function NewSalePage() {
     const cn      = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
     const balance = ob + billed - paid - ret - cn
     if (balance < 0) customerCreditMap[c.id] = Math.abs(balance)
+    else if (balance > 0) customerOutstandingMap[c.id] = balance
   }
 
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
@@ -76,6 +78,7 @@ export default async function NewSalePage() {
         locationStock={locationStock}
         costMap={costMap}
         customerCreditMap={customerCreditMap}
+        customerOutstandingMap={customerOutstandingMap}
       />
     </div>
   )

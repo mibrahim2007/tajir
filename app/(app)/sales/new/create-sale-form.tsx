@@ -50,16 +50,17 @@ const baseSchema = z.object({
 type FormValues   = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
 
-export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerCreditMap = {} }: {
+export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerCreditMap = {}, customerOutstandingMap = {} }: {
   today: string
-  customers:         Customer[]
-  stockItems:        StockItem[]
-  pricingRules:      PricingRule[]
-  isOwner:           boolean
-  locations:         { id: string; name: string }[]
-  locationStock:     LocationStock[]
-  costMap:           Record<string, number>
-  customerCreditMap?: Record<string, number>
+  customers:              Customer[]
+  stockItems:             StockItem[]
+  pricingRules:           PricingRule[]
+  isOwner:                boolean
+  locations:              { id: string; name: string }[]
+  locationStock:          LocationStock[]
+  costMap:                Record<string, number>
+  customerCreditMap?:     Record<string, number>
+  customerOutstandingMap?: Record<string, number>
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -244,6 +245,12 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                       <FormMessage />
                     </FormItem>
                   )} />
+
+                  {watchedCustomer && customerOutstandingMap[watchedCustomer] !== undefined && (
+                    <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                      <span className="font-semibold">Outstanding balance:</span> This customer owes <span className="font-semibold">PKR {customerOutstandingMap[watchedCustomer].toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> from previous transactions.
+                    </div>
+                  )}
 
                   {watchedCustomer && customerCreditMap[watchedCustomer] !== undefined && (
                     <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
