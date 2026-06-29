@@ -1,0 +1,82 @@
+import { requireAuth } from '@/lib/auth/require-auth'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { CreateSaleForm } from './create-sale-form'
+
+export default async function NewSalePage() {
+  const { tenantId, role } = await requireAuth()
+  const admin = createAdminClient()
+
+  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }] = await Promise.all([
+    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, current_quantity, code').eq('tenant_id', tenantId).order('name'),
+    admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
+    admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity').eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
+    admin.from('sales_orders').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
+  ])
+
+  // Latest PKR cost per unit for each stock item (first row per item = most recent purchase)
+  const costMap: Record<string, number> = {}
+  for (const p of rawPurchases ?? []) {
+    if (!costMap[p.stock_item_id]) {
+      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+    }
+  }
+
+  // Build per-customer credit map (negative balance = customer has credit)
+  const customerCreditMap: Record<string, number> = {}
+  for (const c of rawCustomers ?? []) {
+    const ob      = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
+    const billed  = (rawSales ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const paid    = (rawReceipts ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ret     = (rawReturns ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const cn      = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
+    const balance = ob + billed - paid - ret - cn
+    if (balance < 0) customerCreditMap[c.id] = Math.abs(balance)
+  }
+
+  const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
+  const stockItems = (rawItems ?? []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    currentQuantity: l.current_quantity,
+    barcode: l.code ?? null,
+  }))
+  const pricingRules = (rawRules ?? []).map((r) => ({
+    customerId: r.customer_id,
+    stockItemId: r.stock_item_id,
+    rate: r.rate,
+  }))
+  const locations = rawLocs ?? []
+  const locationStock = (rawLocStock ?? []).map((ls) => ({
+    stockItemId: ls.stock_item_id,
+    locationId: ls.location_id,
+    quantity: parseFloat(String(ls.quantity ?? '0')),
+  }))
+
+  const today = new Date().toISOString().split('T')[0]
+
+  return (
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="mb-6">
+        <h1 className="text-2xl font-extrabold tracking-tight">New Sale</h1>
+        <p className="text-sm text-muted-foreground mt-1">Record a sale to a customer.</p>
+      </div>
+      <CreateSaleForm
+        today={today}
+        customers={customers}
+        stockItems={stockItems}
+        pricingRules={pricingRules}
+        isOwner={role === 'owner'}
+        locations={locations}
+        locationStock={locationStock}
+        costMap={costMap}
+        customerCreditMap={customerCreditMap}
+      />
+    </div>
+  )
+}

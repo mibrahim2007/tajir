@@ -1,0 +1,95 @@
+/* Canvas DS — Color tokens.
+   Palette: warm cream backgrounds, teal primary, amber accent.
+   Semantic aliases follow the same pattern as shadcn/ui so that
+   components reference var(--primary) etc rather than raw hex. */
+:root {
+  /* ---- Teal ramp (brand primary) ---- */
+  --color-teal-50:  #f0fdfa;
+  --color-teal-100: #ccfbf1;
+  --color-teal-200: #99f6e4;
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+  --color-teal-800: #115e59;
+  --color-teal-900: #134e4a;
+
+  /* ---- Amber ramp (accent) ---- */
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #ea8c2a;
+  --color-amber-700: #b45309;
+
+  /* ---- Warm neutral ramp ---- */
+  --color-warm-50:  #faf7f1;
+  --color-warm-100: #f4ede0;
+  --color-warm-200: #ece4d8;
+  --color-warm-300: #ddd4c4;
+  --color-warm-400: #c8baa8;
+  --color-warm-500: #a89e90;
+  --color-warm-600: #7c7367;
+  --color-warm-700: #5c5348;
+  --color-warm-800: #3d352c;
+  --color-warm-900: #231f1a;
+
+  /* ---- Status ---- */
+  --color-green-50:  #ecfdf5;  --color-green-100: #d1fae5;
+  --color-green-600: #16a34a;  --color-green-700: #15803d;  --color-green-800: #166534;
+  --color-red-50:    #fff1f0;  --color-red-100:  #fee2e2;
+  --color-red-600:   #dc2626;  --color-red-700:  #c2410c;
+  --color-orange-50: #fff8f0;  --color-orange-100: #ffedd5;
+  --color-orange-700:#b45309;  --color-orange-800:#92400e;
+
+  /* ================================================================
+     SEMANTIC ALIASES — use these in components, never raw hex.
+     ================================================================ */
+
+  /* backgrounds */
+  --background:         #faf7f1;   /* warm cream page bg */
+  --surface:            #ffffff;   /* card / panel bg */
+  --surface-alt:        #fbf8f3;   /* subtle tinted surface */
+  --surface-raised:     #ffffff;   /* elevated modal / tooltip */
+
+  /* foreground / text */
+  --foreground:         #231f1a;   /* primary ink */
+  --muted-foreground:   #7c7367;   /* secondary text, labels */
+  --faint-foreground:   #a89e90;   /* placeholders, inactive */
+
+  /* brand */
+  --primary:            #0d9488;   /* teal-600 */
+  --primary-hover:      #0f766e;   /* teal-700 */
+  --primary-foreground: #ffffff;
+  --primary-soft:       #d7f0ec;   /* teal tint bg */
+
+  /* accent */
+  --accent:             #ea8c2a;   /* amber-600 */
+  --accent-hover:       #b45309;
+  --accent-foreground:  #ffffff;
+  --accent-soft:        #fcebd6;
+
+  /* destructive */
+  --destructive:        #dc2626;
+  --destructive-hover:  #b91c1c;
+  --destructive-foreground: #ffffff;
+  --destructive-soft:   #fee2e2;
+
+  /* status */
+  --pos:                #15803d;   /* profit / positive balance */
+  --pos-soft:           #e3f3e7;
+  --neg:                #c2410c;   /* loss / owed / overdue */
+  --neg-soft:           #fbe7dc;
+  --warn:               #b45309;
+  --warn-soft:          #fbebcf;
+
+  /* borders + chrome */
+  --border:             #ece4d8;   /* standard card / input border */
+  --border-soft:        #f4eee4;   /* table row dividers */
+  --input:              #ece4d8;
+  --ring:               #0d9488;   /* focus ring */
+
+  /* money semantics */
+  --money-owed:         var(--neg);
+  --money-positive:     var(--pos);
+}

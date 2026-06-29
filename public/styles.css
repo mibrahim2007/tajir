@@ -1,0 +1,9 @@
+/* Canvas Design System — global entry point.
+   Link this one file; everything else is @import-ed transitively.
+   Do NOT add inline rules here — keep it as imports only. */
+@import "tokens/fonts.css";
+@import "tokens/colors.css";
+@import "tokens/typography.css";
+@import "tokens/spacing.css";
+@import "tokens/shadows.css";
+@import "tokens/gradients.css";

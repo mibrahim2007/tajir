@@ -1,0 +1,41 @@
+/* Canvas DS — Spacing, radius, and sizing tokens. */
+:root {
+  /* ---- Spacing scale (multiples of 4px) ---- */
+  --space-0:   0px;
+  --space-1:   4px;
+  --space-2:   8px;
+  --space-3:   12px;
+  --space-4:   16px;
+  --space-5:   20px;
+  --space-6:   24px;
+  --space-7:   28px;
+  --space-8:   32px;
+  --space-10:  40px;
+  --space-12:  48px;
+  --space-16:  64px;
+  --space-20:  80px;
+
+  /* ---- Component sizing ---- */
+  --height-input:   44px;   /* touch-safe input height */
+  --height-btn-sm:  34px;
+  --height-btn:     44px;
+  --height-btn-lg:  52px;
+  --height-header:  64px;
+  --height-nav-item:42px;
+  --sidebar-w:      252px;
+
+  /* ---- Border radius ---- */
+  --radius-xs:   6px;
+  --radius-sm:   12px;
+  --radius:      18px;   /* cards, modals */
+  --radius-lg:   24px;
+  --radius-xl:   32px;
+  --radius-pill: 9999px;
+
+  /* ---- Containers ---- */
+  --container-sm:   480px;
+  --container-md:   768px;
+  --container-lg:   1024px;
+  --container-xl:   1280px;
+  --container-wide: 1440px;
+}

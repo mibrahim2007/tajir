@@ -1,0 +1,14 @@
+/* Canvas DS — Fonts.
+   Primary UI: Sora (Google Fonts).
+   Numeric / tabular: Space Grotesk (Google Fonts).
+   ⚠ Substitution note: TTF binaries are not bundled; fonts load from
+   Google Fonts CDN at runtime. For offline / self-hosted deployment,
+   download Sora and Space Grotesk and replace this @import with
+   @font-face rules pointing to your local copies. */
+@import url("https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap");
+
+:root {
+  --font-sans: 'Sora', system-ui, -apple-system, sans-serif;
+  --font-num:  'Space Grotesk', system-ui, monospace;
+  --font-mono: 'Space Grotesk', ui-monospace, 'Courier New', monospace;
+}

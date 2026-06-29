@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Canvas warm cream palette */
+    --background: 40 33% 96%;
+    --foreground: 20 10% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 20 10% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 20 10% 9%;
+    --primary: 174 84% 32%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 27% 94%;
+    --secondary-foreground: 20 10% 9%;
+    --muted: 33 35% 92%;
+    --muted-foreground: 26 16% 43%;
+    --accent: 174 40% 92%;
+    --accent-foreground: 174 84% 22%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 37 25% 86%;
+    --input: 37 25% 86%;
+    --ring: 174 84% 32%;
+    --chart-1: 174 84% 32%;
+    --chart-2: 33 80% 55%;
+    --chart-3: 160 60% 45%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 0 84% 60%;
+    --radius: 0.75rem;
+  }
+  .dark {
+    --background: 20 10% 9%;
+    --foreground: 40 27% 94%;
+    --card: 20 10% 13%;
+    --card-foreground: 40 27% 94%;
+    --popover: 20 10% 13%;
+    --popover-foreground: 40 27% 94%;
+    --primary: 174 67% 40%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 20 12% 16%;
+    --secondary-foreground: 40 27% 94%;
+    --muted: 20 12% 16%;
+    --muted-foreground: 25 15% 56%;
+    --accent: 174 30% 18%;
+    --accent-foreground: 174 67% 60%;
+    --destructive: 0 63% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 22 13% 22%;
+    --input: 22 13% 22%;
+    --ring: 174 67% 40%;
+    --chart-1: 174 67% 40%;
+    --chart-2: 33 80% 55%;
+    --chart-3: 160 60% 45%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 0 84% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-sans, system-ui, sans-serif);
+  }
+}
+
+@media print {
+  header, [data-print-hide] {
+    display: none !important;
+  }
+  body {
+    background: white !important;
+    color: black !important;
+  }
+  .rounded-lg {
+    border-radius: 0 !important;
+  }
+}
