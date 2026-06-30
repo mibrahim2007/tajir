@@ -9,12 +9,12 @@ export default async function NewPurchasePage() {
 
   const [{ data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const supplierList = rawSuppliers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
   const locationList = rawLocs ?? []
 
   return (

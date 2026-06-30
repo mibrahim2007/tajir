@@ -41,7 +41,7 @@ type SaleReturn = {
 type Props = {
   ret: SaleReturn
   customers: { id: string; name: string }[]
-  lots: { id: string; name: string }[]
+  lots: { id: string; name: string; unitOfMeasure: string | null }[]
 }
 
 const SELECT_CLS = 'flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
@@ -110,17 +110,20 @@ export function EditSaleReturnForm({ ret, customers, lots }: Props) {
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="quantity" render={() => (
-              <FormItem>
-                <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
-                <FormControl>
-                  <Input type="number" step="0.001" min="0"
-                    onFocus={(e) => e.target.select()}
-                    {...form.register('quantity', { valueAsNumber: true })} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
+              const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
+              return (
+                <FormItem>
+                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.001" min="0" value={value}
+                      onFocus={(e) => e.target.select()}
+                      {...form.register('quantity', { valueAsNumber: true })} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )
+            }} />
 
             <CurrencyInput
               amountName="rate"

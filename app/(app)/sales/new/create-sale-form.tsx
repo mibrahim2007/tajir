@@ -23,7 +23,7 @@ import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null }
+type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null; unitOfMeasure: string | null }
 type PricingRule = { customerId: string; stockItemId: string; rate: string }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
@@ -436,6 +436,7 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
                                   {form.formState.errors.lines?.[index]?.quantity && (
                                     <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
                                   )}
+                                  {item?.unitOfMeasure && <p className="text-xs text-muted-foreground mt-0.5 text-right">{item.unitOfMeasure}</p>}
                                 </td>
                                 <td className="px-3 py-2">
                                   <NumericInput min={0} step="0.01" placeholder="" className={`text-right ${belowCost ? 'border-amber-400 focus-visible:ring-amber-400' : ''}`}
