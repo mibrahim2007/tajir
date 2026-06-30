@@ -19,14 +19,15 @@ export default async function PendingBalancePage({ searchParams }: { searchParam
   ] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId),
   ])
 
   const supplierMap = new Map((rawSuppliers ?? []).map(s => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map(c => [c.id, c.name]))
   const lotMap      = new Map((rawLots      ?? []).map(l => [l.id, l.name]))
+  const uomMap      = new Map((rawLots      ?? []).map(l => [l.id, l.unit_of_measure ?? null]))
 
-  let rows: { id: string; date: string; partyName: string; stockItemName: string; orderQty: number; received: number; balance: number }[] = []
+  let rows: { id: string; date: string; partyName: string; stockItemName: string; uom: string | null; orderQty: number; received: number; balance: number }[] = []
 
   if (tab === 'purchase') {
     const [{ data: orders }, { data: gpItems }] = await Promise.all([
@@ -51,6 +52,7 @@ export default async function PendingBalancePage({ searchParams }: { searchParam
         date:          o.date,
         partyName:     supplierMap.get(o.supplier_id) ?? '—',
         stockItemName: lotMap.get(o.stock_item_id) ?? '—',
+        uom:           uomMap.get(o.stock_item_id) ?? null,
         orderQty:      Number(o.quantity),
         received:      receivedMap.get(o.id) ?? 0,
         balance:       Number(o.quantity) - (receivedMap.get(o.id) ?? 0),
@@ -80,6 +82,7 @@ export default async function PendingBalancePage({ searchParams }: { searchParam
         date:          o.date,
         partyName:     customerMap.get(o.customer_id) ?? '—',
         stockItemName: lotMap.get(o.stock_item_id) ?? '—',
+        uom:           uomMap.get(o.stock_item_id) ?? null,
         orderQty:      Number(o.quantity),
         received:      dispatchedMap.get(o.id) ?? 0,
         balance:       Number(o.quantity) - (dispatchedMap.get(o.id) ?? 0),
@@ -149,9 +152,9 @@ export default async function PendingBalancePage({ searchParams }: { searchParam
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
                     <td className="px-4 py-3 font-medium">{r.partyName}</td>
                     <td className="px-4 py-3 text-muted-foreground">{r.stockItemName}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{fmt(r.orderQty)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{r.received > 0 ? fmt(r.received) : '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-amber-600 dark:text-amber-400">{fmt(r.balance)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{fmt(r.orderQty)}{r.uom && <span className="ml-1 text-muted-foreground text-xs">{r.uom}</span>}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">{r.received > 0 ? <>{fmt(r.received)}{r.uom && <span className="ml-1 text-xs">{r.uom}</span>}</> : '—'}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-amber-600 dark:text-amber-400">{fmt(r.balance)}{r.uom && <span className="ml-1 text-xs font-normal">{r.uom}</span>}</td>
                   </tr>
                 ))}
               </tbody>
