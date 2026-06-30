@@ -32,7 +32,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
     { data: rawPurchases },
   ] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('id', order.customer_id).single(),
-    admin.from('inventory_lots').select('id, name').eq('id', order.stock_item_id).single(),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('id', order.stock_item_id).single(),
     admin.from('tajir_journal_entries')
       .select('voucher_number')
       .eq('source_id', id)
@@ -129,7 +129,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
             <tr>
               <td className="px-3 py-3 border-r border-gray-200 text-gray-500 tabular-nums">1</td>
               <td className="px-3 py-3 border-r border-gray-200 font-medium">{stockItem?.name ?? '—'}</td>
-              <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+              <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockItem?.unit_of_measure ? <span className="ml-1 text-gray-500 text-xs">{stockItem.unit_of_measure}</span> : null}</td>
               <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
                 {order.currency_code} {fmt(rate)}
                 {belowCost && costPerUnit && (
