@@ -20,6 +20,7 @@ export const inventoryLots = pgTable(
     lot: text('lot'),
     // FK to suppliers added in migration 3 via ALTER TABLE
     defaultSupplierId: uuid('default_supplier_id'),
+    unitOfMeasure: text('unit_of_measure'),
     currentQuantity: numeric('current_quantity', { precision: 15, scale: 3 }).notNull().default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },

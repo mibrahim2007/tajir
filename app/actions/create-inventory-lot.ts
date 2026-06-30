@@ -22,7 +22,7 @@ export async function createInventoryLotAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, code, count, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
+  const { name, code, count, unitOfMeasure, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
 
   const admin = createAdminClient()
 
@@ -47,6 +47,7 @@ export async function createInventoryLotAction(
       name,
       code: code || null,
       count: count || null,
+      unit_of_measure: unitOfMeasure || null,
       item_type_id: itemTypeId || null,
       fiber: fiber || null,
       lot: lot || null,
@@ -65,7 +66,7 @@ export async function createInventoryLotAction(
     action: 'create',
     entity: 'inventory_lots',
     entityId: newLot.id,
-    after: { name, count, itemTypeId, fiber, lot },
+    after: { name, count, unitOfMeasure, itemTypeId, fiber, lot },
   })
 
   return { success: true, data: newLot }
