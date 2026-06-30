@@ -11,7 +11,7 @@ export default async function LocationStockReportPage({ searchParams }: { search
 
   const admin = createAdminClient()
 
-  const [{ data: rawStock }, { data: rawLocations }] = await Promise.all([
+  const [{ data: rawStock }, { data: rawLocations }, { data: rawLots }] = await Promise.all([
     admin
       .from('location_stock_summary')
       .select('stock_item_id, stock_item_name, yarn_count, location_id, location_name, quantity')
@@ -20,7 +20,9 @@ export default async function LocationStockReportPage({ searchParams }: { search
       .order('location_name')
       .order('stock_item_name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, unit_of_measure').eq('tenant_id', tenantId),
   ])
+  const uomMap = new Map((rawLots ?? []).map((l) => [l.id, l.unit_of_measure ?? null]))
 
   const locations = rawLocations ?? []
   const allRows = (rawStock ?? []).map(r => ({
@@ -106,7 +108,7 @@ export default async function LocationStockReportPage({ searchParams }: { search
                     <tr>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Item</th>
                       <th className="text-left px-4 py-2.5 font-medium text-muted-foreground">Count</th>
-                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Quantity</th>
+                      <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">Qty</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -114,7 +116,7 @@ export default async function LocationStockReportPage({ searchParams }: { search
                       <tr key={item.stockItemId} className="hover:bg-muted/20 transition-colors">
                         <td className="px-4 py-2.5 font-medium">{item.stockItemName}</td>
                         <td className="px-4 py-2.5 text-muted-foreground">{item.yarnCount}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{item.quantity.toLocaleString()}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums font-medium">{item.quantity.toLocaleString()}{uomMap.get(item.stockItemId) && <span className="ml-1 text-muted-foreground text-xs">{uomMap.get(item.stockItemId)}</span>}</td>
                       </tr>
                     ))}
                   </tbody>

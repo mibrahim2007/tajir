@@ -22,7 +22,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
 
   let query = admin
     .from('inventory_lots')
-    .select('id, name, code, count, type, fiber, lot, current_quantity, default_supplier_id, item_type_id, item_types(name)', { count: 'exact' })
+    .select('id, name, code, count, type, fiber, lot, current_quantity, unit_of_measure, default_supplier_id, item_type_id, item_types(name)', { count: 'exact' })
     .eq('tenant_id', tenantId)
 
   if (filterCount) query = query.ilike('count', `%${filterCount}%`)
@@ -87,6 +87,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
                     <th className="text-left px-4 py-3 font-medium">Lot</th>
                     <th className="text-left px-4 py-3 font-medium">Supplier</th>
                     <th className="text-right px-4 py-3 font-medium">Qty</th>
+                    <th className="text-left px-4 py-3 font-medium">UOM</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -104,6 +105,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
                         <td className="px-4 py-3">{lot.lot ?? '—'}</td>
                         <td className="px-4 py-3 text-muted-foreground">{lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '—') : '—'}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{parseFloat(String(lot.current_quantity)).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{lot.unit_of_measure ?? '—'}</td>
                       </tr>
                     )
                   })}

@@ -14,7 +14,7 @@ export default async function StockValuationPage() {
   ] = await Promise.all([
     admin
       .from('inventory_lots')
-      .select('id, name, code, count, current_quantity, opening_rate, item_type_id, item_types(name)')
+      .select('id, name, code, count, current_quantity, unit_of_measure, opening_rate, item_type_id, item_types(name)')
       .eq('tenant_id', tenantId)
       .order('name'),
     admin
@@ -52,7 +52,8 @@ export default async function StockValuationPage() {
     const typeName    = Array.isArray(lot.item_types)
       ? (lot.item_types[0] as { name: string } | undefined)?.name ?? '—'
       : (lot.item_types as { name: string } | null)?.name ?? '—'
-    return { id: String(lot.id), name: String(lot.name), code: lot.code ? String(lot.code) : null, count: lot.count ? String(lot.count) : null, typeName, qty, effectiveRate, rateSource, value }
+    const uom = lot.unit_of_measure ? String(lot.unit_of_measure) : null
+    return { id: String(lot.id), name: String(lot.name), code: lot.code ? String(lot.code) : null, count: lot.count ? String(lot.count) : null, typeName, uom, qty, effectiveRate, rateSource, value }
   })
 
   const withStock  = rows.filter(r => r.qty > 0)
@@ -135,7 +136,7 @@ export default async function StockValuationPage() {
                         <td className="px-4 py-3 font-medium">{row.name}</td>
                         <td className="px-4 py-3 text-muted-foreground">{row.count ?? '—'}</td>
                         <td className="px-4 py-3 text-muted-foreground">{row.typeName}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.qty)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.qty)}{row.uom && <span className="ml-1 text-gray-400 text-xs">{row.uom}</span>}</td>
                         <td className="px-4 py-3 text-right tabular-nums">
                           {row.effectiveRate > 0 ? fmtPKR(row.effectiveRate) : <span className="text-muted-foreground">—</span>}
                         </td>

@@ -52,13 +52,14 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
       : Promise.resolve({ data: [] }),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, `${l.name} (${l.count})`]))
+  const uomMap = new Map((rawLots ?? []).map((l) => [l.id, l.unit_of_measure ?? null]))
   const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
 
   type Row = {
@@ -69,6 +70,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     item: string
     location: string
     quantity: number
+    uom: string | null
     rate: number
     currencyCode: string
     pkrAmount: number
@@ -82,6 +84,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     item: lotMap.get(p.stock_item_id) ?? '—',
     location: p.location_id ? (locationMap.get(p.location_id) ?? '—') : '—',
     quantity: parseFloat(p.quantity),
+    uom: uomMap.get(p.stock_item_id) ?? null,
     rate: parseFloat(p.rate),
     currencyCode: p.currency_code,
     pkrAmount: parseFloat(p.pkr_equivalent),
@@ -95,6 +98,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     item: lotMap.get(s.stock_item_id) ?? '—',
     location: s.location_id ? (locationMap.get(s.location_id) ?? '—') : '—',
     quantity: parseFloat(s.quantity),
+    uom: uomMap.get(s.stock_item_id) ?? null,
     rate: parseFloat(s.rate),
     currencyCode: s.currency_code,
     pkrAmount: parseFloat(s.pkr_equivalent),
@@ -194,7 +198,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
                     <td className="px-4 py-2.5">{row.party}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{row.item}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{row.location}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{row.quantity.toLocaleString()}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{row.quantity.toLocaleString()}{row.uom && <span className="ml-1 text-muted-foreground text-xs">{row.uom}</span>}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
                       {row.currencyCode} {row.rate.toLocaleString()}
                     </td>
