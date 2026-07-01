@@ -8,9 +8,10 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const stockSchema = z.object({
-  lotId:    z.string().uuid(),
-  quantity: z.coerce.number().min(0, 'Quantity must be 0 or greater'),
-  rate:     z.coerce.number().min(0, 'Rate must be 0 or greater').default(0),
+  lotId:      z.string().uuid(),
+  quantity:   z.coerce.number().min(0, 'Quantity must be 0 or greater'),
+  rate:       z.coerce.number().min(0, 'Rate must be 0 or greater').default(0),
+  locationId: z.string().uuid('Location is required'),
 })
 
 const customerSchema = z.object({
@@ -37,13 +38,22 @@ export async function setStockOpeningBalance(input: unknown): Promise<ActionResu
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { lotId, quantity, rate } = parsed.data
+  const { lotId, quantity, rate, locationId } = parsed.data
 
   const admin = createAdminClient()
 
+  const { data: location } = await admin
+    .from('locations')
+    .select('id')
+    .eq('id', locationId)
+    .eq('tenant_id', tenantId)
+    .single()
+
+  if (!location) return { success: false, error: 'Location not found', code: 'NOT_FOUND' }
+
   const { data: lot } = await admin
     .from('inventory_lots')
-    .select('current_quantity, opening_rate')
+    .select('current_quantity, opening_rate, location_id')
     .eq('id', lotId)
     .eq('tenant_id', tenantId)
     .single()
@@ -52,13 +62,13 @@ export async function setStockOpeningBalance(input: unknown): Promise<ActionResu
 
   const { error } = await admin
     .from('inventory_lots')
-    .update({ current_quantity: String(quantity), opening_rate: String(rate) })
+    .update({ current_quantity: String(quantity), opening_rate: String(rate), location_id: locationId })
     .eq('id', lotId)
     .eq('tenant_id', tenantId)
 
   if (error) return { success: false, error: 'Failed to update stock quantity', code: 'INTERNAL_ERROR' }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'set_opening_balance', entity: 'inventory_lots', entityId: lotId, before: { currentQuantity: lot.current_quantity, openingRate: lot.opening_rate }, after: { currentQuantity: quantity, openingRate: rate } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'set_opening_balance', entity: 'inventory_lots', entityId: lotId, before: { currentQuantity: lot.current_quantity, openingRate: lot.opening_rate, locationId: lot.location_id }, after: { currentQuantity: quantity, openingRate: rate, locationId } })
 
   return { success: true, data: undefined }
 }

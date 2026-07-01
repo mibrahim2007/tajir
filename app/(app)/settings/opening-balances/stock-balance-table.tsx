@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation'
 import { Check, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { setStockOpeningBalance } from '@/app/actions/set-opening-balance'
 
-type Lot = { id: string; name: string; currentQuantity: string; openingRate: string }
+type Lot = { id: string; name: string; currentQuantity: string; openingRate: string; locationId: string | null }
+type Location = { id: string; name: string }
 
 function fmt(n: string | number) {
   return parseFloat(String(n)).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
@@ -17,11 +19,12 @@ function fmtPKR(n: number) {
   return n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
-export function StockBalanceTable({ lots }: { lots: Lot[] }) {
+export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations: Location[] }) {
   const router = useRouter()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editQty, setEditQty]   = useState('')
   const [editRate, setEditRate] = useState('')
+  const [editLocationId, setEditLocationId] = useState('')
   const [error, setError]       = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
@@ -33,13 +36,15 @@ export function StockBalanceTable({ lots }: { lots: Lot[] }) {
     setEditingId(lot.id)
     setEditQty(parseFloat(lot.currentQuantity).toString())
     setEditRate(parseFloat(lot.openingRate).toString())
+    setEditLocationId(lot.locationId ?? '')
     setError(null)
   }
 
   const save = (lotId: string) => {
+    if (!editLocationId) { setError('Location is required'); return }
     startTransition(async () => {
       setError(null)
-      const result = await setStockOpeningBalance({ lotId, quantity: editQty, rate: editRate })
+      const result = await setStockOpeningBalance({ lotId, quantity: editQty, rate: editRate, locationId: editLocationId })
       if (!result.success) { setError(result.error); return }
       setEditingId(null)
       router.refresh()
@@ -53,6 +58,7 @@ export function StockBalanceTable({ lots }: { lots: Lot[] }) {
           <thead className="bg-muted/50 border-b">
             <tr>
               <th className="text-left px-4 py-3 font-medium">Item</th>
+              <th className="text-left px-4 py-3 font-medium">Location</th>
               <th className="text-right px-4 py-3 font-medium">Quantity</th>
               <th className="text-right px-4 py-3 font-medium">Rate (PKR)</th>
               <th className="text-right px-4 py-3 font-medium">Value (PKR)</th>
@@ -68,6 +74,23 @@ export function StockBalanceTable({ lots }: { lots: Lot[] }) {
               return (
                 <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 font-medium">{lot.name}</td>
+
+                  {/* Location */}
+                  <td className="px-4 py-3">
+                    {isEditing ? (
+                      <Select value={editLocationId} onValueChange={setEditLocationId} disabled={locations.length === 0}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue placeholder={locations.length === 0 ? 'No locations' : 'Select location…'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {locations.map((loc) => <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      locations.find((loc) => loc.id === lot.locationId)?.name
+                        ?? <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
 
                   {/* Quantity */}
                   <td className="px-4 py-3 text-right tabular-nums">
@@ -122,7 +145,7 @@ export function StockBalanceTable({ lots }: { lots: Lot[] }) {
           {lots.some(l => parseFloat(l.openingRate) > 0) && (
             <tfoot className="border-t-2 bg-muted/30">
               <tr>
-                <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
+                <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
                 <td className="px-4 py-3 text-right font-bold tabular-nums">
                   {fmtPKR(lots.reduce((s, l) => s + (parseFloat(l.currentQuantity) || 0) * (parseFloat(l.openingRate) || 0), 0))}
                 </td>

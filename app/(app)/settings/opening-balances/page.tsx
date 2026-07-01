@@ -13,17 +13,21 @@ export default async function OpeningBalancesPage() {
 
   const admin = createAdminClient()
 
-  const [{ data: rawLots }, { data: rawCustomers }, { data: rawSuppliers }] = await Promise.all([
-    admin.from('inventory_lots').select('id, name, current_quantity, opening_rate').eq('tenant_id', tenantId),
+  const [{ data: rawLots }, { data: rawCustomers }, { data: rawSuppliers }, { data: rawLocations }] = await Promise.all([
+    admin.from('inventory_lots').select('id, name, current_quantity, opening_rate, location_id').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId),
   ])
+
+  const locations = (rawLocations ?? []).map((l) => ({ id: l.id, name: l.name }))
 
   const lots = (rawLots ?? []).map((l) => ({
     id: l.id,
     name: l.name,
     currentQuantity: l.current_quantity,
     openingRate: l.opening_rate ?? '0',
+    locationId: l.location_id,
   }))
 
   const customers = (rawCustomers ?? []).map((c) => ({
@@ -51,7 +55,7 @@ export default async function OpeningBalancesPage() {
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Stock Item Quantities</h2>
-        <StockBalanceTable lots={lots} />
+        <StockBalanceTable lots={lots} locations={locations} />
       </section>
 
       <section>
