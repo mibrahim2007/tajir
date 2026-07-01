@@ -47,7 +47,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .order('created_at', { ascending: false }),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId),
     getTenant(tenantId),
   ])
 
@@ -66,6 +66,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
 
   const customerMap = new Map((rawCustomers ?? []).map(c => [c.id, c.name as string]))
   const lotMap      = new Map((rawLots ?? []).map(l => [l.id, l.name as string]))
+  const uomMap      = new Map((rawLots ?? []).map(l => [l.id, l.unit_of_measure ?? null]))
 
   // Filter to customer if selected
   const sales   = (rawSales   ?? []).filter(r => !customerId || r.customer_id === customerId)
@@ -80,7 +81,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
     const customerName = customerMap.get(customerId) ?? customerId
 
     type DetailRow = {
-      sortKey: string; date: string; itemName: string
+      sortKey: string; date: string; itemName: string; uom: string | null
       qty: number; saleRate: number; purchRate: number
       revenue: number; cogs: number; profit: number
       isReturn: boolean
@@ -97,6 +98,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
           sortKey: (r.date as string) + '|' + (r.created_at ?? '') + '|' + r.id,
           date: r.date as string,
           itemName: lotMap.get(r.stock_item_id as string) ?? '—',
+          uom: uomMap.get(r.stock_item_id as string) ?? null,
           qty, saleRate, purchRate, revenue, cogs,
           profit: revenue - cogs, isReturn: false,
         }
@@ -111,6 +113,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
           sortKey: (r.date as string) + '|' + (r.created_at ?? '') + '|' + r.id,
           date: r.date as string,
           itemName: lotMap.get(r.stock_item_id as string) ?? '—',
+          uom: uomMap.get(r.stock_item_id as string) ?? null,
           qty, saleRate, purchRate, revenue, cogs,
           profit: -(revenue - cogs), isReturn: true,
         }
@@ -211,7 +214,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
                           {row.itemName}
                           {row.isReturn && <span className="ml-2 text-[10px] font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/30 border border-purple-200 px-1.5 py-0.5 rounded-full">Return</span>}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.qty)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{fmtQty(row.qty)}{row.uom && <span className="ml-1 text-muted-foreground text-xs">{row.uom}</span>}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
                           {row.saleRate > 0 ? row.saleRate.toLocaleString('en-PK', { maximumFractionDigits: 2 }) : '—'}
                         </td>

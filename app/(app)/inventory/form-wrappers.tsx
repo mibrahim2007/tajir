@@ -9,6 +9,7 @@ type Lot = {
   name: string
   code: string | null
   count: string
+  unitOfMeasure: string | null
   itemTypeId: string | null
   fiber: string | null
   lot: string | null

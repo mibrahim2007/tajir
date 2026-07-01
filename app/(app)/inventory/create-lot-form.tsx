@@ -42,6 +42,8 @@ import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
+const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
+
 type ItemType = { id: string; name: string }
 
 export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
@@ -59,6 +61,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
       name: '',
       code: '',
       count: '',
+      unitOfMeasure: undefined,
       itemTypeId: undefined,
       fiber: '',
       lot: '',
@@ -151,6 +154,33 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                     <FormControl>
                       <Input placeholder="e.g. 30s" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="unitOfMeasure"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit of Measure</FormLabel>
+                    <Select
+                      value={field.value ?? '_none_'}
+                      onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]">
+                          <SelectValue placeholder="Select unit…" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="_none_">No unit</SelectItem>
+                        {UOM_OPTIONS.map((u) => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

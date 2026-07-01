@@ -20,12 +20,13 @@ export default async function PurchaseReturnsPage() {
       .order('date', { ascending: false })
       .limit(200),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -75,7 +76,7 @@ export default async function PurchaseReturnsPage() {
                           <EditPurchaseReturnForm
                             ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null }}
                             suppliers={rawSuppliers ?? []}
-                            lots={rawLots ?? []}
+                            lots={lotList}
                           />
                           <DeleteButton
                             description="Delete this purchase return? Stock quantity will be restored."

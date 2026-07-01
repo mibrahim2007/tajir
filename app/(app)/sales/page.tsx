@@ -40,14 +40,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }, { data: rawPurchases }] = await Promise.all([
     query,
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity')
       .eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
   ])
 
   const orders    = rawOrders ?? []
   const customers = rawCustomers ?? []
-  const lots      = rawLots ?? []
+  const lots      = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
 
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {

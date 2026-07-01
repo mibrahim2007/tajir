@@ -8,13 +8,14 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
-  id:         z.string().uuid(),
-  name:       z.string().min(1, 'Name is required'),
-  code:       z.string().optional(),
-  count:      z.string().optional(),
-  itemTypeId: z.string().uuid().optional(),
-  fiber:      z.string().optional(),
-  lot:        z.string().optional(),
+  id:            z.string().uuid(),
+  name:          z.string().min(1, 'Name is required'),
+  code:          z.string().optional(),
+  count:         z.string().optional(),
+  unitOfMeasure: z.string().optional(),
+  itemTypeId:    z.string().uuid().optional(),
+  fiber:         z.string().optional(),
+  lot:           z.string().optional(),
 })
 
 export async function editInventoryLotAction(input: unknown): Promise<ActionResult<void>> {
@@ -27,13 +28,13 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, name, code, count, itemTypeId, fiber, lot } = parsed.data
+  const { id, name, code, count, unitOfMeasure, itemTypeId, fiber, lot } = parsed.data
 
   const admin = createAdminClient()
 
   const { data: existing } = await admin
     .from('inventory_lots')
-    .select('name, count, item_type_id, fiber, lot')
+    .select('name, count, unit_of_measure, item_type_id, fiber, lot')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -42,7 +43,7 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   const { error } = await admin
     .from('inventory_lots')
-    .update({ name, code: code ?? null, count: count ?? null, item_type_id: itemTypeId ?? null, fiber: fiber ?? null, lot: lot ?? null })
+    .update({ name, code: code ?? null, count: count ?? null, unit_of_measure: unitOfMeasure ?? null, item_type_id: itemTypeId ?? null, fiber: fiber ?? null, lot: lot ?? null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 
@@ -50,8 +51,8 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update', entity: 'inventory_lots', entityId: id,
-    before: { name: existing.name, count: existing.count, itemTypeId: existing.item_type_id, fiber: existing.fiber, lot: existing.lot },
-    after:  { name, count, itemTypeId, fiber, lot },
+    before: { name: existing.name, count: existing.count, unitOfMeasure: existing.unit_of_measure, itemTypeId: existing.item_type_id, fiber: existing.fiber, lot: existing.lot },
+    after:  { name, count, unitOfMeasure, itemTypeId, fiber, lot },
   })
 
   return { success: true, data: undefined }

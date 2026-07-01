@@ -41,7 +41,7 @@ type Sale = {
 type Props = {
   sale: Sale
   customers: { id: string; name: string }[]
-  lots: { id: string; name: string }[]
+  lots: { id: string; name: string; unitOfMeasure: string | null }[]
   costMap: Record<string, number>
 }
 
@@ -120,13 +120,16 @@ export function EditSaleForm({ sale, customers, lots, costMap }: Props) {
               </FormItem>
             )} />
 
-            <FormField control={form.control} name="quantity" render={() => (
-              <FormItem>
-                <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="number" step="0.001" min="0" {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
+              const uom = lots.find(l => l.id === watchedStockItemId)?.unitOfMeasure
+              return (
+                <FormItem>
+                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
+                  <FormControl><Input type="number" step="0.001" min="0" value={value} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )
+            }} />
 
             <CurrencyInput
               amountName="rate"

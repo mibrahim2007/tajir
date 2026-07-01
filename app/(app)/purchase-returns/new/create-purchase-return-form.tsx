@@ -47,7 +47,7 @@ type PurchaseOrder = { id: string; date: string; supplierId: string; stockItemId
 type Props = {
   today:          string
   suppliers:      { id: string; name: string }[]
-  lots:           { id: string; name: string; count: string }[]
+  lots:           { id: string; name: string; count: string; unitOfMeasure: string | null }[]
   purchaseOrders: PurchaseOrder[]
   locations:      { id: string; name: string }[]
 }
@@ -303,6 +303,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
                                 {form.formState.errors.lines?.[index]?.quantity && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
                                 )}
+                                {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
                               <td className="px-3 py-2">
                                 <NumericInput min={0} step="0.01" placeholder="" className="text-right"

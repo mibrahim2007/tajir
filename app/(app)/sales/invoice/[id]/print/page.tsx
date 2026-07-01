@@ -32,7 +32,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   const customerIds = [...new Set(lines.map((l) => l.customer_id))]
 
   const [{ data: stockItems }, { data: customers }, { data: journalEntry }, { data: rawPurchases }] = await Promise.all([
-    admin.from('inventory_lots').select('id, name').in('id', stockIds),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').in('id', stockIds),
     admin.from('tajir_customers').select('id, name').in('id', customerIds),
     admin.from('tajir_journal_entries')
       .select('voucher_number')
@@ -47,7 +47,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
       .order('created_at', { ascending: false }),
   ])
 
-  const stockMap    = new Map((stockItems ?? []).map((s) => [s.id, s.name]))
+  const stockMap    = new Map((stockItems ?? []).map((s) => [s.id, { name: s.name, uom: s.unit_of_measure ?? null }]))
   const customerMap = new Map((customers ?? []).map((c) => [c.id, c.name]))
 
   // Latest cost per stock item
@@ -136,8 +136,8 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
               return (
                 <tr key={line.id} className={i % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : ''}>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-gray-500 tabular-nums">{i + 1}</td>
-                  <td className="px-3 py-2.5 border-r border-gray-200 font-medium">{stockMap.get(line.stock_item_id) ?? '—'}</td>
-                  <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+                  <td className="px-3 py-2.5 border-r border-gray-200 font-medium">{stockMap.get(line.stock_item_id)?.name ?? '—'}</td>
+                  <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockMap.get(line.stock_item_id)?.uom ? <span className="ml-1 text-gray-500 text-xs">{stockMap.get(line.stock_item_id)!.uom}</span> : null}</td>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
                     {first.currency_code} {fmt(rate)}
                     {belowCost && cost && (

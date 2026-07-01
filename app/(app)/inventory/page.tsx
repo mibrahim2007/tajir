@@ -26,7 +26,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
 
   let dataQuery = admin
     .from('inventory_lots')
-    .select('id, name, code, count, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
+    .select('id, name, code, count, unit_of_measure, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
     .eq('tenant_id', tenantId)
 
   let countQuery = admin
@@ -89,6 +89,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Fiber</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Lot</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">UOM</th>
                     <th className="px-4 py-3 w-16" />
                   </tr>
                 </thead>
@@ -106,6 +107,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                         <td className="px-4 py-3">{lot.fiber ?? '—'}</td>
                         <td className="px-4 py-3">{lot.lot ?? '—'}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{lot.current_quantity}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{lot.unit_of_measure ?? '—'}</td>
                         <td className="px-4 py-3">
                           <RoleGate allowedRoles={['owner']}>
                             <div className="flex items-center gap-1">
@@ -115,6 +117,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                                   name: lot.name,
                                   code: lot.code,
                                   count: String(lot.count ?? ''),
+                                  unitOfMeasure: lot.unit_of_measure ?? null,
                                   itemTypeId: lot.item_type_id ?? null,
                                   fiber: lot.fiber,
                                   lot: lot.lot,

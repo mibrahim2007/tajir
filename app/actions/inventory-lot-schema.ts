@@ -4,6 +4,7 @@ export const createLotSchema = z.object({
   name:               z.string().min(1, 'Name is required'),
   code:               z.string().optional(),
   count:              z.string().optional(),
+  unitOfMeasure:      z.string().optional(),
   itemTypeId:         z.string().uuid().optional(),
   fiber:              z.string().optional(),
   lot:                z.string().optional(),

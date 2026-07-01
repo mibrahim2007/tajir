@@ -9,7 +9,7 @@ export default async function NewPurchaseReturnPage() {
 
   const [{ data: rawSuppliers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('purchase_orders')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code')
       .eq('tenant_id', tenantId)
@@ -19,7 +19,7 @@ export default async function NewPurchaseReturnPage() {
   ])
 
   const supplierList = rawSuppliers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? '') }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
   const purchaseOrderList = (rawOrders ?? []).map((o) => ({
     id: o.id,
     date: o.date,

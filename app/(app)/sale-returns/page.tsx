@@ -20,13 +20,14 @@ export default async function SaleReturnsPage() {
       .order('date', { ascending: false })
       .limit(200),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
+  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
   const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
 
   return (
@@ -79,7 +80,7 @@ export default async function SaleReturnsPage() {
                           <EditSaleReturnForm
                             ret={{ id: r.id, customerId: r.customer_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null }}
                             customers={rawCustomers ?? []}
-                            lots={rawLots ?? []}
+                            lots={lotList}
                           />
                           <DeleteButton
                             description="Delete this sale return? Stock quantity will be reversed."

@@ -19,7 +19,7 @@ export default async function ItemLedgerPage({ searchParams }: { searchParams: S
   const admin = createAdminClient()
 
   const { data: rawLots } = await admin
-    .from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name')
+    .from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name')
   const lots = rawLots ?? []
   const lotMap = new Map(lots.map(l => [l.id, l.name]))
 
@@ -42,6 +42,7 @@ export default async function ItemLedgerPage({ searchParams }: { searchParams: S
   }
 
   const itemName = lotMap.get(itemId) ?? itemId
+  const uom = lots.find(l => l.id === itemId)?.unit_of_measure ?? null
 
   /* Fetch supplier/customer maps */
   const [{ data: rawSuppliers }, { data: rawCustomers }] = await Promise.all([
@@ -162,9 +163,9 @@ export default async function ItemLedgerPage({ searchParams }: { searchParams: S
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Party</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Qty In</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-green-600 dark:text-green-400">Qty Out</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Balance</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">Qty In{uom && <span className="ml-1 font-normal normal-case text-muted-foreground">({uom})</span>}</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-green-600 dark:text-green-400">Qty Out{uom && <span className="ml-1 font-normal normal-case text-muted-foreground">({uom})</span>}</th>
+                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Balance{uom && <span className="ml-1 font-normal normal-case">({uom})</span>}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -202,8 +203,8 @@ export default async function ItemLedgerPage({ searchParams }: { searchParams: S
               <tfoot className="border-t-2 bg-muted/30">
                 <tr>
                   <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Closing Balance</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">{fmt(totalIn)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-green-600 dark:text-green-400">{fmt(totalOut)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-blue-600 dark:text-blue-400">{fmt(totalIn)}{uom && <span className="ml-1 text-xs font-normal text-muted-foreground">{uom}</span>}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums font-bold text-green-600 dark:text-green-400">{fmt(totalOut)}{uom && <span className="ml-1 text-xs font-normal text-muted-foreground">{uom}</span>}</td>
                   <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${closingBalance >= 0 ? '' : 'text-destructive'}`}>{fmt(closingBalance)}</td>
                 </tr>
               </tfoot>

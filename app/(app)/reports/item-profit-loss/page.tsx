@@ -25,7 +25,7 @@ export default async function ItemProfitLossPage({ searchParams }: { searchParam
   const admin = createAdminClient()
 
   const { data: rawLots } = await admin
-    .from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name')
+    .from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name')
   const lots = rawLots ?? []
   const lotMap = new Map(lots.map(l => [l.id, l.name]))
 
@@ -48,6 +48,7 @@ export default async function ItemProfitLossPage({ searchParams }: { searchParam
   }
 
   const itemName = lotMap.get(itemId) ?? itemId
+  const uom = lots.find(l => l.id === itemId)?.unit_of_measure ?? null
 
   const [
     { data: rawSuppliers },
@@ -215,7 +216,7 @@ export default async function ItemProfitLossPage({ searchParams }: { searchParam
               {marginPct.toFixed(1)}%
             </p>
             <p className="text-[10px] text-muted-foreground mt-1">
-              Sold {fmtQty(totalSaleQty)} · Bought {fmtQty(totalPurchQty)}
+              Sold {fmtQty(totalSaleQty)}{uom ? ` ${uom}` : ''} · Bought {fmtQty(totalPurchQty)}{uom ? ` ${uom}` : ''}
             </p>
           </div>
         </div>
@@ -235,7 +236,7 @@ export default async function ItemProfitLossPage({ searchParams }: { searchParam
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Party</th>
-                    <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                    <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty{uom && <span className="ml-1 font-normal normal-case">({uom})</span>}</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate (PKR)</th>
                     <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
                   </tr>

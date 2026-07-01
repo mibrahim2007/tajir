@@ -13,13 +13,16 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
 
+const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
+
 const schema = z.object({
-  name:       z.string().min(1, 'Name is required'),
-  code:       z.string().optional(),
-  count:      z.string().optional(),
-  itemTypeId: z.string().uuid().optional(),
-  fiber:      z.string().optional(),
-  lot:        z.string().optional(),
+  name:          z.string().min(1, 'Name is required'),
+  code:          z.string().optional(),
+  count:         z.string().optional(),
+  unitOfMeasure: z.string().optional(),
+  itemTypeId:    z.string().uuid().optional(),
+  fiber:         z.string().optional(),
+  lot:           z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -30,6 +33,7 @@ type Lot = {
   name: string
   code: string | null
   count: string
+  unitOfMeasure: string | null
   itemTypeId: string | null
   fiber: string | null
   lot: string | null
@@ -44,12 +48,13 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      name:       lot.name,
-      code:       lot.code ?? '',
-      count:      lot.count,
-      itemTypeId: lot.itemTypeId ?? undefined,
-      fiber:      lot.fiber ?? '',
-      lot:        lot.lot ?? '',
+      name:          lot.name,
+      code:          lot.code ?? '',
+      count:         lot.count,
+      unitOfMeasure: lot.unitOfMeasure ?? undefined,
+      itemTypeId:    lot.itemTypeId ?? undefined,
+      fiber:         lot.fiber ?? '',
+      lot:           lot.lot ?? '',
     },
   })
 
@@ -90,6 +95,29 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
               <FormItem>
                 <FormLabel>Count</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="unitOfMeasure" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Unit of Measure</FormLabel>
+                <Select
+                  value={field.value ?? '_none_'}
+                  onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
+                >
+                  <FormControl>
+                    <SelectTrigger className="min-h-[44px]">
+                      <SelectValue placeholder="Select unit…" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="_none_">No unit</SelectItem>
+                    {UOM_OPTIONS.map((u) => (
+                      <SelectItem key={u} value={u}>{u}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )} />
