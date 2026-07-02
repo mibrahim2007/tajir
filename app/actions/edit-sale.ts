@@ -17,6 +17,7 @@ const schema = z.object({
   exchangeRate:   z.coerce.number().positive().default(1),
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  locationId:     z.string().uuid().optional().or(z.literal('')),
 })
 
 export async function editSaleAction(input: unknown): Promise<ActionResult<void>> {
@@ -29,7 +30,7 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, paymentDueDate } = parsed.data
+  const { id, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, paymentDueDate, locationId } = parsed.data
   const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
 
   const admin = createAdminClient()
@@ -77,6 +78,7 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
       pkr_equivalent: String(pkrEquivalent),
       date,
       payment_due_date: paymentDueDate ?? null,
+      location_id: locationId || null,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleAction } from '@/app/actions/edit-sale'
 
@@ -22,6 +23,7 @@ const schema = z.object({
   exchangeRate:   z.number().positive().default(1),
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  locationId:     z.string().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -36,16 +38,18 @@ type Sale = {
   exchangeRate: string
   date: string
   paymentDueDate: string | null
+  locationId: string | null
 }
 
 type Props = {
   sale: Sale
   customers: { id: string; name: string }[]
   lots: { id: string; name: string; unitOfMeasure: string | null }[]
+  locations: { id: string; name: string }[]
   costMap: Record<string, number>
 }
 
-export function EditSaleForm({ sale, customers, lots, costMap }: Props) {
+export function EditSaleForm({ sale, customers, lots, locations, costMap }: Props) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -62,6 +66,7 @@ export function EditSaleForm({ sale, customers, lots, costMap }: Props) {
       exchangeRate:   parseFloat(sale.exchangeRate),
       date:           sale.date,
       paymentDueDate: sale.paymentDueDate ?? undefined,
+      locationId:     sale.locationId ?? '',
     },
   })
 
@@ -160,6 +165,27 @@ export function EditSaleForm({ sale, customers, lots, costMap }: Props) {
                 <FormMessage />
               </FormItem>
             )} />
+
+            {locations.length > 0 && (
+              <FormField control={form.control} name="locationId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <Select
+                    value={field.value || '_none_'}
+                    onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="_none_">No location</SelectItem>
+                      {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>

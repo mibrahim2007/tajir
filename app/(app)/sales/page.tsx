@@ -21,12 +21,13 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const filterTo       = typeof params.to       === 'string' ? params.to       : undefined
   const filterCustomer = typeof params.customer === 'string' ? params.customer : undefined
   const filterItem     = typeof params.item     === 'string' ? params.item     : undefined
+  const filterLocation = typeof params.location === 'string' ? params.location : undefined
 
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
   let query = admin.from('sales_orders')
-    .select('id, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date')
+    .select('id, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, location_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -36,18 +37,21 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   if (filterTo)       query = query.lte('date', filterTo)
   if (filterCustomer) query = query.eq('customer_id', filterCustomer)
   if (filterItem)     query = query.eq('stock_item_id', filterItem)
+  if (filterLocation) query = query.eq('location_id', filterLocation)
 
-  const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }, { data: rawPurchases }] = await Promise.all([
+  const [{ data: rawOrders }, { data: rawCustomers }, { data: rawLots }, { data: rawPurchases }, { data: rawLocs }] = await Promise.all([
     query,
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity')
       .eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const orders    = rawOrders ?? []
   const customers = rawCustomers ?? []
   const lots      = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
+  const locationList = rawLocs ?? []
 
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
@@ -57,6 +61,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]))
   const lotMap      = new Map(lots.map((l) => [l.id, l.name]))
+  const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
 
   // Group by invoice_id; solo orders kept individually
   type OrderRow = typeof orders[0]
@@ -86,6 +91,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
     paymentDueDate?: string | null
     currencyCode: string
     hasAnyBelowCost: boolean
+    locationId: string | null
     soloOrder?: OrderRow
   }
 
@@ -110,6 +116,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       paymentDueDate: lines[0].payment_due_date,
       currencyCode: lines[0].currency_code,
       hasAnyBelowCost,
+      locationId:   lines[0].location_id,
     })
   }
 
@@ -129,13 +136,14 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       paymentDueDate: o.payment_due_date,
       currencyCode: o.currency_code,
       hasAnyBelowCost: belowCost,
+      locationId:   o.location_id,
       soloOrder:    o,
     })
   }
 
   displayItems.sort((a, b) => b.date.localeCompare(a.date))
 
-  const hasFilters = filterFrom || filterTo || filterCustomer || filterItem
+  const hasFilters = filterFrom || filterTo || filterCustomer || filterItem || filterLocation
   const totalQty   = displayItems.reduce((s, i) => s + i.totalQty, 0)
   const totalPKR   = displayItems.reduce((s, i) => s + i.totalPKR, 0)
 
@@ -154,7 +162,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       </div>
 
       <Suspense>
-        <SaleFilters customers={customers} lots={lots} />
+        <SaleFilters customers={customers} lots={lots} locations={locationList} />
       </Suspense>
 
       {displayItems.length === 0 ? (
@@ -175,6 +183,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Due</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
                   <th className="px-4 py-3 w-36" />
                 </tr>
               </thead>
@@ -214,6 +223,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                       <td className={`px-4 py-3 text-right whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
                         {dueDate ? formatPKTDate(dueDate) : '—'}
                       </td>
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{item.locationId ? locationMap.get(item.locationId) ?? '—' : '—'}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <Link href={item.type === 'invoice' ? `/sales/invoice/${item.invoiceId}/print` : `/sales/${item.soloOrder!.id}/print`}>
@@ -225,9 +235,10 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                             </Link>
                             {item.type === 'solo' && item.soloOrder && (
                               <EditSaleForm
-                                sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date }}
+                                sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date, locationId: item.soloOrder.location_id }}
                                 customers={customers}
                                 lots={lots}
+                                locations={locationList}
                                 costMap={costMap}
                               />
                             )}
@@ -251,7 +262,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                   <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             </table>

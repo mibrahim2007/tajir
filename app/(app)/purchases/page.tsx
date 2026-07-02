@@ -201,9 +201,10 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                         <RoleGate allowedRoles={['owner']}>
                           {item.type === 'solo' && item.soloOrder && (
                             <EditPurchaseForm
-                              purchase={{ id: item.soloOrder.id, supplierId: item.soloOrder.supplier_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, advancePaid: item.soloOrder.advance_paid, date: item.soloOrder.date }}
+                              purchase={{ id: item.soloOrder.id, supplierId: item.soloOrder.supplier_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, advancePaid: item.soloOrder.advance_paid, date: item.soloOrder.date, locationId: item.soloOrder.location_id }}
                               suppliers={supplierList}
                               lots={lotList}
+                              locations={locationList}
                             />
                           )}
                           <DeleteButton

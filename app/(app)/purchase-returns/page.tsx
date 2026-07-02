@@ -13,20 +13,24 @@ export default async function PurchaseReturnsPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
+    admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const returns = rawReturns ?? []
-  const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
+  const supplierList = rawSuppliers ?? []
+  const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
   const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
+  const locationList = rawLocs ?? []
+  const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -56,6 +60,7 @@ export default async function PurchaseReturnsPage() {
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
                   <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
                   <th className="px-4 py-3 w-16" />
                 </tr>
@@ -69,14 +74,16 @@ export default async function PurchaseReturnsPage() {
                     <td className="px-4 py-3 text-right tabular-nums">{r.quantity}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r.currency_code} {r.rate}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(r.pkr_equivalent))}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
                     <td className="px-4 py-3">
                       <RoleGate allowedRoles={['owner']}>
                         <div className="flex items-center gap-1">
                           <EditPurchaseReturnForm
-                            ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null }}
-                            suppliers={rawSuppliers ?? []}
+                            ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null }}
+                            suppliers={supplierList}
                             lots={lotList}
+                            locations={locationList}
                           />
                           <DeleteButton
                             description="Delete this purchase return? Stock quantity will be restored."

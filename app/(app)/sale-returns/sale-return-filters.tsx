@@ -12,7 +12,7 @@ type Props = {
   locations: { id: string; name: string }[]
 }
 
-export function SaleFilters({ customers, lots, locations }: Props) {
+export function SaleReturnFilters({ customers, lots, locations }: Props) {
   const router      = useRouter()
   const pathname    = usePathname()
   const searchParams = useSearchParams()
