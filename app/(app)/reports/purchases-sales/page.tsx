@@ -23,8 +23,25 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
   const from = parseDate(params.from, firstOfMonth)
   const to = parseDate(params.to, today)
   const type = typeof params.type === 'string' ? params.type : 'all'
+  const location = typeof params.location === 'string' ? params.location : undefined
 
   const admin = createAdminClient()
+
+  let purchaseQuery = admin.from('purchase_orders')
+    .select('id, date, quantity, rate, currency_code, pkr_equivalent, supplier_id, stock_item_id, location_id')
+    .eq('tenant_id', tenantId)
+    .gte('date', from)
+    .lte('date', to)
+    .order('date', { ascending: false })
+  if (location) purchaseQuery = purchaseQuery.eq('location_id', location)
+
+  let salesQuery = admin.from('sales_orders')
+    .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id')
+    .eq('tenant_id', tenantId)
+    .gte('date', from)
+    .lte('date', to)
+    .order('date', { ascending: false })
+  if (location) salesQuery = salesQuery.eq('location_id', location)
 
   const [
     { data: rawPurchases },
@@ -34,22 +51,8 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     { data: rawLots },
     { data: rawLocs },
   ] = await Promise.all([
-    type !== 'sales'
-      ? admin.from('purchase_orders')
-          .select('id, date, quantity, rate, currency_code, pkr_equivalent, supplier_id, stock_item_id, location_id')
-          .eq('tenant_id', tenantId)
-          .gte('date', from)
-          .lte('date', to)
-          .order('date', { ascending: false })
-      : Promise.resolve({ data: [] }),
-    type !== 'purchases'
-      ? admin.from('sales_orders')
-          .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id')
-          .eq('tenant_id', tenantId)
-          .gte('date', from)
-          .lte('date', to)
-          .order('date', { ascending: false })
-      : Promise.resolve({ data: [] }),
+    type !== 'sales' ? purchaseQuery : Promise.resolve({ data: [] }),
+    type !== 'purchases' ? salesQuery : Promise.resolve({ data: [] }),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId),
@@ -60,7 +63,8 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, `${l.name} (${l.count})`]))
   const uomMap = new Map((rawLots ?? []).map((l) => [l.id, l.unit_of_measure ?? null]))
-  const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
+  const locationList = rawLocs ?? []
+  const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
 
   type Row = {
     id: string
@@ -110,7 +114,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
   const totalSales = saleRows.reduce((s, r) => s + r.pkrAmount, 0)
   const netProfit = totalSales - totalPurchases
 
-  const exportParams = new URLSearchParams({ from, to, type })
+  const exportParams = new URLSearchParams({ from, to, type, ...(location ? { location } : {}) })
   const exportHref = `/api/export/purchases-sales?${exportParams}`
 
   const dateLabel = `${formatPKTDate(from + 'T00:00:00')} – ${formatPKTDate(to + 'T00:00:00')}`
@@ -131,7 +135,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
 
       {/* ── Filters ── */}
       <Suspense>
-        <ReportFilters />
+        <ReportFilters locations={locationList} />
       </Suspense>
 
       {/* ── Summary cards ── */}

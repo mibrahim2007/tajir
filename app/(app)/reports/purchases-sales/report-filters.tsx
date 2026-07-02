@@ -4,8 +4,13 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useTransition } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-export function ReportFilters() {
+type Props = {
+  locations: { id: string; name: string }[]
+}
+
+export function ReportFilters({ locations }: Props) {
   const router = useRouter()
   const params = useSearchParams()
   const [isPending, startTransition] = useTransition()
@@ -16,10 +21,14 @@ export function ReportFilters() {
   const from = params.get('from') ?? firstOfMonth
   const to = params.get('to') ?? today
   const type = params.get('type') ?? 'all'
+  const location = params.get('location') ?? 'all'
 
   function apply(updates: Record<string, string>) {
     const next = new URLSearchParams(params.toString())
-    Object.entries(updates).forEach(([k, v]) => next.set(k, v))
+    Object.entries(updates).forEach(([k, v]) => {
+      if (!v || v === 'all') next.delete(k)
+      else next.set(k, v)
+    })
     startTransition(() => router.push(`?${next}`))
   }
 
@@ -57,6 +66,18 @@ export function ReportFilters() {
           </Button>
         ))}
       </div>
+      {locations.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-muted-foreground">Location</label>
+          <Select value={location} onValueChange={(v) => apply({ location: v })} disabled={isPending}>
+            <SelectTrigger className="w-44 min-h-[44px]"><SelectValue placeholder="All Locations" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Locations</SelectItem>
+              {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }
