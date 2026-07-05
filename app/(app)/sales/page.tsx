@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { Plus, AlertTriangle } from 'lucide-react'
+import { Plus, AlertTriangle, Printer, Pencil, RotateCcw } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -150,8 +150,59 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const totalQty   = displayItems.reduce((s, i) => s + i.totalQty, 0)
   const totalPKR   = displayItems.reduce((s, i) => s + i.totalPKR, 0)
 
+  // Item summary + row actions are shared between the desktop table and the
+  // mobile cards so both stay in sync.
+  const itemsLabel = (item: DisplayItem) => {
+    const names = item.type === 'invoice'
+      ? item.stockItemIds.map((id) => lotMap.get(id) ?? '?').join(', ')
+      : (lotMap.get(item.stockItemIds[0]) ?? '—')
+    return (
+      <span className="break-words">
+        {item.type === 'invoice' && <span className="font-medium">{item.itemCount} items </span>}
+        {item.hasAnyBelowCost && (
+          <AlertTriangle className="inline size-3.5 text-amber-500 align-text-bottom mr-0.5" aria-label="One or more items below cost" />
+        )}
+        <span className="text-muted-foreground text-xs">{item.type === 'invoice' ? `(${names})` : names}</span>
+      </span>
+    )
+  }
+
+  const rowActions = (item: DisplayItem) => (
+    <>
+      <Link href={item.type === 'invoice' ? `/sales/invoice/${item.invoiceId}/print` : `/sales/${item.soloOrder!.id}/print`}>
+        <Button variant="ghost" size="icon-sm" title="Print" aria-label="Print"><Printer className="size-4" /></Button>
+      </Link>
+      <RoleGate allowedRoles={['owner']}>
+        <Link href={item.type === 'solo' ? `/sale-returns/new?so=${item.soloOrder!.id}` : `/sale-returns/new`}>
+          <Button variant="ghost" size="icon-sm" title="Record return" aria-label="Record return" className="text-muted-foreground"><RotateCcw className="size-4" /></Button>
+        </Link>
+        {item.type === 'invoice' ? (
+          <Link href={`/sales/invoice/${item.invoiceId}/edit`}>
+            <Button variant="ghost" size="icon-sm" title="Edit" aria-label="Edit" className="text-muted-foreground"><Pencil className="size-4" /></Button>
+          </Link>
+        ) : item.soloOrder && (
+          <EditSaleForm
+            sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date, locationId: item.soloOrder.location_id }}
+            customers={customers}
+            lots={lots}
+            locations={locationList}
+            costMap={costMap}
+          />
+        )}
+        <DeleteButton
+          description={item.type === 'invoice'
+            ? `Delete this invoice (${item.itemCount} items)? Stock quantities will be restored.`
+            : 'Delete this sale order? Stock quantity will be restored.'}
+          onDelete={item.type === 'invoice'
+            ? deleteSaleInvoiceAction.bind(null, { invoiceId: item.invoiceId! })
+            : deleteSaleAction.bind(null, { id: item.soloOrder!.id })}
+        />
+      </RoleGate>
+    </>
+  )
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Sales</h1>
@@ -176,106 +227,95 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount (PKR)</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Due</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
-                  <th className="px-4 py-3 w-36" />
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {displayItems.map((item) => {
-                  const dueDate   = item.paymentDueDate ? new Date(item.paymentDueDate) : null
-                  const isOverdue = dueDate && dueDate < new Date()
-                  return (
-                    <tr key={item.key} className="hover:bg-secondary/50 transition-colors">
-                      <td className="px-4 py-3 whitespace-nowrap font-medium tabular-nums">{item.serialNumber ?? '—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(item.date))}</td>
-                      <td className="px-4 py-3 font-medium">{customerMap.get(item.customerId) ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {item.type === 'invoice'
-                          ? (
-                            <span className="inline-flex items-center gap-1">
-                              <span className="font-medium">{item.itemCount} items</span>
-                              {item.hasAnyBelowCost && (
-                                <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label="One or more items below cost" />
-                              )}
-                              <span className="text-xs text-muted-foreground">({item.stockItemIds.map((id) => lotMap.get(id) ?? '?').join(', ')})</span>
-                            </span>
-                          )
-                          : (
-                            <span className="flex items-center gap-1">
-                              <span className="text-muted-foreground">{lotMap.get(item.stockItemIds[0]) ?? '—'}</span>
-                              {item.hasAnyBelowCost && (
-                                <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400 text-[11px]" title={`Below cost`}>
-                                  <AlertTriangle className="h-3 w-3" />
-                                </span>
-                              )}
-                            </span>
-                          )
-                        }
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{item.totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{formatPKR(item.totalPKR)}</td>
-                      <td className={`px-4 py-3 text-right whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
-                        {dueDate ? formatPKTDate(dueDate) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{item.locationId ? locationMap.get(item.locationId) ?? '—' : '—'}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Link href={item.type === 'invoice' ? `/sales/invoice/${item.invoiceId}/print` : `/sales/${item.soloOrder!.id}/print`}>
-                            <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
-                          </Link>
-                          <RoleGate allowedRoles={['owner']}>
-                            <Link href={item.type === 'solo' ? `/sale-returns/new?so=${item.soloOrder!.id}` : `/sale-returns/new`}>
-                              <Button variant="ghost" size="sm" className="min-h-[36px] text-muted-foreground">Return</Button>
-                            </Link>
-                            {item.type === 'invoice' ? (
-                              <Link href={`/sales/invoice/${item.invoiceId}/edit`}>
-                                <Button variant="ghost" size="sm" className="min-h-[36px] text-muted-foreground">Edit</Button>
-                              </Link>
-                            ) : item.soloOrder && (
-                              <EditSaleForm
-                                sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date, locationId: item.soloOrder.location_id }}
-                                customers={customers}
-                                lots={lots}
-                                locations={locationList}
-                                costMap={costMap}
-                              />
-                            )}
-                            <DeleteButton
-                              description={item.type === 'invoice'
-                                ? `Delete this invoice (${item.itemCount} items)? Stock quantities will be restored.`
-                                : 'Delete this sale order? Stock quantity will be restored.'}
-                              onDelete={item.type === 'invoice'
-                                ? deleteSaleInvoiceAction.bind(null, { invoiceId: item.invoiceId! })
-                                : deleteSaleAction.bind(null, { id: item.soloOrder!.id })}
-                            />
-                          </RoleGate>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-              <tfoot className="border-t-2 bg-muted/30">
-                <tr>
-                  <td colSpan={4} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
-                  <td colSpan={3} />
-                </tr>
-              </tfoot>
-            </table>
+
+          {/* ── Desktop / large screens: full table (fits without horizontal scroll) ── */}
+          <div className="max-lg:hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/50 border-b">
+              <tr>
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
+                <th className="text-right px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                <th className="text-right px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Amount</th>
+                <th className="text-right px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Due</th>
+                <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
+                <th className="text-right px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {displayItems.map((item) => {
+                const dueDate   = item.paymentDueDate ? new Date(item.paymentDueDate) : null
+                const isOverdue = dueDate && dueDate < new Date()
+                return (
+                  <tr key={item.key} className="hover:bg-secondary/50 transition-colors align-top">
+                    <td className="px-3 py-3 whitespace-nowrap font-medium tabular-nums">{item.serialNumber ?? '—'}</td>
+                    <td className="px-3 py-3 whitespace-nowrap">{formatPKTDate(new Date(item.date))}</td>
+                    <td className="px-3 py-3 font-medium break-words">{customerMap.get(item.customerId) ?? '—'}</td>
+                    <td className="px-3 py-3">{itemsLabel(item)}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{item.totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+                    <td className="px-3 py-3 text-right tabular-nums whitespace-nowrap">{formatPKR(item.totalPKR)}</td>
+                    <td className={`px-3 py-3 text-right whitespace-nowrap ${isOverdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                      {dueDate ? formatPKTDate(dueDate) : '—'}
+                    </td>
+                    <td className="px-3 py-3 text-muted-foreground text-xs break-words">{item.locationId ? locationMap.get(item.locationId) ?? '—' : '—'}</td>
+                    <td className="px-2 py-2">
+                      <div className="flex items-center justify-end gap-0.5">{rowActions(item)}</div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot className="border-t-2 bg-muted/30">
+              <tr>
+                <td colSpan={4} className="px-3 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
+                <td className="px-3 py-2.5 text-right tabular-nums font-bold whitespace-nowrap">{formatPKR(totalPKR)}</td>
+                <td colSpan={3} />
+              </tr>
+            </tfoot>
+          </table>
           </div>
+
+          {/* ── Mobile / tablet: stacked cards (no horizontal scroll) ── */}
+          <ul className="lg:hidden divide-y">
+            {displayItems.map((item) => {
+              const dueDate   = item.paymentDueDate ? new Date(item.paymentDueDate) : null
+              const isOverdue = dueDate && dueDate < new Date()
+              const location  = item.locationId ? locationMap.get(item.locationId) : null
+              return (
+                <li key={item.key} className="p-4 space-y-2.5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold tabular-nums">{item.serialNumber ?? '—'}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatPKTDate(new Date(item.date))}{location ? ` · ${location}` : ''}
+                      </p>
+                    </div>
+                    <p className="font-bold tabular-nums whitespace-nowrap">{formatPKR(item.totalPKR)}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-medium break-words">{customerMap.get(item.customerId) ?? '—'}</p>
+                    <p className="text-xs mt-0.5">{itemsLabel(item)}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                      <span>Qty {item.totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</span>
+                      {dueDate && <span className={isOverdue ? 'text-destructive font-medium' : ''}>Due {formatPKTDate(dueDate)}</span>}
+                    </div>
+                    <div className="flex items-center gap-0.5 shrink-0">{rowActions(item)}</div>
+                  </div>
+                </li>
+              )
+            })}
+            <li className="p-4 flex items-center justify-between bg-muted/30">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</span>
+              <span className="text-sm font-bold tabular-nums">{formatPKR(totalPKR)}</span>
+            </li>
+          </ul>
         </div>
       )}
     </div>
