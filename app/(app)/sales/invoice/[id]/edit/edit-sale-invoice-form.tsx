@@ -1,14 +1,16 @@
 'use client'
 
-import { SaleInvoiceForm } from '../sale-invoice-form'
+import { SaleInvoiceForm, type SaleFormValues } from '../../../sale-invoice-form'
 
 type Customer    = { id: string; name: string }
 type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null; unitOfMeasure: string | null }
 type PricingRule = { customerId: string; stockItemId: string; rate: string }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
-export function CreateSaleForm(props: {
-  today: string
+export function EditSaleInvoiceForm(props: {
+  invoiceId:         string
+  initialValues:     SaleFormValues
+  today:             string
   customers:         Customer[]
   stockItems:        StockItem[]
   pricingRules:      PricingRule[]
@@ -18,5 +20,5 @@ export function CreateSaleForm(props: {
   costMap:           Record<string, number>
   customerBalanceMap?: Record<string, number>
 }) {
-  return <SaleInvoiceForm mode="create" {...props} />
+  return <SaleInvoiceForm mode="edit" {...props} />
 }

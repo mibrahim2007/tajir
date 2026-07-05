@@ -19,10 +19,13 @@ type PostJournalEntryParams = {
   sourceId: string
   prefix: string
   lines: JournalLine[]
+  // When re-posting an edited document, pass the original voucher number to
+  // keep it stable instead of drawing a fresh one from the sequence.
+  voucherNumber?: string
 }
 
 export async function postJournalEntry(params: PostJournalEntryParams): Promise<void> {
-  const { tenantId, date, description, reference, sourceType, sourceId, prefix, lines } = params
+  const { tenantId, date, description, reference, sourceType, sourceId, prefix, lines, voucherNumber: reuseVoucher } = params
   const admin = createAdminClient()
 
   // Look up all account IDs by system_key in one query
@@ -41,11 +44,13 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const missingKeys = systemKeys.filter((k) => !accountMap.has(k))
   if (missingKeys.length > 0) return // partial CoA — skip silently
 
-  // Get next voucher number atomically
-  const { data: voucherRow } = await admin
-    .rpc('get_next_voucher_number', { p_tenant_id: tenantId, p_prefix: prefix })
-
-  const voucherNumber = voucherRow as string | null
+  // Reuse the caller-supplied voucher (edits) or draw the next one atomically
+  let voucherNumber = reuseVoucher ?? null
+  if (!voucherNumber) {
+    const { data: voucherRow } = await admin
+      .rpc('get_next_voucher_number', { p_tenant_id: tenantId, p_prefix: prefix })
+    voucherNumber = voucherRow as string | null
+  }
   if (!voucherNumber) return
 
   // Insert journal entry header
