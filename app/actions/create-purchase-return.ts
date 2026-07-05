@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -67,10 +68,13 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     }
   }
 
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'purchase_return', date)
+
   const { data: ret, error: insertError } = await admin
     .from('purchase_returns')
     .insert({
       tenant_id:         tenantId,
+      serial_number:     serialNumber,
       purchase_order_id: purchaseOrderId ?? null,
       supplier_id:       supplierId,
       stock_item_id:     stockItemId,

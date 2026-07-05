@@ -15,6 +15,7 @@ export const tajirCustomers = pgTable('tajir_customers', {
 export const salesOrders = pgTable('sales_orders', {
   id:             uuid('id').primaryKey().defaultRandom(),
   tenantId:       uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serialNumber:   text('serial_number'),
   customerId:     uuid('customer_id').notNull().references(() => tajirCustomers.id),
   stockItemId:    uuid('stock_item_id').notNull().references(() => inventoryLots.id),
   quantity:       numeric('quantity', { precision: 15, scale: 3 }).notNull(),

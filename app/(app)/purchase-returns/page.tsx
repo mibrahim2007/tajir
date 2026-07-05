@@ -15,7 +15,7 @@ export default async function PurchaseReturnsPage() {
 
   const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id')
+      .select('id, serial_number, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
@@ -54,6 +54,7 @@ export default async function PurchaseReturnsPage() {
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
@@ -68,6 +69,7 @@ export default async function PurchaseReturnsPage() {
               <tbody className="divide-y">
                 {returns.map((r) => (
                   <tr key={r.id} className="hover:bg-secondary/50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap font-medium tabular-nums">{r.serial_number ?? '—'}</td>
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
                     <td className="px-4 py-3">{supplierMap.get(r.supplier_id) ?? '—'}</td>
                     <td className="px-4 py-3">{lotMap.get(r.stock_item_id) ?? '—'}</td>

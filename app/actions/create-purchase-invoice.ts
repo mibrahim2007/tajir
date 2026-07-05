@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -55,6 +56,8 @@ export async function createPurchaseInvoiceAction(
   }
 
   const invoiceId = crypto.randomUUID()
+  // One serial for the whole invoice — shared across every line row.
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'purchase_order', date)
   const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number }[] = []
 
   for (let i = 0; i < lines.length; i++) {
@@ -64,6 +67,7 @@ export async function createPurchaseInvoiceAction(
 
     const { data: order, error } = await admin.from('purchase_orders').insert({
       tenant_id:      tenantId,
+      serial_number:  serialNumber,
       supplier_id:    supplierId,
       stock_item_id:  line.stockItemId,
       quantity:       String(line.quantity),

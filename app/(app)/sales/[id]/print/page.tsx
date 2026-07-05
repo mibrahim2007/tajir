@@ -18,7 +18,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
 
   const [{ data: order }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     getTenant(tenantId),
   ])
@@ -85,12 +85,16 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
         {/* Meta grid */}
         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
           <div className="flex gap-2">
-            <span className="text-gray-500 w-28 shrink-0">Invoice No.</span>
-            <span className="font-mono font-bold">{voucherNo}</span>
+            <span className="text-gray-500 w-28 shrink-0">Serial No.</span>
+            <span className="font-mono font-bold">{order.serial_number ?? '—'}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-gray-500 w-24 shrink-0">Date</span>
             <span className="font-semibold">{formatPKTDate(new Date(order.date))}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="text-gray-500 w-28 shrink-0">Voucher No.</span>
+            <span className="font-mono font-bold">{voucherNo}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-gray-500 w-28 shrink-0">Customer</span>

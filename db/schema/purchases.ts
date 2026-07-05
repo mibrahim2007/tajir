@@ -15,6 +15,7 @@ export const suppliers = pgTable('suppliers', {
 export const purchaseOrders = pgTable('purchase_orders', {
   id:            uuid('id').primaryKey().defaultRandom(),
   tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serialNumber:  text('serial_number'),
   supplierId:    uuid('supplier_id').notNull().references(() => suppliers.id),
   stockItemId:   uuid('stock_item_id').notNull().references(() => inventoryLots.id),
   quantity:      numeric('quantity', { precision: 15, scale: 3 }).notNull(),

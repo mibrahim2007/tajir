@@ -27,7 +27,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const admin = createAdminClient()
 
   let query = admin.from('sales_orders')
-    .select('id, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, location_id')
+    .select('id, serial_number, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, location_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -82,6 +82,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
     key: string
     type: 'invoice' | 'solo'
     invoiceId?: string
+    serialNumber: string | null
     date: string
     customerId: string
     stockItemIds: string[]
@@ -107,6 +108,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       key:          invoiceId,
       type:         'invoice',
       invoiceId,
+      serialNumber: lines[0].serial_number,
       date:         lines[0].date,
       customerId:   lines[0].customer_id,
       stockItemIds: lines.map((l) => l.stock_item_id),
@@ -127,6 +129,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
     displayItems.push({
       key:          o.id,
       type:         'solo',
+      serialNumber: o.serial_number,
       date:         o.date,
       customerId:   o.customer_id,
       stockItemIds: [o.stock_item_id],
@@ -177,6 +180,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
@@ -193,6 +197,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                   const isOverdue = dueDate && dueDate < new Date()
                   return (
                     <tr key={item.key} className="hover:bg-secondary/50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap font-medium tabular-nums">{item.serialNumber ?? '—'}</td>
                       <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(item.date))}</td>
                       <td className="px-4 py-3 font-medium">{customerMap.get(item.customerId) ?? '—'}</td>
                       <td className="px-4 py-3">
@@ -259,7 +264,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
               </tbody>
               <tfoot className="border-t-2 bg-muted/30">
                 <tr>
-                  <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                  <td colSpan={4} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
                   <td colSpan={3} />

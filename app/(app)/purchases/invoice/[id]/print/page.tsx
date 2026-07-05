@@ -18,7 +18,7 @@ export default async function PrintPurchaseInvoicePage({ params }: { params: Pro
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('purchase_orders')
-      .select('id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -81,12 +81,16 @@ export default async function PrintPurchaseInvoicePage({ params }: { params: Pro
         {/* Meta */}
         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
           <div className="flex gap-2">
-            <span className="text-gray-500 w-28 shrink-0">Voucher No.</span>
-            <span className="font-mono font-bold">{voucherNo}</span>
+            <span className="text-gray-500 w-28 shrink-0">Serial No.</span>
+            <span className="font-mono font-bold">{first.serial_number ?? '—'}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-gray-500 w-24 shrink-0">Date</span>
             <span className="font-semibold">{formatPKTDate(new Date(first.date))}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="text-gray-500 w-28 shrink-0">Voucher No.</span>
+            <span className="font-mono font-bold">{voucherNo}</span>
           </div>
           <div className="flex gap-2">
             <span className="text-gray-500 w-28 shrink-0">Supplier</span>

@@ -9,6 +9,7 @@ import { salesOrders } from './sales'
 export const purchaseReturns = pgTable('purchase_returns', {
   id:              uuid('id').primaryKey().defaultRandom(),
   tenantId:        uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serialNumber:    text('serial_number'),
   purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id),
   supplierId:      uuid('supplier_id').notNull().references(() => suppliers.id),
   stockItemId:     uuid('stock_item_id').notNull().references(() => inventoryLots.id),
@@ -25,6 +26,7 @@ export const purchaseReturns = pgTable('purchase_returns', {
 export const saleReturns = pgTable('sale_returns', {
   id:            uuid('id').primaryKey().defaultRandom(),
   tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serialNumber:  text('serial_number'),
   saleOrderId:   uuid('sale_order_id').references(() => salesOrders.id),
   customerId:    uuid('customer_id').notNull().references(() => tajirCustomers.id),
   stockItemId:   uuid('stock_item_id').notNull().references(() => inventoryLots.id),

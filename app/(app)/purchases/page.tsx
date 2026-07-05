@@ -26,7 +26,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const admin = createAdminClient()
 
   let query = admin.from('purchase_orders')
-    .select('id, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
+    .select('id, serial_number, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -72,6 +72,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     key: string
     type: 'invoice' | 'solo'
     invoiceId?: string
+    serialNumber: string | null
     date: string
     createdAt: string
     supplierId: string
@@ -92,6 +93,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       key: invoiceId,
       type: 'invoice',
       invoiceId,
+      serialNumber: lines[0].serial_number,
       date:        lines[0].date,
       createdAt:   lines[0].created_at,
       supplierId:  lines[0].supplier_id,
@@ -109,6 +111,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     displayItems.push({
       key:         o.id,
       type:        'solo',
+      serialNumber: o.serial_number,
       date:        o.date,
       createdAt:   o.created_at,
       supplierId:  o.supplier_id,
@@ -162,6 +165,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
+                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
                   <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Items</th>
@@ -173,6 +177,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
               <tbody className="divide-y">
                 {displayItems.map((item) => (
                   <tr key={item.key} className="hover:bg-secondary/50 transition-colors">
+                    <td className="px-4 py-3 whitespace-nowrap font-medium tabular-nums">{item.serialNumber ?? '—'}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="block">{formatPKTDate(new Date(item.date))}</span>
                       <span className="block text-[11px] text-muted-foreground tabular-nums">
@@ -223,7 +228,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
               </tbody>
               <tfoot className="border-t-2 bg-muted/30">
                 <tr>
-                  <td colSpan={3} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
+                  <td colSpan={4} className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Total</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{totalQty.toLocaleString(undefined, { maximumFractionDigits: 3 })}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums font-bold">{formatPKR(totalPKR)}</td>
                   <td />

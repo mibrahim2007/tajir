@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -71,10 +72,13 @@ export async function createSaleOrderAction(input: unknown): Promise<
     return { success: false, error: 'Only the Owner can override stock limits', code: 'UNAUTHORIZED' }
   }
 
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'sale_invoice', date)
+
   const { data: order, error: insertError } = await admin
     .from('sales_orders')
     .insert({
       tenant_id: tenantId,
+      serial_number: serialNumber,
       customer_id: customerId,
       stock_item_id: stockItemId,
       quantity: String(quantity),
