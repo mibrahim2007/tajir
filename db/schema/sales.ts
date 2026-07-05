@@ -25,6 +25,7 @@ export const salesOrders = pgTable('sales_orders', {
   pkrEquivalent:  numeric('pkr_equivalent', { precision: 15, scale: 2 }).notNull(),
   date:           date('date').notNull(),
   paymentDueDate: date('payment_due_date'),
+  notes:          text('notes'),
   confirmedAt:    timestamp('confirmed_at', { withTimezone: true }),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

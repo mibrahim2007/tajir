@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { Pencil, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -54,6 +55,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [confirmBelowCost, setConfirmBelowCost] = useState<FormValues | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -76,7 +78,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
   const cost               = costMap[watchedStockItemId]
   const belowCost          = cost !== undefined && watchedRate > 0 && (watchedRate * (watchedER || 1)) < cost
 
-  const onSubmit = (values: FormValues) => {
+  const save = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
       const result = await editSaleAction({ id: sale.id, ...values })
@@ -84,6 +86,16 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
       setOpen(false)
       router.refresh()
     })
+  }
+
+  const onSubmit = (values: FormValues) => {
+    const c = costMap[values.stockItemId]
+    const ratePKR = values.rate * (values.exchangeRate || 1)
+    if (c !== undefined && values.rate > 0 && ratePKR < c) {
+      setConfirmBelowCost(values)
+      return
+    }
+    save(values)
   }
 
   return (
@@ -194,6 +206,37 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
           </form>
         </Form>
       </SheetContent>
+
+      {/* Below-cost warning */}
+      <Dialog open={!!confirmBelowCost} onOpenChange={(o) => { if (!o) setConfirmBelowCost(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-amber-500" /> Sale Rate Below Cost
+            </DialogTitle>
+          </DialogHeader>
+          {confirmBelowCost && (() => {
+            const c = costMap[confirmBelowCost.stockItemId]
+            const ratePKR = confirmBelowCost.rate * (confirmBelowCost.exchangeRate || 1)
+            const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 2 })
+            return (
+              <div className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 text-sm">
+                <p className="text-muted-foreground">
+                  Rate: Rs {fmt(ratePKR)} · Cost: Rs {fmt(c)} · Loss/unit: Rs {fmt(c - ratePKR)}
+                </p>
+                <p className="mt-1">This sale will make a loss. Save anyway?</p>
+              </div>
+            )
+          })()}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmBelowCost(null)}>Go Back</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={() => { const v = confirmBelowCost!; setConfirmBelowCost(null); save(v) }}>
+              Confirm Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   )
 }

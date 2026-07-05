@@ -36,7 +36,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
   if (location) purchaseQuery = purchaseQuery.eq('location_id', location)
 
   let salesQuery = admin.from('sales_orders')
-    .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id')
+    .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id, notes')
     .eq('tenant_id', tenantId)
     .gte('date', from)
     .lte('date', to)
@@ -61,7 +61,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
 
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, `${l.name} (${l.count})`]))
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.count != null && String(l.count).trim() !== '' ? `${l.name} (${l.count})` : l.name]))
   const uomMap = new Map((rawLots ?? []).map((l) => [l.id, l.unit_of_measure ?? null]))
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
@@ -78,6 +78,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     rate: number
     currencyCode: string
     pkrAmount: number
+    notes: string | null
   }
 
   const purchaseRows: Row[] = (rawPurchases ?? []).map((p) => ({
@@ -92,6 +93,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     rate: parseFloat(p.rate),
     currencyCode: p.currency_code,
     pkrAmount: parseFloat(p.pkr_equivalent),
+    notes: null,
   }))
 
   const saleRows: Row[] = (rawSales ?? []).map((s) => ({
@@ -106,6 +108,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     rate: parseFloat(s.rate),
     currencyCode: s.currency_code,
     pkrAmount: parseFloat(s.pkr_equivalent),
+    notes: s.notes ?? null,
   }))
 
   const rows = [...purchaseRows, ...saleRows].sort((a, b) => b.date.localeCompare(a.date))
@@ -180,6 +183,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
                   <th className="text-left px-4 py-3 font-medium">Type</th>
                   <th className="text-left px-4 py-3 font-medium">Party</th>
                   <th className="text-left px-4 py-3 font-medium">Item</th>
+                  <th className="text-left px-4 py-3 font-medium">Notes</th>
                   <th className="text-left px-4 py-3 font-medium">Location</th>
                   <th className="text-right px-4 py-3 font-medium">Qty</th>
                   <th className="text-right px-4 py-3 font-medium">Rate</th>
@@ -201,6 +205,9 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
                     </td>
                     <td className="px-4 py-2.5">{row.party}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{row.item}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground max-w-[220px]">
+                      {row.notes ? <span className="whitespace-pre-wrap break-words">{row.notes}</span> : <span className="text-muted-foreground/50">—</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-muted-foreground">{row.location}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{row.quantity.toLocaleString()}{row.uom && <span className="ml-1 text-muted-foreground text-xs">{row.uom}</span>}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
@@ -212,7 +219,7 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
               </tbody>
               <tfoot className="border-t bg-muted/30">
                 <tr>
-                  <td colSpan={7} className="px-4 py-3 font-medium text-right">
+                  <td colSpan={8} className="px-4 py-3 font-medium text-right">
                     {type === 'all' ? 'Total' : type === 'purchases' ? 'Total Purchases' : 'Total Sales'}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums font-semibold">

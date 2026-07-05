@@ -52,7 +52,7 @@ export async function createSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, date, paymentDueDate, currencyCode, exchangeRate, locationId, lines, allowOversell } = parsed.data
+  const { customerId, date, paymentDueDate, currencyCode, exchangeRate, locationId, notes, lines, allowOversell } = parsed.data
   const admin = createAdminClient()
 
   const { count: coaCount } = await admin
@@ -112,6 +112,7 @@ export async function createSaleInvoiceAction(
       pkr_equivalent:  String(pkrEquivalent),
       date,
       payment_due_date: paymentDueDate ?? null,
+      notes:           notes?.trim() ? notes.trim() : null,
       location_id:     locationId ?? null,
       invoice_id:      invoiceId,
       confirmed_at:    new Date().toISOString(),

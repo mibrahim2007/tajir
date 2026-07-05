@@ -50,6 +50,7 @@ const baseSchema = z.object({
 
 type FormValues   = z.infer<typeof baseSchema>
 type OversellError = { lineIndex: number; itemName: string; available: number; requested: number }
+type BelowCostLine = { lineIndex: number; itemName: string; rate: number; cost: number }
 
 export function CreateSaleForm({ today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerBalanceMap = {} }: {
   today: string
@@ -67,6 +68,8 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
   const [serverError, setServerError]   = useState<string | null>(null)
   const [oversellErrors, setOversellErrors] = useState<OversellError[]>([])
   const [pendingValues, setPendingValues]   = useState<FormValues | null>(null)
+  const [belowCostLines, setBelowCostLines]   = useState<BelowCostLine[]>([])
+  const [pendingBelowCost, setPendingBelowCost] = useState<FormValues | null>(null)
   const [barcodeInput, setBarcodeInput] = useState('')
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const barcodeRef  = useRef<HTMLInputElement>(null)
@@ -218,7 +221,32 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
     })
   }
 
-  const onSubmit = (values: FormValues) => runSubmit(values, false)
+  const onSubmit = (values: FormValues) => {
+    // Warn if any line is priced below its purchase cost before saving.
+    const below: BelowCostLine[] = []
+    values.lines.forEach((l, i) => {
+      const cost = costMap[l.stockItemId]
+      const ratePKR = (l.rate || 0) * er
+      if (cost !== undefined && l.rate > 0 && ratePKR < cost) {
+        const item = stockItems.find((s) => s.id === l.stockItemId)
+        below.push({ lineIndex: i, itemName: item?.name ?? 'Item', rate: ratePKR, cost })
+      }
+    })
+    if (below.length > 0) {
+      setBelowCostLines(below)
+      setPendingBelowCost(values)
+      return
+    }
+    runSubmit(values, false)
+  }
+
+  const confirmBelowCost = () => {
+    if (!pendingBelowCost) return
+    const values = pendingBelowCost
+    setBelowCostLines([])
+    setPendingBelowCost(null)
+    runSubmit(values, false)
+  }
 
   const confirmOversell = () => {
     if (!pendingValues) return
@@ -555,6 +583,34 @@ export function CreateSaleForm({ today, customers, stockItems, pricingRules, isO
           </div>
         </form>
       </Form>
+
+      {/* Below-cost warning dialog */}
+      <Dialog open={belowCostLines.length > 0} onOpenChange={() => { setBelowCostLines([]); setPendingBelowCost(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-amber-500" /> Sale Rate Below Cost
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            <p className="text-sm text-muted-foreground">
+              The following item{belowCostLines.length > 1 ? 's are' : ' is'} priced below purchase cost. This sale will make a loss.
+            </p>
+            {belowCostLines.map((e) => (
+              <div key={e.lineIndex} className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 text-sm">
+                <p className="font-medium">Line {e.lineIndex + 1}: {e.itemName}</p>
+                <p className="text-muted-foreground">
+                  Rate: Rs {fmt(e.rate)} · Cost: Rs {fmt(e.cost)} · Loss/unit: Rs {fmt(e.cost - e.rate)}
+                </p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setBelowCostLines([]); setPendingBelowCost(null) }}>Go Back</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={confirmBelowCost}>Confirm Anyway</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Oversell dialog */}
       <Dialog open={oversellErrors.length > 0} onOpenChange={() => { setOversellErrors([]); setPendingValues(null) }}>

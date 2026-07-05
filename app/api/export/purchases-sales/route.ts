@@ -31,7 +31,7 @@ export async function GET(req: Request) {
   if (location) purchaseQuery = purchaseQuery.eq('location_id', location)
 
   let salesQuery = admin.from('sales_orders')
-    .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id')
+    .select('id, date, quantity, rate, currency_code, pkr_equivalent, customer_id, stock_item_id, location_id, notes')
     .eq('tenant_id', tenantId).gte('date', from).lte('date', to).order('date', { ascending: false })
   if (location) salesQuery = salesQuery.eq('location_id', location)
 
@@ -53,7 +53,7 @@ export async function GET(req: Request) {
 
   const supplierMap = new Map((rawSuppliers ?? []).map((s) => [s.id, s.name]))
   const customerMap = new Map((rawCustomers ?? []).map((c) => [c.id, c.name]))
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, `${l.name} (${l.count})`]))
+  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.count != null && String(l.count).trim() !== '' ? `${l.name} (${l.count})` : l.name]))
   const locationMap = new Map((rawLocs ?? []).map((l) => [l.id, l.name]))
 
   const workbook = new ExcelJS.Workbook()
@@ -64,6 +64,7 @@ export async function GET(req: Request) {
     { header: 'Type', key: 'type', width: 12 },
     { header: 'Party', key: 'party', width: 28 },
     { header: 'Item', key: 'item', width: 32 },
+    { header: 'Notes', key: 'notes', width: 30 },
     { header: 'Location', key: 'location', width: 20 },
     { header: 'Quantity', key: 'qty', width: 12 },
     { header: 'Rate', key: 'rate', width: 14 },
@@ -80,6 +81,7 @@ export async function GET(req: Request) {
     type: 'Purchase',
     party: supplierMap.get(p.supplier_id) ?? '—',
     item: lotMap.get(p.stock_item_id) ?? '—',
+    notes: '',
     location: p.location_id ? (locationMap.get(p.location_id) ?? '—') : '—',
     qty: parseFloat(p.quantity),
     rate: parseFloat(p.rate),
@@ -93,6 +95,7 @@ export async function GET(req: Request) {
     type: 'Sale',
     party: customerMap.get(s.customer_id) ?? '—',
     item: lotMap.get(s.stock_item_id) ?? '—',
+    notes: s.notes ?? '',
     location: s.location_id ? (locationMap.get(s.location_id) ?? '—') : '—',
     qty: parseFloat(s.quantity),
     rate: parseFloat(s.rate),

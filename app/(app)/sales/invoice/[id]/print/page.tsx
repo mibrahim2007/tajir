@@ -18,7 +18,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -63,9 +63,12 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   const voucherNo  = journalEntry?.voucher_number ?? `SI-${invoiceId.slice(-6).toUpperCase()}`
   const entryTime  = formatPKTDateTime(new Date(first.created_at)).split(', ')[1]
   const customerName = customerMap.get(first.customer_id) ?? '—'
+  const notes = lines.find((l) => l.notes && l.notes.trim())?.notes?.trim() ?? null
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Keep the invoice on a single printed page */}
+      <style>{`@media print { @page { size: A4; margin: 12mm } html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact } }`}</style>
       <div className="print:hidden flex items-center gap-3 px-6 py-4 border-b bg-background sticky top-0">
         <Link href="/sales">
           <Button variant="ghost" size="sm">← Back</Button>
@@ -162,13 +165,21 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
         </table>
 
         {first.payment_due_date && (
-          <div className="text-sm text-gray-500 mb-8">
+          <div className="text-sm text-gray-500 mb-4">
             Payment due by <span className="font-semibold text-gray-700">{formatPKTDate(new Date(first.payment_due_date))}</span>
           </div>
         )}
 
+        {/* Notes */}
+        {notes && (
+          <div className="text-sm mb-8 print:mb-6">
+            <p className="text-gray-500 font-semibold text-[11px] uppercase tracking-wide mb-1">Notes</p>
+            <p className="whitespace-pre-wrap text-gray-700 border border-gray-200 rounded px-3 py-2">{notes}</p>
+          </div>
+        )}
+
         {/* Signatures */}
-        <div className="flex justify-between mt-16 pt-4 text-sm text-center gap-4">
+        <div className="flex justify-between mt-16 print:mt-10 pt-4 text-sm text-center gap-4">
           <div className="flex-1"><div className="border-t border-black pt-2 text-gray-500">Accountant</div></div>
           <div className="flex-1"><div className="border-t border-black pt-2 text-gray-500">Customer Representative</div></div>
           <div className="flex-1"><div className="border-t border-black pt-2 text-gray-500">Authorized By</div></div>
