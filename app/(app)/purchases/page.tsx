@@ -84,6 +84,9 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     currencyCode: string
     exchangeRate: string
     soloOrder?: OrderRow
+    // The underlying order for any single-line row (solo, or a 1-item
+    // invoice) — used to enable inline editing of that one line.
+    singleOrder?: OrderRow
   }
 
   const displayItems: DisplayItem[] = []
@@ -104,6 +107,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       advancePaid: lines.reduce((s, l) => s + parseFloat(l.advance_paid ?? '0'), 0),
       currencyCode: lines[0].currency_code,
       exchangeRate: lines[0].exchange_rate,
+      singleOrder: lines.length === 1 ? lines[0] : undefined,
     })
   }
 
@@ -123,6 +127,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       currencyCode: o.currency_code,
       exchangeRate: o.exchange_rate,
       soloOrder:   o,
+      singleOrder: o,
     })
   }
 
@@ -204,9 +209,9 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                           <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
                         </Link>
                         <RoleGate allowedRoles={['owner']}>
-                          {item.type === 'solo' && item.soloOrder && (
+                          {item.singleOrder && (
                             <EditPurchaseForm
-                              purchase={{ id: item.soloOrder.id, supplierId: item.soloOrder.supplier_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, advancePaid: item.soloOrder.advance_paid, date: item.soloOrder.date, locationId: item.soloOrder.location_id }}
+                              purchase={{ id: item.singleOrder.id, supplierId: item.singleOrder.supplier_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, advancePaid: item.singleOrder.advance_paid, date: item.singleOrder.date, locationId: item.singleOrder.location_id }}
                               suppliers={supplierList}
                               lots={lotList}
                               locations={locationList}

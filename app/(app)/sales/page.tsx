@@ -94,6 +94,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
     hasAnyBelowCost: boolean
     locationId: string | null
     soloOrder?: OrderRow
+    // The underlying order for any single-line row (solo, or a 1-item
+    // invoice) — used to enable inline editing of that one line.
+    singleOrder?: OrderRow
   }
 
   const displayItems: DisplayItem[] = []
@@ -119,6 +122,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       currencyCode: lines[0].currency_code,
       hasAnyBelowCost,
       locationId:   lines[0].location_id,
+      singleOrder:  lines.length === 1 ? lines[0] : undefined,
     })
   }
 
@@ -141,6 +145,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       hasAnyBelowCost: belowCost,
       locationId:   o.location_id,
       soloOrder:    o,
+      singleOrder:  o,
     })
   }
 
@@ -238,9 +243,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
                             <Link href={item.type === 'solo' ? `/sale-returns/new?so=${item.soloOrder!.id}` : `/sale-returns/new`}>
                               <Button variant="ghost" size="sm" className="min-h-[36px] text-muted-foreground">Return</Button>
                             </Link>
-                            {item.type === 'solo' && item.soloOrder && (
+                            {item.singleOrder && (
                               <EditSaleForm
-                                sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date, locationId: item.soloOrder.location_id }}
+                                sale={{ id: item.singleOrder.id, customerId: item.singleOrder.customer_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, date: item.singleOrder.date, paymentDueDate: item.singleOrder.payment_due_date, locationId: item.singleOrder.location_id }}
                                 customers={customers}
                                 lots={lots}
                                 locations={locationList}
