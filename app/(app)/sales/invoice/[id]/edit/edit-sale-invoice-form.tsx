@@ -12,6 +12,7 @@ export function EditSaleInvoiceForm(props: {
   initialValues:     SaleFormValues
   today:             string
   customers:         Customer[]
+  suppliers?:        Customer[]
   stockItems:        StockItem[]
   pricingRules:      PricingRule[]
   isOwner:           boolean

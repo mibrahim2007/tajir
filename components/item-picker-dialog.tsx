@@ -9,8 +9,9 @@ import { cn } from '@/lib/utils'
 export type PickerItem = {
   id: string
   name: string
-  badge?: string   // e.g. count "30s"
+  badge?: string   // e.g. count "30s" or an identity tag like "Supplier"
   meta?: string    // e.g. "1,250 avail." shown on the right
+  disabled?: boolean  // shown greyed and non-selectable (e.g. wrong party type for this form)
 }
 
 type Props = {
@@ -48,6 +49,8 @@ export function ItemPickerDialog({
     : items
 
   function pick(id: string) {
+    const item = items.find((i) => i.id === id)
+    if (item?.disabled) return
     onSelect(id)
     close()
   }
@@ -138,14 +141,18 @@ export function ItemPickerDialog({
                   <ul>
                     {filtered.map((item) => {
                       const isSelected = item.id === value
+                      const isDisabled = !!item.disabled
                       return (
                         <li key={item.id}>
                           <button
                             type="button"
+                            disabled={isDisabled}
                             onClick={() => pick(item.id)}
                             className={cn(
                               'w-full flex items-center justify-between px-4 py-3 text-left text-sm transition-colors',
-                              'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
+                              isDisabled
+                                ? 'cursor-not-allowed opacity-50'
+                                : 'hover:bg-accent focus-visible:bg-accent focus-visible:outline-none',
                               isSelected && 'bg-accent'
                             )}
                           >

@@ -9,8 +9,9 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSuppliers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('sales_orders')
       .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code')
@@ -21,6 +22,7 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
   ])
 
   const customerList = rawCustomers ?? []
+  const supplierList = rawSuppliers ?? []
   const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
   const saleOrderList = (rawOrders ?? []).map((o) => ({
     id: o.id,
@@ -44,6 +46,7 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
       <CreateSaleReturnForm
         today={today}
         customers={customerList}
+        suppliers={supplierList}
         lots={lotList}
         saleOrders={saleOrderList}
         locations={locations}

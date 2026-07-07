@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { buildPartyItems } from '@/lib/party-picker'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { createSaleReturnAction } from '@/app/actions/create-sale-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -47,13 +48,14 @@ type SaleOrder = { id: string; date: string; customerId: string; stockItemId: st
 type Props = {
   today:              string
   customers:          { id: string; name: string }[]
+  suppliers?:         { id: string; name: string }[]
   lots:               { id: string; name: string; count: string; unitOfMeasure: string | null }[]
   saleOrders:         SaleOrder[]
   locations:          { id: string; name: string }[]
   defaultSaleOrderId?: string
 }
 
-export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locations, defaultSaleOrderId = '' }: Props) {
+export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, saleOrders, locations, defaultSaleOrderId = '' }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -108,7 +110,12 @@ export function CreateSaleReturnForm({ today, customers, lots, saleOrders, locat
   const [customerList, setCustomerList] = useState<PickerItem[]>(
     customers.map((c) => ({ id: c.id, name: c.name }))
   )
-  const customerPickerItems = customerList
+  // Merged party list: selectable customers + greyed-out suppliers (shown with
+  // their identity badge but not selectable on a sale return).
+  const customerPickerItems = useMemo(
+    () => buildPartyItems(customerList, suppliers, 'customer'),
+    [customerList, suppliers],
+  )
   const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
 
   const saleOrderPickerItems = useMemo<PickerItem[]>(() =>

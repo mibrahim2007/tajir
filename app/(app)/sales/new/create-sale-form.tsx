@@ -10,6 +10,7 @@ type LocationStock = { stockItemId: string; locationId: string; quantity: number
 export function CreateSaleForm(props: {
   today: string
   customers:         Customer[]
+  suppliers?:        Customer[]
   stockItems:        StockItem[]
   pricingRules:      PricingRule[]
   isOwner:           boolean

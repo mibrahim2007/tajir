@@ -6,8 +6,9 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSuppliers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, current_quantity, code, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -42,6 +43,7 @@ export default async function NewSalePage() {
   }
 
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
+  const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
     id: l.id,
     name: l.name,
@@ -72,6 +74,7 @@ export default async function NewSalePage() {
       <CreateSaleForm
         today={today}
         customers={customers}
+        suppliers={suppliers}
         stockItems={stockItems}
         pricingRules={pricingRules}
         isOwner={role === 'owner'}

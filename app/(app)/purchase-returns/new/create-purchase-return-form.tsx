@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { buildPartyItems } from '@/lib/party-picker'
 import { QuickCreateSupplier } from '@/components/quick-create-forms'
 import { createPurchaseReturnAction } from '@/app/actions/create-purchase-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -47,12 +48,13 @@ type PurchaseOrder = { id: string; date: string; supplierId: string; stockItemId
 type Props = {
   today:          string
   suppliers:      { id: string; name: string }[]
+  customers?:     { id: string; name: string }[]
   lots:           { id: string; name: string; count: string; unitOfMeasure: string | null }[]
   purchaseOrders: PurchaseOrder[]
   locations:      { id: string; name: string }[]
 }
 
-export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrders, locations }: Props) {
+export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lots, purchaseOrders, locations }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -101,7 +103,12 @@ export function CreatePurchaseReturnForm({ today, suppliers, lots, purchaseOrder
   const [supplierList, setSupplierList] = useState<PickerItem[]>(
     suppliers.map((s) => ({ id: s.id, name: s.name }))
   )
-  const supplierPickerItems = supplierList
+  // Merged party list: selectable suppliers + greyed-out customers (shown with
+  // their identity badge but not selectable on a purchase return).
+  const supplierPickerItems = useMemo(
+    () => buildPartyItems(customers, supplierList, 'supplier'),
+    [customers, supplierList],
+  )
   const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
 
   const onSubmit = (values: FormValues) => {

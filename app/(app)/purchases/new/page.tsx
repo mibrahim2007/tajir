@@ -7,13 +7,15 @@ export default async function NewPurchasePage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   const supplierList = rawSuppliers ?? []
+  const customerList = rawCustomers ?? []
   const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
   const locationList = rawLocs ?? []
 
@@ -23,7 +25,7 @@ export default async function NewPurchasePage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a purchase from a supplier.</p>
       </div>
-      <CreatePurchaseForm today={today} suppliers={supplierList} lots={lotList} locations={locationList} />
+      <CreatePurchaseForm today={today} suppliers={supplierList} customers={customerList} lots={lotList} locations={locationList} />
     </div>
   )
 }

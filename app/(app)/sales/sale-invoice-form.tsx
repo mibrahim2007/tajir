@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { buildPartyItems } from '@/lib/party-picker'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
@@ -55,13 +56,14 @@ type BelowCostLine = { lineIndex: number; itemName: string; rate: number; cost: 
 
 export function SaleInvoiceForm({
   mode = 'create', invoiceId, initialValues,
-  today, customers, stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerBalanceMap = {},
+  today, customers, suppliers = [], stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerBalanceMap = {},
 }: {
   mode?:             'create' | 'edit'
   invoiceId?:        string
   initialValues?:    SaleFormValues
   today:             string
   customers:         Customer[]
+  suppliers?:        Customer[]
   stockItems:        StockItem[]
   pricingRules:      PricingRule[]
   isOwner:           boolean
@@ -96,7 +98,12 @@ export function SaleInvoiceForm({
     [requireLocation],
   )
 
-  const customerPickerItems = customerList
+  // Merged party list: selectable customers + greyed-out suppliers (shown with
+  // their identity badge but not selectable on a sale).
+  const customerPickerItems = useMemo(
+    () => buildPartyItems(customerList, suppliers, 'customer'),
+    [customerList, suppliers],
+  )
 
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(formSchema) as Resolver<SaleFormValues>,

@@ -7,8 +7,9 @@ export default async function NewPurchaseReturnPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawOrders }, { data: rawLocs }] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('purchase_orders')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code')
@@ -19,6 +20,7 @@ export default async function NewPurchaseReturnPage() {
   ])
 
   const supplierList = rawSuppliers ?? []
+  const customerList = rawCustomers ?? []
   const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
   const purchaseOrderList = (rawOrders ?? []).map((o) => ({
     id: o.id,
@@ -40,6 +42,7 @@ export default async function NewPurchaseReturnPage() {
       <CreatePurchaseReturnForm
         today={today}
         suppliers={supplierList}
+        customers={customerList}
         lots={lotList}
         purchaseOrders={purchaseOrderList}
         locations={locations}

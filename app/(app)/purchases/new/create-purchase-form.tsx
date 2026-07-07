@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
+import { buildPartyItems } from '@/lib/party-picker'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -46,11 +47,12 @@ type FormValues = z.infer<typeof schema>
 type Props = {
   today: string
   suppliers: { id: string; name: string }[]
+  customers?: { id: string; name: string }[]
   lots:      { id: string; name: string; count: string; unitOfMeasure: string | null }[]
   locations: { id: string; name: string }[]
 }
 
-export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props) {
+export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -64,7 +66,12 @@ export function CreatePurchaseForm({ today, suppliers, lots, locations }: Props)
     lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
   )
 
-  const supplierPickerItems = supplierList
+  // Merged party list: selectable suppliers + greyed-out customers (shown with
+  // their identity badge but not selectable on a purchase).
+  const supplierPickerItems = useMemo(
+    () => buildPartyItems(customers, supplierList, 'supplier'),
+    [customers, supplierList],
+  )
   const lotPickerItems      = lotList
 
   const form = useForm<FormValues>({
