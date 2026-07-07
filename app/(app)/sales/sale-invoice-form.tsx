@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
-import { buildPartyItems } from '@/lib/party-picker'
+import { buildPartyItems, needsMirror } from '@/lib/party-picker'
+import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
@@ -98,10 +99,10 @@ export function SaleInvoiceForm({
     [requireLocation],
   )
 
-  // Merged party list: selectable customers + greyed-out suppliers (shown with
-  // their identity badge but not selectable on a sale).
+  // Merged party list: customers + suppliers, each with an identity badge. Both
+  // are selectable; a supplier pick is mirrored to a customer at save time.
   const customerPickerItems = useMemo(
-    () => buildPartyItems(customerList, suppliers, 'customer'),
+    () => buildPartyItems(customerList, suppliers),
     [customerList, suppliers],
   )
 
@@ -209,8 +210,16 @@ export function SaleInvoiceForm({
     startTransition(async () => {
       setServerError(null)
 
+      // If a supplier was picked, mirror it to a customer so customer_id is valid.
+      let customerId = values.customerId
+      if (needsMirror(customerId, customerList.map((c) => c.id))) {
+        const res = await resolvePartyAction({ partyId: customerId, requiredType: 'customer' })
+        if (!res.success) { setServerError(res.error); return }
+        customerId = res.data.id
+      }
+
       const payload = {
-        customerId:     values.customerId,
+        customerId,
         date:           values.date,
         paymentDueDate: values.paymentDueDate || undefined,
         currencyCode:   values.currencyCode,

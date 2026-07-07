@@ -16,7 +16,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
-import { buildPartyItems } from '@/lib/party-picker'
+import { buildPartyItems, needsMirror } from '@/lib/party-picker'
+import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -66,10 +67,10 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
   )
 
-  // Merged party list: selectable suppliers + greyed-out customers (shown with
-  // their identity badge but not selectable on a purchase).
+  // Merged party list: customers + suppliers, each with an identity badge. Both
+  // are selectable; a customer pick is mirrored to a supplier at save time.
   const supplierPickerItems = useMemo(
-    () => buildPartyItems(customers, supplierList, 'supplier'),
+    () => buildPartyItems(customers, supplierList),
     [customers, supplierList],
   )
   const lotPickerItems      = lotList
@@ -102,8 +103,17 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
+
+      // If a customer was picked, mirror it to a supplier so supplier_id is valid.
+      let supplierId = values.supplierId
+      if (needsMirror(supplierId, supplierList.map((s) => s.id))) {
+        const res = await resolvePartyAction({ partyId: supplierId, requiredType: 'supplier' })
+        if (!res.success) { setServerError(res.error); return }
+        supplierId = res.data.id
+      }
+
       const result = await createPurchaseInvoiceAction({
-        supplierId:   values.supplierId,
+        supplierId,
         date:         values.date,
         currencyCode: values.currencyCode,
         exchangeRate: values.exchangeRate,

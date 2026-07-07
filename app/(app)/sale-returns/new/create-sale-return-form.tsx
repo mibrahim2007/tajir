@@ -15,7 +15,8 @@ import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
-import { buildPartyItems } from '@/lib/party-picker'
+import { buildPartyItems, needsMirror } from '@/lib/party-picker'
+import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { createSaleReturnAction } from '@/app/actions/create-sale-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -110,10 +111,10 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
   const [customerList, setCustomerList] = useState<PickerItem[]>(
     customers.map((c) => ({ id: c.id, name: c.name }))
   )
-  // Merged party list: selectable customers + greyed-out suppliers (shown with
-  // their identity badge but not selectable on a sale return).
+  // Merged party list: customers + suppliers, each with an identity badge. Both
+  // are selectable; a supplier pick is mirrored to a customer at save time.
   const customerPickerItems = useMemo(
-    () => buildPartyItems(customerList, suppliers, 'customer'),
+    () => buildPartyItems(customerList, suppliers),
     [customerList, suppliers],
   )
   const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
@@ -134,12 +135,21 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
+
+      // If a supplier was picked, mirror it to a customer so customer_id is valid.
+      let customerId = values.customerId
+      if (needsMirror(customerId, customerList.map((c) => c.id))) {
+        const res = await resolvePartyAction({ partyId: customerId, requiredType: 'customer' })
+        if (!res.success) { setServerError(res.error); return }
+        customerId = res.data.id
+      }
+
       let firstEntryId: string | null = null
       for (let i = 0; i < values.lines.length; i++) {
         const line = values.lines[i]
         const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
         const result = await createSaleReturnAction({
-          customerId:  values.customerId,
+          customerId,
           stockItemId: line.stockItemId,
           quantity:    line.quantity,
           rate:        effectiveRate,
