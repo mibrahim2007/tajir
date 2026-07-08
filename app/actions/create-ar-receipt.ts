@@ -17,6 +17,7 @@ const schema = z.object({
   paymentMethodNote: z.string().optional(),
   chequeNumber:      z.string().optional(),
   bankId:            z.string().uuid().optional(),
+  moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
 })
 
 export async function createArReceiptAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -32,7 +33,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, amount, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId } = parsed.data
+  const { customerId, amount, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId, moneyAccount } = parsed.data
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
   const admin = createAdminClient()
@@ -56,11 +57,11 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Failed to record receipt', code: 'INTERNAL_ERROR' }
   }
 
-  // Auto-post GL: DR Cash in Hand, CR Accounts Receivable
+  // Auto-post GL: DR the selected money account (Cash / Bank / PDC), CR Accounts Receivable
   await postJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
     lines: [
-      { accountSystemKey: 'cash_in_hand',        debit: pkrEquivalent, credit: 0 },
+      { accountSystemKey: moneyAccount,          debit: pkrEquivalent, credit: 0 },
       { accountSystemKey: 'accounts_receivable',  debit: 0, credit: pkrEquivalent, customerId },
     ],
   })

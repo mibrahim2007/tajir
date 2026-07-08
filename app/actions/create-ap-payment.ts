@@ -17,6 +17,7 @@ const schema = z.object({
   paymentMethodNote: z.string().optional(),
   chequeNumber:      z.string().optional(),
   bankId:            z.string().uuid().optional(),
+  moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
 })
 
 export async function createApPaymentAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -32,7 +33,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, amount, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId } = parsed.data
+  const { supplierId, amount, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId, moneyAccount } = parsed.data
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
   const admin = createAdminClient()
@@ -56,12 +57,12 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     return { success: false, error: 'Failed to record payment', code: 'INTERNAL_ERROR' }
   }
 
-  // Auto-post GL: DR Accounts Payable, CR Cash in Hand
+  // Auto-post GL: DR Accounts Payable, CR the selected money account (Cash / Bank / PDC)
   await postJournalEntry({
     tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',
     lines: [
       { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId },
-      { accountSystemKey: 'cash_in_hand',     debit: 0, credit: pkrEquivalent },
+      { accountSystemKey: moneyAccount,       debit: 0, credit: pkrEquivalent },
     ],
   })
 

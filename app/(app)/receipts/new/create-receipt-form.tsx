@@ -15,6 +15,7 @@ import { CurrencyInput } from '@/components/currency-input'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
+import { MONEY_ACCOUNTS } from '@/lib/constants/money-accounts'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
@@ -40,6 +41,7 @@ const schema = z.object({
   paymentMethodNote: z.string().optional(),
   chequeNumber:      z.string().optional(),
   bankId:            z.string().optional(),
+  moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -59,7 +61,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '' },
+    defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '', moneyAccount: 'cash_in_hand' },
   })
 
   const selectedCustomerId  = form.watch('customerId')
@@ -153,6 +155,24 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
                   <Label>Date <span className="text-destructive">*</span></Label>
                   <Input type="date" {...form.register('date')} className="min-h-[44px]" />
                   {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Received in <span className="text-destructive">*</span></Label>
+                  <Controller
+                    control={form.control}
+                    name="moneyAccount"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {MONEY_ACCOUNTS.map((a) => (
+                            <SelectItem key={a.value} value={a.value}>{a.label} ({a.code})</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

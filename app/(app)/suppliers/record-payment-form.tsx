@@ -9,8 +9,10 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
+import { MONEY_ACCOUNTS } from '@/lib/constants/money-accounts'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
@@ -19,6 +21,7 @@ const schema = z.object({
   exchangeRate: z.number().positive().default(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
+  moneyAccount: z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -32,7 +35,7 @@ export function RecordPaymentForm({ supplierId, today }: { supplierId: string; t
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '' },
+    defaultValues: { amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', moneyAccount: 'cash_in_hand' },
   })
 
   const onSubmit = (values: FormValues) => {
@@ -40,7 +43,7 @@ export function RecordPaymentForm({ supplierId, today }: { supplierId: string; t
       setServerError(null)
       const result = await createApPaymentAction({ ...values, supplierId })
       if (!result.success) { setServerError(result.error); return }
-      form.reset({ amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '' })
+      form.reset({ amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', moneyAccount: 'cash_in_hand' })
       setOpen(false)
       router.refresh()
     })
@@ -70,6 +73,23 @@ export function RecordPaymentForm({ supplierId, today }: { supplierId: string; t
                 <FormItem>
                   <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                   <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="moneyAccount" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Paid from <span className="text-destructive">*</span></FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {MONEY_ACCOUNTS.map((a) => (
+                        <SelectItem key={a.value} value={a.value}>{a.label} ({a.code})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )} />
