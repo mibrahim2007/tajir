@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { SeedAccountsButton } from './seed-accounts-button'
 import { UploadCoaButton } from './upload-coa-button'
 import { AddAccountButton } from './add-account-button'
+import { AccountRowActions } from './account-row-actions'
 
 const TYPE_LABELS: Record<string, string> = {
   asset:     'Asset',
@@ -31,6 +32,7 @@ export default async function AccountsPage() {
     .order('code')
 
   const accounts = rawAccounts ?? []
+  const pickerAccounts = accounts.map((a) => ({ code: a.code, name: a.name, parent_code: a.parent_code }))
 
   // Group top-level sections (no parent)
   const topLevel = accounts.filter((a) => !a.parent_code)
@@ -53,8 +55,15 @@ export default async function AccountsPage() {
         >
           <span className="font-mono text-xs text-muted-foreground w-16 shrink-0">{child.code}</span>
           <span className={`text-sm ${child.is_header ? 'font-semibold' : ''}`}>{child.name}</span>
-          {child.is_system && (
+          {child.is_system ? (
             <span className="ml-auto text-xs text-muted-foreground border rounded px-1.5 py-0.5">system</span>
+          ) : (
+            <div className="ml-auto flex items-center gap-2">
+              {!child.is_active && (
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground border rounded px-1.5 py-0.5">inactive</span>
+              )}
+              {role === 'owner' && <AccountRowActions account={child} accounts={pickerAccounts} />}
+            </div>
           )}
         </div>
         {renderChildren(child.code, depth + 1)}
@@ -89,7 +98,12 @@ export default async function AccountsPage() {
               <div className={`flex items-center gap-3 px-4 py-3 border-b ${TYPE_COLORS[section.account_type] ?? ''}`}>
                 <span className="font-mono text-xs w-16 shrink-0 opacity-70">{section.code}</span>
                 <span className="font-bold text-sm uppercase tracking-wide">{section.name}</span>
-                <span className="ml-auto text-xs font-medium capitalize">{TYPE_LABELS[section.account_type]}</span>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs font-medium capitalize">{TYPE_LABELS[section.account_type]}</span>
+                  {role === 'owner' && !section.is_system && (
+                    <AccountRowActions account={section} accounts={pickerAccounts} />
+                  )}
+                </div>
               </div>
               <div className="bg-background">
                 {renderChildren(section.code, 0)}
