@@ -42,17 +42,17 @@ export default async function PayablesAgingPage() {
       .filter((p) => p.supplier_id === s.id)
       .map((p) => ({
         date: p.date,
-        net: parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid),
+        net: p.pkr_equivalent - p.advance_paid,
       }))
       .filter((p) => p.net > 0)
 
     const totalPaid = allPayments
       .filter((p) => p.supplier_id === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
+      .reduce((sum, p) => sum + p.pkr_equivalent, 0)
 
     const lineItems: { date: string; amount: number }[] = [
-      ...(parseFloat(s.opening_balance_pkr_equivalent) > 0
-        ? [{ date: s.created_at.split('T')[0], amount: parseFloat(s.opening_balance_pkr_equivalent) }]
+      ...(s.opening_balance_pkr_equivalent > 0
+        ? [{ date: s.created_at.split('T')[0], amount: s.opening_balance_pkr_equivalent }]
         : []),
       ...sPurchases.map((p) => ({ date: p.date, amount: p.net })),
     ].sort((a, b) => a.date.localeCompare(b.date))

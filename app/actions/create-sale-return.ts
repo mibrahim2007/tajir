@@ -65,8 +65,8 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
         .eq('sale_order_id', saleOrderId)
         .eq('tenant_id', tenantId)
 
-      const alreadyReturned = (existingReturns ?? []).reduce((s, r) => s + parseFloat(r.quantity), 0)
-      const originalQty = parseFloat(originalSale.quantity)
+      const alreadyReturned = (existingReturns ?? []).reduce((s, r) => s + r.quantity, 0)
+      const originalQty = originalSale.quantity
 
       if (alreadyReturned + quantity > originalQty) {
         const available = originalQty - alreadyReturned
@@ -96,11 +96,11 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
       sale_order_id: saleOrderId ?? null,
       customer_id:   customerId,
       stock_item_id: stockItemId,
-      quantity:      String(quantity),
-      rate:          String(rate),
+      quantity:      quantity,
+      rate:          rate,
       currency_code: currencyCode,
-      exchange_rate: String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
+      exchange_rate: exchangeRate,
+      pkr_equivalent: pkrEquivalent,
       date,
       reason:        reason ?? null,
       location_id:   locationId ?? null,

@@ -44,7 +44,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-type SaleOrder = { id: string; date: string; customerId: string; stockItemId: string; quantity: string; rate: string; currencyCode: string }
+type SaleOrder = { id: string; date: string; customerId: string; stockItemId: string; quantity: number; rate: number; currencyCode: string }
 
 type Props = {
   today:              string
@@ -103,7 +103,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
       const lines = form.getValues('lines')
       if (lines.length === 1 && !lines[0].stockItemId) {
         form.setValue('lines.0.stockItemId', so.stockItemId)
-        form.setValue('lines.0.rate', parseFloat(so.rate))
+        form.setValue('lines.0.rate', so.rate)
       }
     }
   }

@@ -43,8 +43,8 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
       .single(),
   ])
 
-  const amount     = parseFloat(receipt.amount)
-  const pkrAmount  = parseFloat(receipt.pkr_equivalent)
+  const amount     = receipt.amount
+  const pkrAmount  = receipt.pkr_equivalent
   const isUSD      = receipt.currency_code === 'USD'
   const voucherNo  = journalEntry?.voucher_number ?? `RC-${id.slice(-6).toUpperCase()}`
   const entryTime  = formatPKTDateTime(new Date(receipt.created_at)).split(', ')[1]

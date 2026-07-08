@@ -32,10 +32,10 @@ type PurchaseReturn = {
   id: string
   supplierId: string
   stockItemId: string
-  quantity: string
-  rate: string
+  quantity: number
+  rate: number
   currencyCode: string
-  exchangeRate: string
+  exchangeRate: number
   date: string
   reason: string | null
   locationId: string | null
@@ -61,10 +61,10 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
     defaultValues: {
       supplierId:   ret.supplierId,
       stockItemId:  ret.stockItemId,
-      quantity:     parseFloat(ret.quantity),
-      rate:         parseFloat(ret.rate),
+      quantity:     ret.quantity,
+      rate:         ret.rate,
       currencyCode: ret.currencyCode as 'PKR' | 'USD',
-      exchangeRate: parseFloat(ret.exchangeRate),
+      exchangeRate: ret.exchangeRate,
       date:         ret.date,
       reason:       ret.reason ?? '',
       locationId:   ret.locationId ?? '',

@@ -30,22 +30,22 @@ export default async function SuppliersPage() {
 
   const outstandingBySupplier = new Map<string, number>()
   for (const s of suppliers) {
-    const openingBalance = parseFloat(s.opening_balance_pkr_equivalent ?? '0')
+    const openingBalance = s.opening_balance_pkr_equivalent  ?? 0
     const purchased = purchases
       .filter((p) => p.supplier_id === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid), 0)
+      .reduce((sum, p) => sum + p.pkr_equivalent - p.advance_paid, 0)
     const paid = payments
       .filter((p) => p.supplier_id === s.id)
-      .reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
+      .reduce((sum, p) => sum + p.pkr_equivalent, 0)
     const returned = returns
       .filter((r) => r.supplier_id === s.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
     const debited = debitNotes
       .filter((n) => n.supplier_id === s.id)
-      .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+      .reduce((sum, n) => sum + n.pkr_equivalent, 0)
     const refunded = refunds
       .filter((r) => r.supplier_id === s.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
     outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited + refunded)
   }
 

@@ -49,10 +49,10 @@ export default async function PrintPurchaseInvoicePage({ params }: { params: Pro
   const supplierMap = new Map((suppliers ?? []).map((s) => [s.id, s.name]))
   const locationMap = new Map((locations ?? []).map((l) => [l.id, l.name]))
 
-  const totalPKR    = lines.reduce((s, l) => s + parseFloat(l.pkr_equivalent), 0)
-  const advancePaid = lines.reduce((s, l) => s + parseFloat(l.advance_paid ?? '0'), 0)
+  const totalPKR    = lines.reduce((s, l) => s + l.pkr_equivalent, 0)
+  const advancePaid = lines.reduce((s, l) => s + l.advance_paid, 0)
   const balanceDue  = totalPKR - advancePaid
-  const er          = parseFloat(first.exchange_rate)
+  const er          = first.exchange_rate
   const isUSD       = first.currency_code === 'USD'
   const voucherNo   = journalEntry?.voucher_number ?? `PI-${invoiceId.slice(-6).toUpperCase()}`
   const entryTime   = formatPKTDateTime(new Date(first.created_at)).split(', ')[1]
@@ -127,9 +127,9 @@ export default async function PrintPurchaseInvoicePage({ params }: { params: Pro
           </thead>
           <tbody>
             {lines.map((line, i) => {
-              const qty    = parseFloat(line.quantity)
-              const rate   = parseFloat(line.rate)
-              const amount = parseFloat(line.pkr_equivalent)
+              const qty    = line.quantity
+              const rate   = line.rate
+              const amount = line.pkr_equivalent
               return (
                 <tr key={line.id} className={i % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : ''}>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-gray-500 tabular-nums">{i + 1}</td>

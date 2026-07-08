@@ -100,8 +100,8 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
       accountCode: acc?.code ?? '—',
       accountName: acc?.name ?? '—',
       lineDescription: line.description ?? '',
-      debit: parseFloat(line.debit),
-      credit: parseFloat(line.credit),
+      debit: line.debit,
+      credit: line.credit,
     })
   }
 

@@ -33,10 +33,10 @@ type Sale = {
   id: string
   customerId: string
   stockItemId: string
-  quantity: string
-  rate: string
+  quantity: number
+  rate: number
   currencyCode: string
-  exchangeRate: string
+  exchangeRate: number
   date: string
   paymentDueDate: string | null
   locationId: string | null
@@ -62,10 +62,10 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
     defaultValues: {
       customerId:     sale.customerId,
       stockItemId:    sale.stockItemId,
-      quantity:       parseFloat(sale.quantity),
-      rate:           parseFloat(sale.rate),
+      quantity:       sale.quantity,
+      rate:           sale.rate,
       currencyCode:   sale.currencyCode as 'PKR' | 'USD',
-      exchangeRate:   parseFloat(sale.exchangeRate),
+      exchangeRate:   sale.exchangeRate,
       date:           sale.date,
       paymentDueDate: sale.paymentDueDate ?? undefined,
       locationId:     sale.locationId ?? '',

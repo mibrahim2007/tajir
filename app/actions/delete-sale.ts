@@ -41,7 +41,7 @@ export async function deleteSaleAction(input: unknown): Promise<ActionResult<voi
   if (error) return { success: false, error: 'Failed to delete sale', code: 'INTERNAL_ERROR' }
 
   // Restore inventory quantity
-  await admin.rpc('adjust_inventory_quantity', { p_lot_id: sale.stock_item_id, p_delta: parseFloat(sale.quantity) })
+  await admin.rpc('adjust_inventory_quantity', { p_lot_id: sale.stock_item_id, p_delta: sale.quantity })
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'sales_orders', entityId: id, before: { customerId: sale.customer_id, stockItemId: sale.stock_item_id, quantity: sale.quantity, rate: sale.rate, pkrEquivalent: sale.pkr_equivalent, date: sale.date } })
 

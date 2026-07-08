@@ -32,7 +32,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-type SaleOrder = { id: string; date: string; customerId: string; pkrEquivalent: string; currencyCode: string }
+type SaleOrder = { id: string; date: string; customerId: string; pkrEquivalent: number; currencyCode: string }
 
 type Props = {
   today:      string
@@ -132,7 +132,7 @@ export function CreateCreditNoteForm({ today, customers, saleOrders }: Props) {
                         const customer = customers.find((c) => c.id === o.customerId)
                         return (
                           <SelectItem key={o.id} value={o.id}>
-                            {o.date} — {customer?.name ?? '?'} — Rs {parseFloat(o.pkrEquivalent).toLocaleString('en-PK', { maximumFractionDigits: 0 })}
+                            {o.date} — {customer?.name ?? '?'} — Rs {o.pkrEquivalent.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
                           </SelectItem>
                         )
                       })}

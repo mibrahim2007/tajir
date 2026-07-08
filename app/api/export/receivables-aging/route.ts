@@ -46,14 +46,14 @@ export async function GET() {
   let grandTotal = 0, grandB0 = 0, grandB31 = 0, grandB61 = 0, grandB90plus = 0
 
   for (const c of allCustomers ?? []) {
-    const cSales = (allSales ?? []).filter((s) => s.customer_id === c.id).map((s) => ({ date: s.date, amount: parseFloat(s.pkr_equivalent) }))
-    const totalReceived = (allReceiptsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
-    const totalReturned = (allReturnsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
-    const totalCredited = (allCreditNotesData ?? []).filter((n) => n.customer_id === c.id).reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
-    const totalRefunded = (allRefundsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+    const cSales = (allSales ?? []).filter((s) => s.customer_id === c.id).map((s) => ({ date: s.date, amount: s.pkr_equivalent }))
+    const totalReceived = (allReceiptsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
+    const totalReturned = (allReturnsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
+    const totalCredited = (allCreditNotesData ?? []).filter((n) => n.customer_id === c.id).reduce((sum, n) => sum + n.pkr_equivalent, 0)
+    const totalRefunded = (allRefundsData ?? []).filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
 
     const lineItems = [
-      ...(parseFloat(c.opening_balance_pkr_equivalent) > 0 ? [{ date: c.created_at.split('T')[0], amount: parseFloat(c.opening_balance_pkr_equivalent) }] : []),
+      ...(c.opening_balance_pkr_equivalent > 0 ? [{ date: c.created_at.split('T')[0], amount: c.opening_balance_pkr_equivalent }] : []),
       ...cSales,
     ].sort((a, b) => a.date.localeCompare(b.date))
 

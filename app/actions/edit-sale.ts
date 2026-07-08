@@ -44,7 +44,7 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
 
   if (!existing) return { success: false, error: 'Sale not found', code: 'NOT_FOUND' }
 
-  const oldQty = parseFloat(existing.quantity)
+  const oldQty = existing.quantity
   // positive delta means selling more → decrease inventory by delta
   const qtyDelta = quantity - oldQty
 
@@ -56,7 +56,7 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
       .eq('id', stockItemId)
       .eq('tenant_id', tenantId)
       .single()
-    const available = parseFloat(lot?.current_quantity ?? '0')
+    const available = lot?.current_quantity  ?? 0
     if (available - qtyDelta < 0) {
       return {
         success: false,
@@ -71,11 +71,11 @@ export async function editSaleAction(input: unknown): Promise<ActionResult<void>
     .update({
       customer_id: customerId,
       stock_item_id: stockItemId,
-      quantity: String(quantity),
-      rate: String(rate),
+      quantity: quantity,
+      rate: rate,
       currency_code: currencyCode,
-      exchange_rate: String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
+      exchange_rate: exchangeRate,
+      pkr_equivalent: pkrEquivalent,
       date,
       payment_due_date: paymentDueDate ?? null,
       location_id: locationId || null,

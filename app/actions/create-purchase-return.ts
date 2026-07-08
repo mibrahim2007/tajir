@@ -59,7 +59,7 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     .eq('id', stockItemId)
     .eq('tenant_id', tenantId)
     .single()
-  const available = parseFloat(lot?.current_quantity ?? '0')
+  const available = lot?.current_quantity  ?? 0
   if (available - quantity < 0) {
     return {
       success: false,
@@ -78,11 +78,11 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
       purchase_order_id: purchaseOrderId ?? null,
       supplier_id:       supplierId,
       stock_item_id:     stockItemId,
-      quantity:          String(quantity),
-      rate:              String(rate),
+      quantity:          quantity,
+      rate:              rate,
       currency_code:     currencyCode,
-      exchange_rate:     String(exchangeRate),
-      pkr_equivalent:    String(pkrEquivalent),
+      exchange_rate:     exchangeRate,
+      pkr_equivalent:    pkrEquivalent,
       date,
       reason:            reason ?? null,
       location_id:       locationId ?? null,

@@ -25,9 +25,9 @@ type FormValues = z.infer<typeof schema>
 
 type Payment = {
   id: string
-  amount: string
+  amount: number
   currencyCode: string
-  pkrEquivalent: string
+  pkrEquivalent: number
   date: string
   paymentMethodNote: string | null
 }
@@ -38,8 +38,8 @@ export function EditApPaymentForm({ payment }: { payment: Payment }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const amount = parseFloat(payment.amount)
-  const pkrEq = parseFloat(payment.pkrEquivalent)
+  const amount = payment.amount
+  const pkrEq = payment.pkrEquivalent
   const currency = payment.currencyCode as 'PKR' | 'USD'
   const exchangeRate = currency === 'USD' && amount > 0 ? pkrEq / amount : 1
 

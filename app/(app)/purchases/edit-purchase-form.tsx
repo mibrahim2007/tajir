@@ -32,11 +32,11 @@ type Purchase = {
   id: string
   supplierId: string
   stockItemId: string
-  quantity: string
-  rate: string
+  quantity: number
+  rate: number
   currencyCode: string
-  exchangeRate: string
-  advancePaid: string
+  exchangeRate: number
+  advancePaid: number
   date: string
   locationId: string | null
 }
@@ -59,12 +59,12 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
     defaultValues: {
       supplierId:   purchase.supplierId,
       stockItemId:  purchase.stockItemId,
-      quantity:     parseFloat(purchase.quantity),
-      rate:         parseFloat(purchase.rate),
+      quantity:     purchase.quantity,
+      rate:         purchase.rate,
       currencyCode: purchase.currencyCode as 'PKR' | 'USD',
-      exchangeRate: parseFloat(purchase.exchangeRate),
+      exchangeRate: purchase.exchangeRate,
       date:         purchase.date,
-      advancePaid:  parseFloat(purchase.advancePaid),
+      advancePaid:  purchase.advancePaid,
       locationId:   purchase.locationId ?? '',
     },
   })

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { setCustomerOpeningBalance } from '@/app/actions/set-opening-balance'
 import { formatPKR } from '@/lib/utils/currency'
 
-type Customer = { id: string; name: string; openingBalance: string; openingBalanceCurrency: string; openingBalancePkrEquivalent: string }
+type Customer = { id: string; name: string; openingBalance: number; openingBalanceCurrency: string; openingBalancePkrEquivalent: number }
 
 export function CustomerBalanceTable({ customers }: { customers: Customer[] }) {
   const router = useRouter()
@@ -26,7 +26,7 @@ export function CustomerBalanceTable({ customers }: { customers: Customer[] }) {
 
   const startEdit = (c: Customer) => {
     setEditingId(c.id)
-    setEditAmount(parseFloat(c.openingBalance).toString())
+    setEditAmount(c.openingBalance.toString())
     setEditCurrency((c.openingBalanceCurrency || 'PKR') as 'PKR' | 'USD')
     setEditRate('1')
     setError(null)
@@ -88,7 +88,7 @@ export function CustomerBalanceTable({ customers }: { customers: Customer[] }) {
                     )}
                   </div>
                 ) : (
-                  formatPKR(parseFloat(c.openingBalancePkrEquivalent))
+                  formatPKR(c.openingBalancePkrEquivalent)
                 )}
               </td>
               <td className="px-4 py-3 text-right">

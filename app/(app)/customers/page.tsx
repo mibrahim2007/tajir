@@ -30,22 +30,22 @@ export default async function CustomersPage() {
 
   const outstandingByCustomer = new Map<string, number>()
   for (const c of customers) {
-    const openingBalance = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
+    const openingBalance = c.opening_balance_pkr_equivalent  ?? 0
     const billed = sales
       .filter((s) => s.customer_id === c.id)
-      .reduce((sum, s) => sum + parseFloat(s.pkr_equivalent), 0)
+      .reduce((sum, s) => sum + s.pkr_equivalent, 0)
     const received = receipts
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
     const returned = returns
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
     const credited = creditNotes
       .filter((n) => n.customer_id === c.id)
-      .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+      .reduce((sum, n) => sum + n.pkr_equivalent, 0)
     const refunded = refunds
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
     outstandingByCustomer.set(c.id, openingBalance + billed - received - returned - credited + refunded)
   }
 

@@ -7,6 +7,7 @@ type ItemType = { id: string; name: string }
 type Lot = {
   id: string
   name: string
+  sku: string
   code: string | null
   count: string
   unitOfMeasure: string | null
@@ -25,8 +26,17 @@ const EditInventoryLotFormDynamic = dynamic(
   { ssr: false, loading: () => null }
 )
 
+const CreateItemsByTypeDynamic = dynamic(
+  () => import('./create-items-by-type').then((m) => ({ default: m.CreateItemsByType })),
+  { ssr: false, loading: () => null }
+)
+
 export function CreateLotFormWrapper({ itemTypes }: { itemTypes: ItemType[] }) {
   return <CreateLotFormDynamic itemTypes={itemTypes} />
+}
+
+export function CreateItemsByTypeWrapper({ itemTypes }: { itemTypes: ItemType[] }) {
+  return <CreateItemsByTypeDynamic itemTypes={itemTypes} />
 }
 
 export function EditInventoryLotFormWrapper({ lot, itemTypes }: { lot: Lot; itemTypes: ItemType[] }) {

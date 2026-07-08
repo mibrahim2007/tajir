@@ -49,9 +49,9 @@ export async function resolvePartyAction(input: {
     .insert({
       tenant_id: tenantId,
       name: other.name,
-      opening_balance: '0',
+      opening_balance: 0,
       opening_balance_currency: 'PKR',
-      opening_balance_pkr_equivalent: '0',
+      opening_balance_pkr_equivalent: 0,
     })
     .select('id')
     .single()

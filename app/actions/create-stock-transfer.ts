@@ -37,7 +37,7 @@ export async function createStockTransferAction(input: unknown): Promise<ActionR
       from_location_id: fromLocationId,
       to_location_id:   toLocationId,
       stock_item_id:    stockItemId,
-      quantity:         String(quantity),
+      quantity:         quantity,
       date,
       notes:            notes ?? null,
     })

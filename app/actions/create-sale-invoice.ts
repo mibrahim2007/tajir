@@ -66,7 +66,7 @@ export async function createSaleInvoiceAction(
   const { data: lots } = await admin.from('inventory_lots')
     .select('id, current_quantity').eq('tenant_id', tenantId).in('id', stockIds)
 
-  const lotMap = new Map((lots ?? []).map((l) => [l.id, parseFloat(l.current_quantity)]))
+  const lotMap = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
 
   // Aggregate requested quantities per stockItemId (same item may appear multiple times)
   const requestedMap = new Map<string, number>()
@@ -105,11 +105,11 @@ export async function createSaleInvoiceAction(
       serial_number:   serialNumber,
       customer_id:     customerId,
       stock_item_id:   line.stockItemId,
-      quantity:        String(line.quantity),
-      rate:            String(effectiveRate),
+      quantity:        line.quantity,
+      rate:            effectiveRate,
       currency_code:   currencyCode,
-      exchange_rate:   String(exchangeRate),
-      pkr_equivalent:  String(pkrEquivalent),
+      exchange_rate:   exchangeRate,
+      pkr_equivalent:  pkrEquivalent,
       date,
       payment_due_date: paymentDueDate ?? null,
       notes:           notes?.trim() ? notes.trim() : null,

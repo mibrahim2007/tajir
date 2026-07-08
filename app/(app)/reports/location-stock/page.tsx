@@ -26,12 +26,12 @@ export default async function LocationStockReportPage({ searchParams }: { search
 
   const locations = rawLocations ?? []
   const allRows = (rawStock ?? []).map(r => ({
-    stockItemId: r.stock_item_id,
+    stockItemId: r.stock_item_id ?? '',
     stockItemName: r.stock_item_name,
     yarnCount: r.yarn_count,
-    locationId: r.location_id,
-    locationName: r.location_name,
-    quantity: parseFloat(String(r.quantity ?? '0')),
+    locationId: r.location_id ?? '',
+    locationName: r.location_name ?? '',
+    quantity: r.quantity ?? 0,
   }))
 
   const rows = filterLocation ? allRows.filter(r => r.locationId === filterLocation) : allRows

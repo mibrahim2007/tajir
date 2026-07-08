@@ -1,9 +1,13 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
+import { Barcode } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateLotFormWrapper } from './form-wrappers'
+import { CreateItemsByTypeWrapper } from './form-wrappers'
 import { EditInventoryLotFormWrapper } from './form-wrappers'
 import { InventoryFilters } from './inventory-filters'
+import { BulkLabelPrint } from './bulk-label-print'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteInventoryLotAction } from '@/app/actions/delete-inventory-lot'
@@ -13,7 +17,7 @@ const PAGE_SIZE = 50
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
 
 export default async function InventoryPage({ searchParams }: { searchParams: SearchParams }) {
-  const { tenantId, role } = await requireAuth()
+  const { tenantId } = await requireAuth()
   const params = await searchParams
 
   const filterCount    = typeof params.count === 'string' ? params.count    : undefined
@@ -26,7 +30,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
 
   let dataQuery = admin
     .from('inventory_lots')
-    .select('id, name, code, count, unit_of_measure, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
+    .select('id, name, sku, code, count, unit_of_measure, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
     .eq('tenant_id', tenantId)
 
   let countQuery = admin
@@ -60,7 +64,10 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
             {hasFilters ? ' (filtered)' : ''}
           </p>
         </div>
-        <CreateLotFormWrapper itemTypes={safeItemTypes} />
+        <div className="flex items-center gap-2">
+          <CreateItemsByTypeWrapper itemTypes={safeItemTypes} />
+          <CreateLotFormWrapper itemTypes={safeItemTypes} />
+        </div>
       </div>
 
       <Suspense>
@@ -76,13 +83,17 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
           </p>
         </div>
       ) : (
-        <>
+        <BulkLabelPrint>
           <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 border-b">
                   <tr>
+                    <th className="px-4 py-3 w-10">
+                      <input type="checkbox" className="label-select-all h-4 w-4 align-middle" aria-label="Select all for labels" />
+                    </th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Name</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">SKU</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Code</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Count</th>
                     <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Type</th>
@@ -100,7 +111,11 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                       : (lot.item_types as { name: string } | null)?.name
                     return (
                       <tr key={lot.id} className="hover:bg-secondary/50 transition-colors">
+                        <td className="px-4 py-3">
+                          <input type="checkbox" className="label-checkbox h-4 w-4 align-middle" value={lot.id} aria-label={`Select ${lot.name} for labels`} />
+                        </td>
                         <td className="px-4 py-3 font-medium">{lot.name}</td>
+                        <td className="px-4 py-3 font-mono text-xs tabular-nums">{lot.sku}</td>
                         <td className="px-4 py-3 text-muted-foreground">{lot.code ?? '—'}</td>
                         <td className="px-4 py-3">{lot.count}</td>
                         <td className="px-4 py-3">{typeName ?? lot.type ?? '—'}</td>
@@ -109,12 +124,21 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                         <td className="px-4 py-3 text-right tabular-nums">{lot.current_quantity}</td>
                         <td className="px-4 py-3 text-muted-foreground">{lot.unit_of_measure ?? '—'}</td>
                         <td className="px-4 py-3">
-                          <RoleGate allowedRoles={['owner']}>
-                            <div className="flex items-center gap-1">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              href={`/inventory/labels/print?ids=${lot.id}`}
+                              target="_blank"
+                              title="Print barcode label"
+                              className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                            >
+                              <Barcode className="h-4 w-4" />
+                            </Link>
+                            <RoleGate allowedRoles={['owner']}>
                               <EditInventoryLotFormWrapper
                                 lot={{
                                   id: lot.id,
                                   name: lot.name,
+                                  sku: lot.sku,
                                   code: lot.code,
                                   count: String(lot.count ?? ''),
                                   unitOfMeasure: lot.unit_of_measure ?? null,
@@ -128,8 +152,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                                 description={`Delete stock item "${lot.name}"? This cannot be undone.`}
                                 onDelete={deleteInventoryLotAction.bind(null, { id: lot.id })}
                               />
-                            </div>
-                          </RoleGate>
+                            </RoleGate>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -157,7 +181,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
               </div>
             )}
           </div>
-        </>
+        </BulkLabelPrint>
       )}
     </div>
   )

@@ -97,7 +97,7 @@ export default async function ProfitLossPage({ searchParams }: { searchParams: S
   const netByAccount = new Map<string, number>()
   for (const line of lines) {
     const prev = netByAccount.get(line.account_id) ?? 0
-    netByAccount.set(line.account_id, prev + parseFloat(line.debit) - parseFloat(line.credit))
+    netByAccount.set(line.account_id, prev + line.debit - line.credit)
   }
 
   // Filter to P&L accounts only (revenue 4xxx, expense 5xxx/6xxx/7xxx)

@@ -69,13 +69,13 @@ export default async function SupplierLedgerPage({ params }: Props) {
     debit: number
     credit: number
     balance: number
-    rawPayment?: { id: string; amount: string; currencyCode: string; pkrEquivalent: string; date: string; paymentMethodNote: string | null }
+    rawPayment?: { id: string; amount: number; currencyCode: string; pkrEquivalent: number; date: string; paymentMethodNote: string | null }
   }
 
   const rows: LedgerRow[] = []
   let runningBalance = 0
 
-  const ob = parseFloat(supplierRow.opening_balance_pkr_equivalent)
+  const ob = supplierRow.opening_balance_pkr_equivalent
   if (ob !== 0) {
     runningBalance += ob
     rows.push({ id: 'ob', kind: 'opening', date: supplierRow.created_at.split('T')[0], description: 'Opening Balance', debit: ob, credit: 0, balance: runningBalance })
@@ -98,29 +98,29 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   for (const item of entries) {
     if (item.kind === 'purchase') {
-      const net = parseFloat(item.entry.pkr_equivalent) - parseFloat(item.entry.advance_paid)
+      const net = item.entry.pkr_equivalent - item.entry.advance_paid
       runningBalance += net
       const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
       rows.push({ id: item.entry.id, kind: 'purchase', date: item.date, description: `Purchase — ${itemName} (${item.entry.quantity} units @ ${item.entry.currency_code} ${item.entry.rate})`, debit: net, credit: 0, balance: runningBalance })
     } else if (item.kind === 'purchase_return') {
-      const amount = parseFloat(item.entry.pkr_equivalent)
+      const amount = item.entry.pkr_equivalent
       runningBalance -= amount
       const itemName = lotMap.get(item.entry.stock_item_id) ?? 'Unknown item'
       rows.push({ id: item.entry.id, kind: 'purchase_return', date: item.date, description: `Purchase Return — ${itemName} (${item.entry.quantity} units${item.entry.reason ? ` — ${item.entry.reason}` : ''})`, debit: 0, credit: amount, balance: runningBalance })
     } else if (item.kind === 'debit_note') {
-      const amount = parseFloat(item.entry.pkr_equivalent)
+      const amount = item.entry.pkr_equivalent
       runningBalance -= amount
       const desc = `Debit Note${item.entry.reason ? ` — ${item.entry.reason}` : ''}${item.entry.reference ? ` (Ref: ${item.entry.reference})` : ''}`
       rows.push({ id: item.entry.id, kind: 'debit_note', date: item.date, description: desc, debit: 0, credit: amount, balance: runningBalance })
     } else if (item.kind === 'supplier_refund') {
       // Money received FROM supplier — increases (or restores) our balance
-      const amount = parseFloat(item.entry.pkr_equivalent)
+      const amount = item.entry.pkr_equivalent
       runningBalance += amount
       const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'
       const desc = `Payment Received${item.entry.notes ? ` — ${item.entry.notes}` : ''} (${method})`
       rows.push({ id: item.entry.id, kind: 'supplier_refund', date: item.date, description: desc, debit: amount, credit: 0, balance: runningBalance })
     } else {
-      const paid = parseFloat(item.entry.pkr_equivalent)
+      const paid = item.entry.pkr_equivalent
       runningBalance -= paid
       rows.push({
         id: item.entry.id,

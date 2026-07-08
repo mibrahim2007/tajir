@@ -39,8 +39,8 @@ export async function deleteSaleReturnAction(input: unknown): Promise<ActionResu
     .eq('id', ret.stock_item_id)
     .eq('tenant_id', tenantId)
     .single()
-  const available = parseFloat(lot?.current_quantity ?? '0')
-  const returnQty = parseFloat(ret.quantity)
+  const available = lot?.current_quantity  ?? 0
+  const returnQty = ret.quantity
   if (available - returnQty < 0) {
     return {
       success: false,
@@ -75,7 +75,7 @@ export async function deleteSaleReturnAction(input: unknown): Promise<ActionResu
   // Reverse inventory (remove goods that were returned to stock)
   await admin.rpc('adjust_inventory_quantity', {
     p_lot_id: ret.stock_item_id,
-    p_delta:  -parseFloat(ret.quantity),
+    p_delta:  -ret.quantity,
   })
 
   await createAuditEntry({

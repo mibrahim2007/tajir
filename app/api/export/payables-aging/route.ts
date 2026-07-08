@@ -42,11 +42,11 @@ export async function GET() {
   let grandTotal = 0, grandB0 = 0, grandB31 = 0, grandB61 = 0, grandB90plus = 0
 
   for (const s of allSuppliers ?? []) {
-    const sPurchases = (allPurchases ?? []).filter((p) => p.supplier_id === s.id).map((p) => ({ date: p.date, net: parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid) })).filter((p) => p.net > 0)
-    const totalPaid = (allPaymentsData ?? []).filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
+    const sPurchases = (allPurchases ?? []).filter((p) => p.supplier_id === s.id).map((p) => ({ date: p.date, net: p.pkr_equivalent - p.advance_paid })).filter((p) => p.net > 0)
+    const totalPaid = (allPaymentsData ?? []).filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent, 0)
 
     const lineItems = [
-      ...(parseFloat(s.opening_balance_pkr_equivalent) > 0 ? [{ date: s.created_at.split('T')[0], amount: parseFloat(s.opening_balance_pkr_equivalent) }] : []),
+      ...(s.opening_balance_pkr_equivalent > 0 ? [{ date: s.created_at.split('T')[0], amount: s.opening_balance_pkr_equivalent }] : []),
       ...sPurchases.map((p) => ({ date: p.date, amount: p.net })),
     ].sort((a, b) => a.date.localeCompare(b.date))
 

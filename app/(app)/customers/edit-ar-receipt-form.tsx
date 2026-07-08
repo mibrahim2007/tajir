@@ -25,9 +25,9 @@ type FormValues = z.infer<typeof schema>
 
 type Receipt = {
   id: string
-  amount: string
+  amount: number
   currencyCode: string
-  pkrEquivalent: string
+  pkrEquivalent: number
   date: string
   paymentMethodNote: string | null
 }
@@ -38,8 +38,8 @@ export function EditArReceiptForm({ receipt }: { receipt: Receipt }) {
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const amount = parseFloat(receipt.amount)
-  const pkrEq = parseFloat(receipt.pkrEquivalent)
+  const amount = receipt.amount
+  const pkrEq = receipt.pkrEquivalent
   const currency = receipt.currencyCode as 'PKR' | 'USD'
   const exchangeRate = currency === 'USD' && amount > 0 ? pkrEq / amount : 1
 

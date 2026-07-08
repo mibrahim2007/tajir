@@ -88,11 +88,11 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     party: supplierMap.get(p.supplier_id) ?? '—',
     item: lotMap.get(p.stock_item_id) ?? '—',
     location: p.location_id ? (locationMap.get(p.location_id) ?? '—') : '—',
-    quantity: parseFloat(p.quantity),
+    quantity: p.quantity,
     uom: uomMap.get(p.stock_item_id) ?? null,
-    rate: parseFloat(p.rate),
+    rate: p.rate,
     currencyCode: p.currency_code,
-    pkrAmount: parseFloat(p.pkr_equivalent),
+    pkrAmount: p.pkr_equivalent,
     notes: null,
   }))
 
@@ -103,11 +103,11 @@ export default async function PurchasesSalesReportPage({ searchParams }: { searc
     party: customerMap.get(s.customer_id) ?? '—',
     item: lotMap.get(s.stock_item_id) ?? '—',
     location: s.location_id ? (locationMap.get(s.location_id) ?? '—') : '—',
-    quantity: parseFloat(s.quantity),
+    quantity: s.quantity,
     uom: uomMap.get(s.stock_item_id) ?? null,
-    rate: parseFloat(s.rate),
+    rate: s.rate,
     currencyCode: s.currency_code,
-    pkrAmount: parseFloat(s.pkr_equivalent),
+    pkrAmount: s.pkr_equivalent,
     notes: s.notes ?? null,
   }))
 

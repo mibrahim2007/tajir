@@ -39,9 +39,9 @@ export async function createSupplierAction(input: unknown): Promise<ActionResult
     .insert({
       tenant_id: tenantId,
       name,
-      opening_balance: String(openingBalance),
+      opening_balance: openingBalance,
       opening_balance_currency: openingBalanceCurrency,
-      opening_balance_pkr_equivalent: String(pkrEquivalent),
+      opening_balance_pkr_equivalent: pkrEquivalent,
     })
     .select('id')
     .single()

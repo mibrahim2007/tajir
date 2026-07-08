@@ -58,7 +58,7 @@ export async function deletePurchaseReturnAction(input: unknown): Promise<Action
   // Restore inventory
   await admin.rpc('adjust_inventory_quantity', {
     p_lot_id: ret.stock_item_id,
-    p_delta:  parseFloat(ret.quantity),
+    p_delta:  ret.quantity,
   })
 
   await createAuditEntry({

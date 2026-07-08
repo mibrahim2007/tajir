@@ -39,8 +39,8 @@ export async function deletePurchaseAction(input: unknown): Promise<ActionResult
     .eq('id', purchase.stock_item_id)
     .eq('tenant_id', tenantId)
     .single()
-  const available = parseFloat(lot?.current_quantity ?? '0')
-  const purchaseQty = parseFloat(purchase.quantity)
+  const available = lot?.current_quantity  ?? 0
+  const purchaseQty = purchase.quantity
   if (available - purchaseQty < 0) {
     return {
       success: false,
@@ -58,7 +58,7 @@ export async function deletePurchaseAction(input: unknown): Promise<ActionResult
   if (error) return { success: false, error: 'Failed to delete purchase', code: 'INTERNAL_ERROR' }
 
   // Reverse the inventory increment
-  await admin.rpc('adjust_inventory_quantity', { p_lot_id: purchase.stock_item_id, p_delta: -parseFloat(purchase.quantity) })
+  await admin.rpc('adjust_inventory_quantity', { p_lot_id: purchase.stock_item_id, p_delta: -purchase.quantity })
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'delete', entity: 'purchase_orders', entityId: id, before: { supplierId: purchase.supplier_id, stockItemId: purchase.stock_item_id, quantity: purchase.quantity, rate: purchase.rate, pkrEquivalent: purchase.pkr_equivalent, date: purchase.date } })
 

@@ -41,9 +41,9 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     .insert({
       tenant_id: tenantId,
       supplier_id: supplierId,
-      amount: String(amount),
+      amount: amount,
       currency_code: currencyCode,
-      pkr_equivalent: String(pkrEquivalent),
+      pkr_equivalent: pkrEquivalent,
       payment_method_note: paymentMethodNote || null,
       cheque_number: chequeNumber || null,
       bank_id: bankId ?? null,

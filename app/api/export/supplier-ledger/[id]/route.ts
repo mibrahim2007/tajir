@@ -40,7 +40,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   let balance = 0
 
-  const ob = parseFloat(supplier.opening_balance_pkr_equivalent)
+  const ob = supplier.opening_balance_pkr_equivalent
   if (ob !== 0) {
     balance += ob
     sheet.addRow({ date: supplier.created_at.split('T')[0], desc: 'Opening Balance', debit: Math.round(ob * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
@@ -62,24 +62,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   for (const item of entries) {
     if (item.kind === 'purchase') {
       const e = item.entry as NonNullable<typeof rawPurchases>[0]
-      const net = parseFloat(e.pkr_equivalent) - parseFloat(e.advance_paid)
+      const net = e.pkr_equivalent - e.advance_paid
       balance += net
       sheet.addRow({ date: item.date, desc: `Purchase — ${lotMap.get(e.stock_item_id) ?? '?'} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: Math.round(net * 100) / 100, credit: '', balance: Math.round(balance * 100) / 100 })
     } else if (item.kind === 'purchase_return') {
       const e = item.entry as NonNullable<typeof rawReturns>[0]
-      const amt = parseFloat(e.pkr_equivalent)
+      const amt = e.pkr_equivalent
       balance -= amt
       const itemName = lotMap.get(e.stock_item_id) ?? '?'
       sheet.addRow({ date: item.date, desc: `Purchase Return — ${itemName} (${e.quantity} units${e.reason ? ` — ${e.reason}` : ''})`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     } else if (item.kind === 'debit_note') {
       const e = item.entry as NonNullable<typeof rawDebitNotes>[0]
-      const amt = parseFloat(e.pkr_equivalent)
+      const amt = e.pkr_equivalent
       balance -= amt
       const desc = `Debit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`
       sheet.addRow({ date: item.date, desc, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     } else {
       const e = item.entry as NonNullable<typeof rawPayments>[0]
-      const amt = parseFloat(e.pkr_equivalent)
+      const amt = e.pkr_equivalent
       balance -= amt
       sheet.addRow({ date: item.date, desc: `Payment${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     }

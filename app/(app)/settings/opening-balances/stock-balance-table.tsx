@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { setStockOpeningBalance } from '@/app/actions/set-opening-balance'
 
-type Lot = { id: string; name: string; currentQuantity: string; openingRate: string; locationId: string | null }
+type Lot = { id: string; name: string; currentQuantity: number; openingRate: number; locationId: string | null }
 type Location = { id: string; name: string }
 
 function fmt(n: string | number) {
@@ -34,8 +34,8 @@ export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations:
 
   const startEdit = (lot: Lot) => {
     setEditingId(lot.id)
-    setEditQty(parseFloat(lot.currentQuantity).toString())
-    setEditRate(parseFloat(lot.openingRate).toString())
+    setEditQty(lot.currentQuantity.toString())
+    setEditRate(lot.openingRate.toString())
     setEditLocationId(lot.locationId ?? '')
     setError(null)
   }
@@ -67,8 +67,8 @@ export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations:
           </thead>
           <tbody className="divide-y">
             {lots.map((lot) => {
-              const qty  = parseFloat(lot.currentQuantity) || 0
-              const rate = parseFloat(lot.openingRate) || 0
+              const qty  = lot.currentQuantity || 0
+              const rate = lot.openingRate || 0
               const val  = qty * rate
               const isEditing = editingId === lot.id
               return (
@@ -142,12 +142,12 @@ export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations:
             })}
           </tbody>
           {/* Totals */}
-          {lots.some(l => parseFloat(l.openingRate) > 0) && (
+          {lots.some(l => l.openingRate > 0) && (
             <tfoot className="border-t-2 bg-muted/30">
               <tr>
                 <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
                 <td className="px-4 py-3 text-right font-bold tabular-nums">
-                  {fmtPKR(lots.reduce((s, l) => s + (parseFloat(l.currentQuantity) || 0) * (parseFloat(l.openingRate) || 0), 0))}
+                  {fmtPKR(lots.reduce((s, l) => s + (l.currentQuantity || 0) * (l.openingRate || 0), 0))}
                 </td>
                 <td />
               </tr>

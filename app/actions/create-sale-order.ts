@@ -62,7 +62,7 @@ export async function createSaleOrderAction(input: unknown): Promise<
     .eq('tenant_id', tenantId)
     .single()
 
-  const available = lot ? parseFloat(lot.current_quantity) : 0
+  const available = lot ? lot.current_quantity : 0
 
   if (available < quantity && !allowOversell) {
     return { success: false as const, error: 'Insufficient stock', code: 'OVERSELL' as const, available, requested: quantity }
@@ -81,11 +81,11 @@ export async function createSaleOrderAction(input: unknown): Promise<
       serial_number: serialNumber,
       customer_id: customerId,
       stock_item_id: stockItemId,
-      quantity: String(quantity),
-      rate: String(rate),
+      quantity: quantity,
+      rate: rate,
       currency_code: currencyCode,
-      exchange_rate: String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
+      exchange_rate: exchangeRate,
+      pkr_equivalent: pkrEquivalent,
       date,
       payment_due_date: paymentDueDate ?? null,
       location_id:     locationId ?? null,

@@ -56,7 +56,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
     if (!costMap[p.stock_item_id])
-      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+      costMap[p.stock_item_id] = p.pkr_equivalent / p.quantity
   }
 
   const customerMap = new Map(customers.map((c) => [c.id, c.name]))
@@ -101,7 +101,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   for (const [invoiceId, lines] of invoiceMap) {
     const hasAnyBelowCost = lines.some((l) => {
       const cost = costMap[l.stock_item_id]
-      const ratePKR = parseFloat(l.rate) * parseFloat(l.exchange_rate)
+      const ratePKR = l.rate * l.exchange_rate
       return cost !== undefined && ratePKR < cost
     })
     displayItems.push({
@@ -113,8 +113,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       customerId:   lines[0].customer_id,
       stockItemIds: lines.map((l) => l.stock_item_id),
       itemCount:    lines.length,
-      totalQty:     lines.reduce((s, l) => s + parseFloat(l.quantity), 0),
-      totalPKR:     lines.reduce((s, l) => s + parseFloat(l.pkr_equivalent), 0),
+      totalQty:     lines.reduce((s, l) => s + l.quantity, 0),
+      totalPKR:     lines.reduce((s, l) => s + l.pkr_equivalent, 0),
       paymentDueDate: lines[0].payment_due_date,
       currencyCode: lines[0].currency_code,
       hasAnyBelowCost,
@@ -124,7 +124,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
 
   for (const o of soloOrders) {
     const cost = costMap[o.stock_item_id]
-    const ratePKR = parseFloat(o.rate) * parseFloat(o.exchange_rate)
+    const ratePKR = o.rate * o.exchange_rate
     const belowCost = cost !== undefined && ratePKR < cost
     displayItems.push({
       key:          o.id,
@@ -134,8 +134,8 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       customerId:   o.customer_id,
       stockItemIds: [o.stock_item_id],
       itemCount:    1,
-      totalQty:     parseFloat(o.quantity),
-      totalPKR:     parseFloat(o.pkr_equivalent),
+      totalQty:     o.quantity,
+      totalPKR:     o.pkr_equivalent,
       paymentDueDate: o.payment_due_date,
       currencyCode: o.currency_code,
       hasAnyBelowCost: belowCost,

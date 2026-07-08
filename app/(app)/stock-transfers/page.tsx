@@ -59,7 +59,7 @@ export default async function StockTransfersPage() {
                 <Td strong>{itemMap.get(t.stock_item_id as string) ?? '—'}</Td>
                 <Td>{locMap.get(t.from_location_id as string) ?? '—'}</Td>
                 <Td>{locMap.get(t.to_location_id as string) ?? '—'}</Td>
-                <Td right mono>{parseFloat(t.quantity as string).toLocaleString('en-PK')}</Td>
+                <Td right mono>{t.quantity.toLocaleString('en-PK')}</Td>
                 <Td muted>{(t.notes as string | null) ?? '—'}</Td>
               </tr>
             ))}

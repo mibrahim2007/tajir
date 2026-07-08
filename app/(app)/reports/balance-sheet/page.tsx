@@ -84,7 +84,7 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
   const netByAccount = new Map<string, number>()
   for (const line of lines) {
     const prev = netByAccount.get(line.account_id) ?? 0
-    netByAccount.set(line.account_id, prev + parseFloat(line.debit) - parseFloat(line.credit))
+    netByAccount.set(line.account_id, prev + line.debit - line.credit)
   }
 
   type BSRow = { code: string; name: string; amount: number }

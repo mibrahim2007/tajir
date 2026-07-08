@@ -26,8 +26,8 @@ import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null; unitOfMeasure: string | null }
-type PricingRule = { customerId: string; stockItemId: string; rate: string }
+type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null }
+type PricingRule = { customerId: string; stockItemId: string; rate: number }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
 const lineSchema = z.object({
@@ -178,13 +178,13 @@ export function SaleInvoiceForm({
         name: s.name,
         meta: locStockMap
           ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
-          : `${parseFloat(s.currentQuantity).toLocaleString()} avail.`,
+          : `${s.currentQuantity.toLocaleString()} avail.`,
       }))
   }, [stockItems, locStockMap, selectedItemIds])
 
   const getPricedRate = (customerId: string, stockItemId: string) => {
     const rule = pricingRules.find((r) => r.customerId === customerId && r.stockItemId === stockItemId)
-    return rule ? parseFloat(rule.rate) : null
+    return rule ? rule.rate : null
   }
 
   const handleBarcodeScan = useCallback((code: string) => {
@@ -463,7 +463,7 @@ export function SaleInvoiceForm({
                             const ratePKR   = (line.rate || 0) * er
                             const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
                             const avail  = item
-                              ? (locStockMap ? (locStockMap[item.id] ?? 0) : parseFloat(item.currentQuantity))
+                              ? (locStockMap ? (locStockMap[item.id] ?? 0) : item.currentQuantity)
                               : null
 
                             return (

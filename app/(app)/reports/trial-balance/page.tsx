@@ -52,8 +52,8 @@ export default async function TrialBalancePage({ searchParams }: { searchParams:
   for (const line of lines) {
     const prev = totals.get(line.account_id) ?? { debit: 0, credit: 0 }
     totals.set(line.account_id, {
-      debit:  prev.debit  + parseFloat(line.debit),
-      credit: prev.credit + parseFloat(line.credit),
+      debit:  prev.debit  + line.debit,
+      credit: prev.credit + line.credit,
     })
   }
 

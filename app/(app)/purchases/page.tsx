@@ -82,7 +82,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     totalPKR: number
     advancePaid: number
     currencyCode: string
-    exchangeRate: string
+    exchangeRate: number
     soloOrder?: OrderRow
     // The underlying order for any single-line row (solo, or a 1-item
     // invoice) — used to enable inline editing of that one line.
@@ -102,9 +102,9 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       supplierId:  lines[0].supplier_id,
       stockItemIds: lines.map((l) => l.stock_item_id),
       itemCount:   lines.length,
-      totalQty:    lines.reduce((s, l) => s + parseFloat(l.quantity), 0),
-      totalPKR:    lines.reduce((s, l) => s + parseFloat(l.pkr_equivalent), 0),
-      advancePaid: lines.reduce((s, l) => s + parseFloat(l.advance_paid ?? '0'), 0),
+      totalQty:    lines.reduce((s, l) => s + l.quantity, 0),
+      totalPKR:    lines.reduce((s, l) => s + l.pkr_equivalent, 0),
+      advancePaid: lines.reduce((s, l) => s + l.advance_paid, 0),
       currencyCode: lines[0].currency_code,
       exchangeRate: lines[0].exchange_rate,
       singleOrder: lines.length === 1 ? lines[0] : undefined,
@@ -121,9 +121,9 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
       supplierId:  o.supplier_id,
       stockItemIds: [o.stock_item_id],
       itemCount:   1,
-      totalQty:    parseFloat(o.quantity),
-      totalPKR:    parseFloat(o.pkr_equivalent),
-      advancePaid: parseFloat(o.advance_paid ?? '0'),
+      totalQty:    o.quantity,
+      totalPKR:    o.pkr_equivalent,
+      advancePaid: o.advance_paid  ?? 0,
       currencyCode: o.currency_code,
       exchangeRate: o.exchange_rate,
       soloOrder:   o,

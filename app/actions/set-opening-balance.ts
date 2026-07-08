@@ -62,7 +62,7 @@ export async function setStockOpeningBalance(input: unknown): Promise<ActionResu
 
   const { error } = await admin
     .from('inventory_lots')
-    .update({ current_quantity: String(quantity), opening_rate: String(rate), location_id: locationId })
+    .update({ current_quantity: quantity, opening_rate: rate, location_id: locationId })
     .eq('id', lotId)
     .eq('tenant_id', tenantId)
 
@@ -99,7 +99,7 @@ export async function setCustomerOpeningBalance(input: unknown): Promise<ActionR
 
   const { error } = await admin
     .from('tajir_customers')
-    .update({ opening_balance: String(openingBalance), opening_balance_currency: currencyCode, opening_balance_pkr_equivalent: String(pkrEquivalent) })
+    .update({ opening_balance: openingBalance, opening_balance_currency: currencyCode, opening_balance_pkr_equivalent: pkrEquivalent })
     .eq('id', customerId)
     .eq('tenant_id', tenantId)
 
@@ -136,7 +136,7 @@ export async function setSupplierOpeningBalance(input: unknown): Promise<ActionR
 
   const { error } = await admin
     .from('suppliers')
-    .update({ opening_balance: String(openingBalance), opening_balance_currency: currencyCode, opening_balance_pkr_equivalent: String(pkrEquivalent) })
+    .update({ opening_balance: openingBalance, opening_balance_currency: currencyCode, opening_balance_pkr_equivalent: pkrEquivalent })
     .eq('id', supplierId)
     .eq('tenant_id', tenantId)
 

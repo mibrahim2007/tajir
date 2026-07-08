@@ -37,10 +37,10 @@ export default async function NewReceiptPage() {
 
   // Compute outstanding per customer
   const customerList = customers.map((c) => {
-    const opening = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
-    const billed = sales.filter((s) => s.customer_id === c.id).reduce((sum, s) => sum + parseFloat(s.pkr_equivalent), 0)
-    const received = receipts.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
-    const returned = returns.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+    const opening = c.opening_balance_pkr_equivalent  ?? 0
+    const billed = sales.filter((s) => s.customer_id === c.id).reduce((sum, s) => sum + s.pkr_equivalent, 0)
+    const received = receipts.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
+    const returned = returns.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
     return { id: c.id, name: c.name, outstanding: opening + billed - received - returned }
   })
 
@@ -54,7 +54,7 @@ export default async function NewReceiptPage() {
         date: s.date,
         itemName: lotMap.get(s.stock_item_id) ?? '—',
         qty: s.quantity,
-        pkrEquivalent: parseFloat(s.pkr_equivalent),
+        pkrEquivalent: s.pkr_equivalent,
       })
     }
   }

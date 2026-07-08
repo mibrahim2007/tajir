@@ -25,7 +25,7 @@ export default async function NewSalePage() {
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
     if (!costMap[p.stock_item_id]) {
-      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+      costMap[p.stock_item_id] = p.pkr_equivalent / p.quantity
     }
   }
 
@@ -33,12 +33,12 @@ export default async function NewSalePage() {
   // This is the initial value shown immediately; the form will refresh it live on customer select.
   const customerBalanceMap: Record<string, number> = {}
   for (const c of rawCustomers ?? []) {
-    const ob       = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
-    const billed   = (rawSales       ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const paid     = (rawReceipts    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const ret      = (rawReturns     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const cn       = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
-    const refunded = (rawRefunds     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ob       = c.opening_balance_pkr_equivalent  ?? 0
+    const billed   = (rawSales       ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const paid     = (rawReceipts    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const ret      = (rawReturns     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const cn       = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + n.pkr_equivalent, 0)
+    const refunded = (rawRefunds     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
@@ -58,8 +58,8 @@ export default async function NewSalePage() {
   }))
   const locations = rawLocs ?? []
   const locationStock = (rawLocStock ?? []).map((ls) => ({
-    stockItemId: ls.stock_item_id,
-    locationId: ls.location_id,
+    stockItemId: ls.stock_item_id ?? '',
+    locationId: ls.location_id ?? '',
     quantity: parseFloat(String(ls.quantity ?? '0')),
   }))
 

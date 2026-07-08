@@ -38,18 +38,18 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
     if (!costMap[p.stock_item_id]) {
-      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+      costMap[p.stock_item_id] = p.pkr_equivalent / p.quantity
     }
   }
 
   const customerBalanceMap: Record<string, number> = {}
   for (const c of rawCustomers ?? []) {
-    const ob       = parseFloat(c.opening_balance_pkr_equivalent ?? '0')
-    const billed   = (rawSales       ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const paid     = (rawReceipts    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const ret      = (rawReturns     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const cn       = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
-    const refunded = (rawRefunds     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ob       = c.opening_balance_pkr_equivalent  ?? 0
+    const billed   = (rawSales       ?? []).filter((s) => s.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const paid     = (rawReceipts    ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const ret      = (rawReturns     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const cn       = (rawCreditNotes ?? []).filter((n) => n.customer_id === c.id).reduce((s, n) => s + n.pkr_equivalent, 0)
+    const refunded = (rawRefunds     ?? []).filter((r) => r.customer_id === c.id).reduce((s, r) => s + r.pkr_equivalent, 0)
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
@@ -61,7 +61,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
   const pricingRules = (rawRules ?? []).map((r) => ({ customerId: r.customer_id, stockItemId: r.stock_item_id, rate: r.rate }))
   const locations = rawLocs ?? []
   const locationStock = (rawLocStock ?? []).map((ls) => ({
-    stockItemId: ls.stock_item_id, locationId: ls.location_id, quantity: parseFloat(String(ls.quantity ?? '0')),
+    stockItemId: ls.stock_item_id ?? '', locationId: ls.location_id ?? '', quantity: ls.quantity ?? 0,
   }))
 
   const first = invoiceLines[0]
@@ -72,12 +72,12 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     paymentDueDate: first.payment_due_date ?? '',
     notes:          invoiceLines.find((l) => l.notes && l.notes.trim())?.notes ?? '',
     currencyCode:   (first.currency_code === 'USD' ? 'USD' : 'PKR'),
-    exchangeRate:   parseFloat(first.exchange_rate),
+    exchangeRate:   first.exchange_rate,
     locationId:     first.location_id ?? '',
     lines: invoiceLines.map((l) => ({
       stockItemId: l.stock_item_id,
-      quantity:    parseFloat(l.quantity),
-      rate:        parseFloat(l.rate),
+      quantity:    l.quantity,
+      rate:        l.rate,
       discountPct: 0,
     })),
   }

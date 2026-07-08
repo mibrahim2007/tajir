@@ -71,7 +71,7 @@ export default async function CashbookPage({ searchParams }: { searchParams: Sea
       .lt('tajir_journal_entries.date', date)
 
     for (const l of priorLines ?? []) {
-      opening += parseFloat(l.debit) - parseFloat(l.credit)
+      opening += l.debit - l.credit
     }
 
     // Day's movements through the cash/bank accounts.

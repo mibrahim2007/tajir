@@ -14,8 +14,8 @@ export default async function NewStockTransferPage() {
   ])
 
   const locationStock = (rawLocStock ?? []).map((ls) => ({
-    stockItemId: ls.stock_item_id,
-    locationId: ls.location_id,
+    stockItemId: ls.stock_item_id ?? '',
+    locationId: ls.location_id ?? '',
     quantity: parseFloat(String(ls.quantity ?? '0')),
   }))
 

@@ -83,10 +83,10 @@ export async function GET(req: Request) {
     item: lotMap.get(p.stock_item_id) ?? '—',
     notes: '',
     location: p.location_id ? (locationMap.get(p.location_id) ?? '—') : '—',
-    qty: parseFloat(p.quantity),
-    rate: parseFloat(p.rate),
+    qty: p.quantity,
+    rate: p.rate,
     currency: p.currency_code,
-    pkr: parseFloat(p.pkr_equivalent),
+    pkr: p.pkr_equivalent,
     sortDate: p.date,
   }))
 
@@ -97,10 +97,10 @@ export async function GET(req: Request) {
     item: lotMap.get(s.stock_item_id) ?? '—',
     notes: s.notes ?? '',
     location: s.location_id ? (locationMap.get(s.location_id) ?? '—') : '—',
-    qty: parseFloat(s.quantity),
-    rate: parseFloat(s.rate),
+    qty: s.quantity,
+    rate: s.rate,
     currency: s.currency_code,
-    pkr: parseFloat(s.pkr_equivalent),
+    pkr: s.pkr_equivalent,
     sortDate: s.date,
   }))
 

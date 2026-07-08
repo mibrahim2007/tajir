@@ -37,10 +37,10 @@ export default async function NewPaymentPage() {
 
   // Compute outstanding per supplier
   const supplierList = suppliers.map((s) => {
-    const opening = parseFloat(s.opening_balance_pkr_equivalent ?? '0')
-    const purchased = purchases.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + parseFloat(p.pkr_equivalent) - parseFloat(p.advance_paid), 0)
-    const paid = payments.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + parseFloat(p.pkr_equivalent), 0)
-    const returned = returns.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+    const opening = s.opening_balance_pkr_equivalent  ?? 0
+    const purchased = purchases.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent - p.advance_paid, 0)
+    const paid = payments.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent, 0)
+    const returned = returns.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
     return { id: s.id, name: s.name, outstanding: opening + purchased - paid - returned }
   })
 
@@ -54,8 +54,8 @@ export default async function NewPaymentPage() {
         date: p.date,
         itemName: lotMap.get(p.stock_item_id) ?? '—',
         qty: p.quantity,
-        pkrEquivalent: parseFloat(p.pkr_equivalent),
-        advancePaid: parseFloat(p.advance_paid),
+        pkrEquivalent: p.pkr_equivalent,
+        advancePaid: p.advance_paid,
       })
     }
   }

@@ -32,7 +32,7 @@ export async function deleteSaleInvoiceAction(input: unknown): Promise<ActionRes
   await admin.from('sales_orders').delete().eq('invoice_id', invoiceId).eq('tenant_id', tenantId)
 
   const removeMap = new Map<string, number>()
-  for (const o of orders) removeMap.set(o.stock_item_id, (removeMap.get(o.stock_item_id) ?? 0) + parseFloat(o.quantity))
+  for (const o of orders) removeMap.set(o.stock_item_id, (removeMap.get(o.stock_item_id) ?? 0) + o.quantity)
   for (const [stockItemId, qty] of removeMap) {
     await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: qty })
   }

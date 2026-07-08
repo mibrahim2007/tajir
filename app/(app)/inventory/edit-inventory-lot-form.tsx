@@ -17,6 +17,7 @@ const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piec
 
 const schema = z.object({
   name:          z.string().min(1, 'Name is required'),
+  sku:           z.string().trim().min(1, 'SKU is required').max(64, 'SKU too long'),
   code:          z.string().optional(),
   count:         z.string().optional(),
   unitOfMeasure: z.string().optional(),
@@ -31,6 +32,7 @@ type ItemType = { id: string; name: string }
 type Lot = {
   id: string
   name: string
+  sku: string
   code: string | null
   count: string
   unitOfMeasure: string | null
@@ -49,6 +51,7 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
     resolver: zodResolver(schema),
     defaultValues: {
       name:          lot.name,
+      sku:           lot.sku,
       code:          lot.code ?? '',
       count:         lot.count,
       unitOfMeasure: lot.unitOfMeasure ?? undefined,
@@ -84,6 +87,13 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
                 <FormMessage />
               </FormItem>
             )} />
+            <FormField control={form.control} name="sku" render={({ field }) => (
+              <FormItem>
+                <FormLabel>SKU / Barcode <span className="text-destructive">*</span></FormLabel>
+                <FormControl><Input className="font-mono" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             <FormField control={form.control} name="code" render={({ field }) => (
               <FormItem>
                 <FormLabel>Code</FormLabel>
@@ -94,7 +104,7 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
             <FormField control={form.control} name="count" render={({ field }) => (
               <FormItem>
                 <FormLabel>Count</FormLabel>
-                <FormControl><Input {...field} /></FormControl>
+                <FormControl><Input type="number" inputMode="decimal" placeholder="e.g. 10" {...field} value={field.value ?? ''} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

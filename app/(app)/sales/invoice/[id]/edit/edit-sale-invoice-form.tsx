@@ -3,8 +3,8 @@
 import { SaleInvoiceForm, type SaleFormValues } from '../../../sale-invoice-form'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: string; barcode: string | null; unitOfMeasure: string | null }
-type PricingRule = { customerId: string; stockItemId: string; rate: string }
+type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null }
+type PricingRule = { customerId: string; stockItemId: string; rate: number }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
 export function EditSaleInvoiceForm(props: {

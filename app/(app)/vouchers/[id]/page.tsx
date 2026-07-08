@@ -48,8 +48,8 @@ export default async function VoucherDetailPage({ params }: { params: Promise<{ 
 
   const accountMap = new Map((rawAccounts ?? []).map((a) => [a.id, `${a.code} — ${a.name}`]))
 
-  const totalDebit  = lines.reduce((s, l) => s + parseFloat(l.debit), 0)
-  const totalCredit = lines.reduce((s, l) => s + parseFloat(l.credit), 0)
+  const totalDebit  = lines.reduce((s, l) => s + l.debit, 0)
+  const totalCredit = lines.reduce((s, l) => s + l.credit, 0)
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
@@ -87,10 +87,10 @@ export default async function VoucherDetailPage({ params }: { params: Promise<{ 
                 <td className="px-4 py-3 font-mono text-xs">{accountMap.get(line.account_id) ?? '—'}</td>
                 <td className="px-4 py-3 text-muted-foreground">{line.description ?? ''}</td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  {parseFloat(line.debit) > 0 ? formatPKR(parseFloat(line.debit)) : ''}
+                  {line.debit > 0 ? formatPKR(line.debit) : ''}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  {parseFloat(line.credit) > 0 ? formatPKR(parseFloat(line.credit)) : ''}
+                  {line.credit > 0 ? formatPKR(line.credit) : ''}
                 </td>
               </tr>
             ))}

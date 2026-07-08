@@ -33,10 +33,10 @@ export async function deletePurchaseInvoiceAction(input: unknown): Promise<Actio
   const stockIds = [...new Set(orders.map((o) => o.stock_item_id))]
   const { data: lots } = await admin.from('inventory_lots')
     .select('id, current_quantity').eq('tenant_id', tenantId).in('id', stockIds)
-  const lotMap = new Map((lots ?? []).map((l) => [l.id, parseFloat(l.current_quantity)]))
+  const lotMap = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
 
   const removeMap = new Map<string, number>()
-  for (const o of orders) removeMap.set(o.stock_item_id, (removeMap.get(o.stock_item_id) ?? 0) + parseFloat(o.quantity))
+  for (const o of orders) removeMap.set(o.stock_item_id, (removeMap.get(o.stock_item_id) ?? 0) + o.quantity)
 
   for (const [stockItemId, qty] of removeMap) {
     if ((lotMap.get(stockItemId) ?? 0) - qty < 0) {

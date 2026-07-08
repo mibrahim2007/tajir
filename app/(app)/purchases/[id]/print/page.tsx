@@ -43,12 +43,12 @@ export default async function PrintPurchasePage({ params }: { params: Promise<{ 
       .single(),
   ])
 
-  const qty         = parseFloat(order.quantity)
-  const rate        = parseFloat(order.rate)
-  const pkrTotal    = parseFloat(order.pkr_equivalent)
-  const advancePaid = parseFloat(order.advance_paid ?? '0')
+  const qty         = order.quantity
+  const rate        = order.rate
+  const pkrTotal    = order.pkr_equivalent
+  const advancePaid = order.advance_paid  ?? 0
   const balanceDue  = pkrTotal - advancePaid
-  const er          = parseFloat(order.exchange_rate)
+  const er          = order.exchange_rate
   const isUSD       = order.currency_code === 'USD'
   const voucherNo   = journalEntry?.voucher_number ?? `PO-${id.slice(-6).toUpperCase()}`
   const entryTime   = formatPKTDateTime(new Date(order.created_at)).split(', ')[1]

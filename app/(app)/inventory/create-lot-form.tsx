@@ -59,6 +59,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
     resolver: zodResolver(createLotSchema),
     defaultValues: {
       name: '',
+      sku: '',
       code: '',
       count: '',
       unitOfMeasure: undefined,
@@ -133,6 +134,21 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
 
               <FormField
                 control={form.control}
+                name="sku"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>SKU / Barcode</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Auto-generated (e.g. TJR-000123)" {...field} value={field.value ?? ''} />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Leave blank to auto-assign the next code.</p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="code"
                 render={({ field }) => (
                   <FormItem>
@@ -152,7 +168,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                   <FormItem>
                     <FormLabel>Count</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. 30s" {...field} />
+                      <Input type="number" inputMode="decimal" placeholder="e.g. 10" {...field} value={field.value ?? ''} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

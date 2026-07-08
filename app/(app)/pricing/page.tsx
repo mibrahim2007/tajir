@@ -60,7 +60,7 @@ export default async function PricingPage() {
                 <tr key={rule.id} className="hover:bg-secondary/50 transition-colors">
                   <td className="px-4 py-3 font-medium">{customerMap.get(rule.customer_id) ?? '—'}</td>
                   <td className="px-4 py-3 text-muted-foreground">{itemMap.get(rule.stock_item_id) ?? '—'}</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(rule.rate))}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{formatPKR(rule.rate)}</td>
                   <td className="px-4 py-3 text-right text-muted-foreground whitespace-nowrap">
                     {new Date(rule.effective_from).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>

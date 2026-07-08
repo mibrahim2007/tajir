@@ -71,7 +71,7 @@ export default async function PricingHistoryPage({ params }: Props) {
             <tbody className="divide-y">
               {rules.map((rule) => (
                 <tr key={rule.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 text-right tabular-nums font-medium">{formatPKR(parseFloat(rule.rate))}</td>
+                  <td className="px-4 py-3 text-right tabular-nums font-medium">{formatPKR(rule.rate)}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(rule.effective_from))}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
                     {rule.superseded_at ? formatPKTDate(new Date(rule.superseded_at)) : '—'}

@@ -54,7 +54,7 @@ export async function setPricingRuleAction(input: unknown): Promise<ActionResult
       tenant_id: tenantId,
       customer_id: customerId,
       stock_item_id: stockItemId,
-      rate: String(rate),
+      rate: rate,
       is_active: true,
     })
     .select('id')

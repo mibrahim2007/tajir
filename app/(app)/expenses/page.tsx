@@ -99,7 +99,7 @@ export default async function ExpensesPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{e.description || '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
-                      {line ? formatPKR(parseFloat(line.debit)) : '—'}
+                      {line ? formatPKR(line.debit) : '—'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <RoleGate allowedRoles={['owner']}>

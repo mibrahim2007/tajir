@@ -62,8 +62,8 @@ export default async function DebitNotesPage() {
                   <tr key={n.id} className="hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(n.date))}</td>
                     <td className="px-4 py-3">{supplierMap.get(n.supplier_id) ?? '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{n.currency_code} {parseFloat(n.amount).toLocaleString('en-PK', { minimumFractionDigits: 2 })}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(n.pkr_equivalent))}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{n.currency_code} {n.amount.toLocaleString('en-PK', { minimumFractionDigits: 2 })}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(n.pkr_equivalent)}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{n.reference ?? '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{n.reason ?? '—'}</td>
                     <td className="px-4 py-3">

@@ -58,7 +58,7 @@ export async function GET(req: Request) {
       fiber: lot.fiber ?? '',
       lot: lot.lot ?? '',
       supplier: lot.default_supplier_id ? (supplierMap.get(lot.default_supplier_id) ?? '') : '',
-      qty: parseFloat(lot.current_quantity),
+      qty: lot.current_quantity,
     })
   }
 

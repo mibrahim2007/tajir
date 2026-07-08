@@ -19,12 +19,12 @@ export async function getCustomerBalanceAction(customerId: string): Promise<numb
 
     if (!customer) return null
 
-    const ob       = parseFloat(customer.opening_balance_pkr_equivalent ?? '0')
-    const billed   = (sales       ?? []).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const paid     = (receipts    ?? []).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const ret      = (returns     ?? []).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
-    const cn       = (creditNotes ?? []).reduce((s, n) => s + parseFloat(n.pkr_equivalent), 0)
-    const refunded = (refunds     ?? []).reduce((s, r) => s + parseFloat(r.pkr_equivalent), 0)
+    const ob       = customer.opening_balance_pkr_equivalent  ?? 0
+    const billed   = (sales       ?? []).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const paid     = (receipts    ?? []).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const ret      = (returns     ?? []).reduce((s, r) => s + r.pkr_equivalent, 0)
+    const cn       = (creditNotes ?? []).reduce((s, n) => s + n.pkr_equivalent, 0)
+    const refunded = (refunds     ?? []).reduce((s, r) => s + r.pkr_equivalent, 0)
 
     // balance = what customer owes us (positive = they owe, negative = we owe / credit)
     // refunds pay credit back to the customer, so they reduce the credit (add to balance)

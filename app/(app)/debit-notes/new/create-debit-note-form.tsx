@@ -32,7 +32,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-type PurchaseOrder = { id: string; date: string; supplierId: string; pkrEquivalent: string; currencyCode: string }
+type PurchaseOrder = { id: string; date: string; supplierId: string; pkrEquivalent: number; currencyCode: string }
 
 type Props = {
   today:          string
@@ -132,7 +132,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                         const supplier = suppliers.find((s) => s.id === o.supplierId)
                         return (
                           <SelectItem key={o.id} value={o.id}>
-                            {o.date} — {supplier?.name ?? '?'} — Rs {parseFloat(o.pkrEquivalent).toLocaleString('en-PK', { maximumFractionDigits: 0 })}
+                            {o.date} — {supplier?.name ?? '?'} — Rs {o.pkrEquivalent.toLocaleString('en-PK', { maximumFractionDigits: 0 })}
                           </SelectItem>
                         )
                       })}

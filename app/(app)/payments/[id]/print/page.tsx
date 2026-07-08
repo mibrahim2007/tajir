@@ -43,8 +43,8 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
       .single(),
   ])
 
-  const amount     = parseFloat(payment.amount)
-  const pkrAmount  = parseFloat(payment.pkr_equivalent)
+  const amount     = payment.amount
+  const pkrAmount  = payment.pkr_equivalent
   const isUSD      = payment.currency_code === 'USD'
   const voucherNo  = journalEntry?.voucher_number ?? `PM-${id.slice(-6).toUpperCase()}`
   const entryTime  = formatPKTDateTime(new Date(payment.created_at)).split(', ')[1]

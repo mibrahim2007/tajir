@@ -44,10 +44,10 @@ export async function createSupplierRefundAction(input: unknown): Promise<Action
     .insert({
       tenant_id:      tenantId,
       supplier_id:    supplierId,
-      amount:         String(amount),
+      amount:         amount,
       currency_code:  currencyCode,
-      exchange_rate:  String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
+      exchange_rate:  exchangeRate,
+      pkr_equivalent: pkrEquivalent,
       date,
       payment_method: paymentMethod,
       notes:          notes ?? null,

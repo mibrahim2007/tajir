@@ -45,7 +45,7 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
 
   if (!existing) return { success: false, error: 'Purchase return not found', code: 'NOT_FOUND' }
 
-  const oldQty = parseFloat(existing.quantity)
+  const oldQty = existing.quantity
   // Purchase return reduces stock; increasing qty removes more stock
   const extraRemoval = quantity - oldQty
   if (extraRemoval > 0) {
@@ -55,7 +55,7 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
       .eq('id', stockItemId)
       .eq('tenant_id', tenantId)
       .single()
-    const available = parseFloat(lot?.current_quantity ?? '0')
+    const available = lot?.current_quantity  ?? 0
     if (available < extraRemoval) {
       return {
         success: false,
@@ -70,11 +70,11 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
     .update({
       supplier_id:    supplierId,
       stock_item_id:  stockItemId,
-      quantity:       String(quantity),
-      rate:           String(rate),
+      quantity:       quantity,
+      rate:           rate,
       currency_code:  currencyCode,
-      exchange_rate:  String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
+      exchange_rate:  exchangeRate,
+      pkr_equivalent: pkrEquivalent,
       date,
       reason:         reason ?? null,
       location_id:    locationId || null,

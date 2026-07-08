@@ -47,17 +47,17 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
       .limit(1),
   ])
 
-  const qty      = parseFloat(order.quantity)
-  const rate     = parseFloat(order.rate)
-  const pkrTotal = parseFloat(order.pkr_equivalent)
-  const er       = parseFloat(order.exchange_rate)
+  const qty      = order.quantity
+  const rate     = order.rate
+  const pkrTotal = order.pkr_equivalent
+  const er       = order.exchange_rate
   const isUSD    = order.currency_code === 'USD'
   const voucherNo = journalEntry?.voucher_number ?? `SO-${id.slice(-6).toUpperCase()}`
   const entryTime = formatPKTDateTime(new Date(order.created_at)).split(', ')[1]
 
   const lastPurchase = rawPurchases?.[0]
   const costPerUnit  = lastPurchase
-    ? parseFloat(lastPurchase.pkr_equivalent) / parseFloat(lastPurchase.quantity)
+    ? lastPurchase.pkr_equivalent / lastPurchase.quantity
     : null
   const saleRatePKR  = rate * er
   const belowCost    = costPerUnit !== null && saleRatePKR < costPerUnit

@@ -139,7 +139,7 @@ function DonutChart({ data }: { data: { label: string; value: number; color: str
     }]
   } else {
     let angle = -Math.PI / 2
-    filtered.forEach((seg, idx) => {
+    filtered.forEach((seg) => {
       const sweep = (seg.value / total) * 2 * Math.PI
       const ea    = angle + sweep
       const lg    = sweep > Math.PI ? 1 : 0
@@ -333,8 +333,8 @@ export default async function DashboardPage({
   const catMap = new Map<string, { name: string; qty: number; ci: number }>()
   let ci = 0
   ;(inventoryData ?? []).forEach(lot => {
-    const rawT    = lot.item_types as unknown
-    const typeName = Array.isArray(rawT) ? (rawT[0] as any)?.name ?? 'Uncategorized' : (rawT as any)?.name ?? 'Uncategorized'
+    const rawT    = lot.item_types as { name: string } | { name: string }[] | null
+    const typeName = (Array.isArray(rawT) ? rawT[0]?.name : rawT?.name) ?? 'Uncategorized'
     const key     = (lot.item_type_id as string | null) ?? '__none__'
     const qty     = parse(lot.current_quantity)
     if (qty <= 0) return

@@ -15,7 +15,7 @@ import { registerAction } from '@/app/actions/register'
 
 const schema = z
   .object({
-    businessName: z.string().min(1, 'Business name is required'),
+    businessName: z.string().min(1, 'Company is required'),
     username: z.string().min(3, 'Username must be at least 3 characters').regex(/^[a-z0-9_]+$/, 'Lowercase letters, numbers, and underscores only'),
     email: z.string().email('Invalid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
@@ -113,7 +113,7 @@ export function SignUpForm() {
               name="businessName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Business Name</FormLabel>
+                  <FormLabel>Company</FormLabel>
                   <FormControl>
                     <Input placeholder="e.g. Tariq Yarn Trading" {...field} />
                   </FormControl>

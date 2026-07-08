@@ -5,11 +5,12 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
+import { parseCount } from '@/lib/parse-count'
 import { createLotSchema, type CreateLotInput } from './inventory-lot-schema'
 
 export async function createInventoryLotAction(
   input: CreateLotInput,
-): Promise<ActionResult<{ id: string }>> {
+): Promise<ActionResult<{ id: string; sku: string }>> {
   const parsed = createLotSchema.safeParse(input)
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
@@ -22,7 +23,7 @@ export async function createInventoryLotAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, code, count, unitOfMeasure, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
+  const { name, sku, code, count, unitOfMeasure, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
 
   const admin = createAdminClient()
 
@@ -45,18 +46,24 @@ export async function createInventoryLotAction(
     .insert({
       tenant_id: tenantId,
       name,
+      // Omit sku when blank so the DB default auto-mints the next TJR-NNNNNN.
+      ...(sku ? { sku } : {}),
       code: code || null,
-      count: count || null,
+      count: parseCount(count),
       unit_of_measure: unitOfMeasure || null,
       item_type_id: itemTypeId || null,
       fiber: fiber || null,
       lot: lot || null,
       default_supplier_id: defaultSupplierId || null,
     })
-    .select('id')
+    .select('id, sku')
     .single()
 
   if (error || !newLot) {
+    // A user-supplied SKU that collides with an existing one surfaces clearly.
+    if (error?.code === '23505' && sku) {
+      return { success: false, error: `SKU "${sku}" is already in use`, code: 'SKU_DUPLICATE' }
+    }
     return { success: false, error: 'Failed to create stock item', code: 'INTERNAL_ERROR' }
   }
 

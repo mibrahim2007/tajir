@@ -66,9 +66,9 @@ export default async function PaymentsPage() {
                     {p.payment_method_note || '—'}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {formatPKR(parseFloat(p.pkr_equivalent))}
+                    {formatPKR(p.pkr_equivalent)}
                     {p.currency_code !== 'PKR' && (
-                      <span className="ml-1 text-xs text-muted-foreground">({p.currency_code} {parseFloat(p.amount).toLocaleString()})</span>
+                      <span className="ml-1 text-xs text-muted-foreground">({p.currency_code} {p.amount.toLocaleString()})</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

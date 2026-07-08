@@ -42,7 +42,7 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
 
   const { error } = await admin
     .from('ap_payments')
-    .update({ amount: String(amount), currency_code: currencyCode, pkr_equivalent: String(pkrEquivalent), date, payment_method_note: paymentMethodNote ?? null })
+    .update({ amount: amount, currency_code: currencyCode, pkr_equivalent: pkrEquivalent, date, payment_method_note: paymentMethodNote ?? null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 

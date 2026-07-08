@@ -75,7 +75,7 @@ export default async function PurchaseReturnsPage() {
                     <td className="px-4 py-3">{lotMap.get(r.stock_item_id) ?? '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r.quantity}</td>
                     <td className="px-4 py-3 text-right tabular-nums">{r.currency_code} {r.rate}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(parseFloat(r.pkr_equivalent))}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(r.pkr_equivalent)}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
                     <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
                     <td className="px-4 py-3">

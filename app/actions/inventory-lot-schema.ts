@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const createLotSchema = z.object({
   name:               z.string().min(1, 'Name is required'),
+  sku:                z.string().trim().max(64, 'SKU too long').optional(),
   code:               z.string().optional(),
   count:              z.string().optional(),
   unitOfMeasure:      z.string().optional(),

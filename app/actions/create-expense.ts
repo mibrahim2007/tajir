@@ -78,8 +78,8 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
 
   // Insert lines: DR expense account, CR cash
   await admin.from('tajir_journal_entry_lines').insert([
-    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: expenseAccountId, description: narration, debit: String(amount), credit: '0' },
-    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: cashAcc.id,       description: narration, debit: '0',            credit: String(amount) },
+    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: expenseAccountId, description: narration, debit: amount, credit: 0 },
+    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: cashAcc.id,       description: narration, debit: 0,            credit: amount },
   ])
 
   await createAuditEntry({

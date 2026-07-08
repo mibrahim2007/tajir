@@ -44,7 +44,7 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
 
   if (!existing) return { success: false, error: 'Purchase not found', code: 'NOT_FOUND' }
 
-  const oldQty = parseFloat(existing.quantity)
+  const oldQty = existing.quantity
   const qtyDelta = quantity - oldQty
 
   // Guard: reducing purchase qty removes stock — block if it would go negative
@@ -55,7 +55,7 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
       .eq('id', stockItemId)
       .eq('tenant_id', tenantId)
       .single()
-    const available = parseFloat(lot?.current_quantity ?? '0')
+    const available = lot?.current_quantity  ?? 0
     if (available + qtyDelta < 0) {
       return {
         success: false,
@@ -70,12 +70,12 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
     .update({
       supplier_id: supplierId,
       stock_item_id: stockItemId,
-      quantity: String(quantity),
-      rate: String(rate),
+      quantity: quantity,
+      rate: rate,
       currency_code: currencyCode,
-      exchange_rate: String(exchangeRate),
-      pkr_equivalent: String(pkrEquivalent),
-      advance_paid: String(advancePaid),
+      exchange_rate: exchangeRate,
+      pkr_equivalent: pkrEquivalent,
+      advance_paid: advancePaid,
       date,
       location_id: locationId || null,
     })

@@ -54,11 +54,11 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
     if (!costMap[p.stock_item_id])
-      costMap[p.stock_item_id] = parseFloat(p.pkr_equivalent) / parseFloat(p.quantity)
+      costMap[p.stock_item_id] = p.pkr_equivalent / p.quantity
   }
 
-  const totalPKR   = lines.reduce((s, l) => s + parseFloat(l.pkr_equivalent), 0)
-  const er         = parseFloat(first.exchange_rate)
+  const totalPKR   = lines.reduce((s, l) => s + l.pkr_equivalent, 0)
+  const er         = first.exchange_rate
   const isUSD      = first.currency_code === 'USD'
   const voucherNo  = journalEntry?.voucher_number ?? `SI-${invoiceId.slice(-6).toUpperCase()}`
   const entryTime  = formatPKTDateTime(new Date(first.created_at)).split(', ')[1]
@@ -134,9 +134,9 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
           </thead>
           <tbody>
             {lines.map((line, i) => {
-              const qty      = parseFloat(line.quantity)
-              const rate     = parseFloat(line.rate)
-              const amount   = parseFloat(line.pkr_equivalent)
+              const qty      = line.quantity
+              const rate     = line.rate
+              const amount   = line.pkr_equivalent
               const cost     = costMap[line.stock_item_id]
               const ratePKR  = rate * er
               const belowCost = cost !== undefined && ratePKR < cost

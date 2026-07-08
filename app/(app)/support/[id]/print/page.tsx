@@ -69,7 +69,7 @@ export default async function PrintSupportTicketPage({ params }: { params: Promi
         </h2>
 
         <div className="space-y-4 mb-10">
-          {(messages ?? []).map((msg, i) => (
+          {(messages ?? []).map((msg) => (
             <div key={msg.id} className="border border-gray-200 rounded-lg overflow-hidden">
               <div className={`flex items-center justify-between px-4 py-2 text-xs ${msg.is_staff_reply ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-700'}`}>
                 <span className="font-semibold">

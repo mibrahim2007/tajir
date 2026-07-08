@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 
 const reports = [
@@ -17,6 +17,7 @@ const reports = [
   { href: '/reports/balance-sheet', label: 'Balance Sheet', description: 'Assets, liabilities, and equity as of a given date. Verifies the accounting equation.', icon: Landmark },
   { href: '/reports/trial-balance', label: 'Trial Balance', description: 'All GL account balances as of a given date. Verifies that total debits equal total credits.', icon: Scale },
   { href: '/reports/general-ledger', label: 'General Ledger', description: 'Full double-entry ledger with date range and account filters. Shows running balance per account.', icon: BookOpen },
+  { href: '/reports/consolidated-ledger', label: 'Consolidated Ledger', description: 'Map a customer to its supplier counterpart and view one net statement combining receivables and payables for the same party.', icon: Link2 },
   { href: '/reports/cashbook', label: 'Daily Cashbook', description: 'Cash in, cash out, and running balance across cash & bank accounts for a single day, with opening and closing balances.', icon: Wallet },
   { href: '/reports/bank-statement', label: 'Bank Statement', description: 'All deposits, withdrawals and running balance for a selected bank account over a date range. Printable.', icon: Landmark },
 ]

@@ -43,7 +43,7 @@ export default async function VouchersPage() {
 
   const totalsMap = new Map<string, number>()
   for (const line of rawTotals ?? []) {
-    totalsMap.set(line.journal_entry_id, (totalsMap.get(line.journal_entry_id) ?? 0) + parseFloat(line.debit))
+    totalsMap.set(line.journal_entry_id, (totalsMap.get(line.journal_entry_id) ?? 0) + line.debit)
   }
 
   return (

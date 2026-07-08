@@ -46,30 +46,30 @@ export default async function ReceivablesAgingPage() {
   for (const c of allCustomers) {
     const cSales = allSales
       .filter((s) => s.customer_id === c.id)
-      .map((s) => ({ date: s.date, amount: parseFloat(s.pkr_equivalent) }))
+      .map((s) => ({ date: s.date, amount: s.pkr_equivalent }))
 
     const totalReceived = allReceipts
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
 
     const totalReturned = allReturns
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
 
     const totalCredited = allCreditNotes
       .filter((n) => n.customer_id === c.id)
-      .reduce((sum, n) => sum + parseFloat(n.pkr_equivalent), 0)
+      .reduce((sum, n) => sum + n.pkr_equivalent, 0)
 
     const totalRefunded = allRefunds
       .filter((r) => r.customer_id === c.id)
-      .reduce((sum, r) => sum + parseFloat(r.pkr_equivalent), 0)
+      .reduce((sum, r) => sum + r.pkr_equivalent, 0)
 
     // Refunds consume the customer's credit balance, so they reduce net credits
     const totalCredits = totalReceived + totalReturned + totalCredited - totalRefunded
 
     const lineItems: { date: string; amount: number }[] = [
-      ...(parseFloat(c.opening_balance_pkr_equivalent) > 0
-        ? [{ date: c.created_at.split('T')[0], amount: parseFloat(c.opening_balance_pkr_equivalent) }]
+      ...(c.opening_balance_pkr_equivalent > 0
+        ? [{ date: c.created_at.split('T')[0], amount: c.opening_balance_pkr_equivalent }]
         : []),
       ...cSales,
     ].sort((a, b) => a.date.localeCompare(b.date))
