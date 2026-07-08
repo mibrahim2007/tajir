@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { SeedAccountsButton } from './seed-accounts-button'
 import { UploadCoaButton } from './upload-coa-button'
+import { AddAccountButton } from './add-account-button'
 
 const TYPE_LABELS: Record<string, string> = {
   asset:     'Asset',
@@ -70,6 +71,7 @@ export default async function AccountsPage() {
         </div>
         {role === 'owner' && (
           <div className="flex items-center gap-2">
+            <AddAccountButton accounts={accounts.map((a) => ({ code: a.code, name: a.name, account_type: a.account_type }))} />
             <UploadCoaButton />
             {accounts.length === 0 && <SeedAccountsButton />}
           </div>
