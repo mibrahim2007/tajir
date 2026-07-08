@@ -70,6 +70,12 @@
 }
 
 @media print {
+  /* Render backgrounds/colours as designed instead of the browser's
+     ink-saving washed-out defaults, so tables and shading print solid. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
   header, [data-print-hide] {
     display: none !important;
   }
@@ -80,4 +86,26 @@
   .rounded-lg {
     border-radius: 0 !important;
   }
+
+  /* Darker output: faint gray text prints too light on paper, so bump the
+     muted grays toward near-black for legibility. */
+  .text-gray-300, .text-gray-400 { color: #4b5563 !important; } /* -> gray-600 */
+  .text-gray-500, .text-muted-foreground { color: #374151 !important; } /* -> gray-700 */
+  .text-gray-600, .text-gray-700 { color: #1f2937 !important; } /* -> gray-800 */
+
+  /* Darken hairline borders so table grids stay visible when printed.
+     The default `border` utility resolves to the light --border token, so we
+     darken the token itself here (leaving explicit border-black lines intact),
+     plus the explicit gray border utilities. */
+  :root {
+    --border: 220 9% 46%; /* ~gray-500 */
+    --input: 220 9% 46%;
+  }
+  .border-gray-100, .border-gray-200, .border-gray-300 {
+    border-color: #6b7280 !important; /* gray-500 */
+  }
+
+  /* Give shaded table rows/headers a stronger, printable fill. */
+  .bg-gray-50 { background-color: #eceef1 !important; }
+  .bg-gray-100 { background-color: #dde0e5 !important; }
 }
