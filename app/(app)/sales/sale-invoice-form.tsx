@@ -253,8 +253,11 @@ export function SaleInvoiceForm({
         if ('error' in result) { setServerError(result.error); return }
       } else {
         await uploaderRef.current?.uploadFiles(result.data.invoiceId, 'sale_order')
+        // The action already revalidated /sales, so a single push loads fresh
+        // data. Do NOT also call router.refresh() — that re-renders the heavy
+        // sales list a second time inside this transition and leaves the button
+        // stuck on "Saving…" until that redundant render finishes.
         router.push('/sales')
-        router.refresh()
       }
     })
   }

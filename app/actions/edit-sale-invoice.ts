@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -208,6 +209,8 @@ export async function editSaleInvoiceAction(
     before: { lineCount: existingLines.length },
     after: { customerId, date, currencyCode, totalPKR, lineCount: lines.length },
   })
+
+  revalidatePath('/sales')
 
   return { success: true, data: { invoiceId } }
 }

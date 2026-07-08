@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -151,6 +152,11 @@ export async function createSaleInvoiceAction(
     entity: 'sales_orders', entityId: invoiceId,
     after: { customerId, date, currencyCode, totalPKR, lineCount: lines.length },
   })
+
+  // Invalidate the sales list server-side so the client can navigate to a fresh
+  // /sales in a single load — no redundant client-side router.refresh() that
+  // would re-render the heavy list a second time and wedge the "Saving…" state.
+  revalidatePath('/sales')
 
   return { success: true, data: { invoiceId } }
 }
