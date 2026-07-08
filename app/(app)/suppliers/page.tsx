@@ -1,12 +1,7 @@
-import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSupplierForm } from './create-supplier-form'
-import { EditSupplierForm } from './edit-supplier-form'
-import { DeleteButton } from '@/components/delete-button'
-import { RoleGate } from '@/components/role-gate'
-import { deleteSupplierAction } from '@/app/actions/delete-supplier'
-import { formatPKR } from '@/lib/utils/currency'
+import { SuppliersList } from './suppliers-list'
 
 export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
@@ -49,6 +44,12 @@ export default async function SuppliersPage() {
     outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited + refunded)
   }
 
+  const supplierItems = suppliers.map((s) => ({
+    id: s.id,
+    name: s.name,
+    outstanding: outstandingBySupplier.get(s.id) ?? 0,
+  }))
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -64,51 +65,7 @@ export default async function SuppliersPage() {
           <p className="text-muted-foreground text-sm">No suppliers yet. Add your first supplier to start tracking payables.</p>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b">
-              <tr>
-                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Name</th>
-                <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Outstanding (PKR)</th>
-                <th className="px-4 py-3" />
-                <th className="px-4 py-3 w-24" />
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {suppliers.map((s) => {
-                const outstanding = outstandingBySupplier.get(s.id) ?? 0
-                return (
-                  <tr key={s.id} className="hover:bg-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-medium">{s.name}</td>
-                    <td className={`px-4 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-destructive' : outstanding < 0 ? 'text-emerald-600' : 'text-muted-foreground'}`}>
-                      {formatPKR(Math.abs(outstanding))}
-                      {outstanding < 0 && <span className="ml-1 text-xs opacity-70">CR</span>}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Link
-                        href={`/suppliers/${s.id}/ledger`}
-                        className="text-xs underline underline-offset-4 text-muted-foreground hover:text-foreground"
-                      >
-                        Ledger
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <RoleGate allowedRoles={['owner']}>
-                        <div className="flex gap-1 justify-end">
-                          <EditSupplierForm id={s.id} currentName={s.name} />
-                          <DeleteButton
-                            description={`Delete supplier "${s.name}"? This cannot be undone.`}
-                            onDelete={deleteSupplierAction.bind(null, { id: s.id })}
-                          />
-                        </div>
-                      </RoleGate>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <SuppliersList suppliers={supplierItems} />
       )}
     </div>
   )
