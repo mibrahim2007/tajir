@@ -9,7 +9,7 @@ import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  openingBalance: z.coerce.number().min(0).default(0),
+  openingBalance: z.coerce.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.coerce.number().positive().default(1),
 })

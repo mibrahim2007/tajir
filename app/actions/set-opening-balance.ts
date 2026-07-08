@@ -16,14 +16,14 @@ const stockSchema = z.object({
 
 const customerSchema = z.object({
   customerId:     z.string().uuid(),
-  openingBalance: z.coerce.number().min(0),
+  openingBalance: z.coerce.number(),
   currencyCode:   z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:   z.coerce.number().positive().default(1),
 })
 
 const supplierSchema = z.object({
   supplierId:     z.string().uuid(),
-  openingBalance: z.coerce.number().min(0),
+  openingBalance: z.coerce.number(),
   currencyCode:   z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:   z.coerce.number().positive().default(1),
 })

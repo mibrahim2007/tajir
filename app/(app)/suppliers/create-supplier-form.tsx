@@ -16,7 +16,7 @@ import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
-  openingBalance: z.number().min(0).default(0),
+  openingBalance: z.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
 })
@@ -71,6 +71,7 @@ export function CreateSupplierForm() {
                 currencyName="openingBalanceCurrency"
                 exchangeRateName="exchangeRate"
                 label="Opening Balance"
+                allowNegative
               />
 
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}

@@ -61,7 +61,6 @@ export function SupplierBalanceTable({ suppliers }: { suppliers: Supplier[] }) {
                   <div className="flex items-center gap-2 justify-end">
                     <Input
                       type="number"
-                      min={0}
                       step="0.01"
                       value={editAmount}
                       onChange={(e) => setEditAmount(e.target.value)}
