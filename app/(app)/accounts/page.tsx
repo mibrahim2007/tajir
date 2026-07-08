@@ -1,9 +1,11 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { formatPKR } from '@/lib/utils/currency'
 import { SeedAccountsButton } from './seed-accounts-button'
 import { UploadCoaButton } from './upload-coa-button'
 import { AddAccountButton } from './add-account-button'
 import { AccountRowActions } from './account-row-actions'
+import { AccountOpeningBalanceButton } from './account-opening-balance-button'
 
 const TYPE_LABELS: Record<string, string> = {
   asset:     'Asset',
@@ -34,6 +36,36 @@ export default async function AccountsPage() {
   const accounts = rawAccounts ?? []
   const pickerAccounts = accounts.map((a) => ({ code: a.code, name: a.name, parent_code: a.parent_code }))
 
+  // Opening balances are stored as `opening_balance` journal entries (one per
+  // account, offset against Opening Balance Equity). Read them back so we can
+  // show the current amount on each row and prefill the editor.
+  const { data: obEntries } = await admin
+    .from('tajir_journal_entries')
+    .select('id, date, source_id')
+    .eq('tenant_id', tenantId)
+    .eq('source_type', 'opening_balance')
+
+  const sourceByEntry = new Map((obEntries ?? []).map((e) => [e.id, e.source_id]))
+  const dateByEntry = new Map((obEntries ?? []).map((e) => [e.id, e.date]))
+  const openingByAccount = new Map<string, { amount: number; date: string }>()
+  const obEntryIds = (obEntries ?? []).map((e) => e.id)
+  if (obEntryIds.length > 0) {
+    const { data: obLines } = await admin
+      .from('tajir_journal_entry_lines')
+      .select('journal_entry_id, account_id, debit, credit')
+      .in('journal_entry_id', obEntryIds)
+    for (const line of obLines ?? []) {
+      // The target account's leg is the one whose account matches the entry's source_id
+      // (the other leg is the Opening Balance Equity contra).
+      if (line.account_id === sourceByEntry.get(line.journal_entry_id)) {
+        openingByAccount.set(line.account_id, {
+          amount: Number(line.debit) + Number(line.credit),
+          date:   dateByEntry.get(line.journal_entry_id) as string,
+        })
+      }
+    }
+  }
+
   // Group top-level sections (no parent)
   const topLevel = accounts.filter((a) => !a.parent_code)
   const byParent = new Map<string, typeof accounts>()
@@ -55,16 +87,29 @@ export default async function AccountsPage() {
         >
           <span className="font-mono text-xs text-muted-foreground w-16 shrink-0">{child.code}</span>
           <span className={`text-sm ${child.is_header ? 'font-semibold' : ''}`}>{child.name}</span>
-          {child.is_system ? (
-            <span className="ml-auto text-xs text-muted-foreground border rounded px-1.5 py-0.5">system</span>
-          ) : (
-            <div className="ml-auto flex items-center gap-2">
-              {!child.is_active && (
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground border rounded px-1.5 py-0.5">inactive</span>
-              )}
-              {role === 'owner' && <AccountRowActions account={child} accounts={pickerAccounts} />}
-            </div>
-          )}
+          <div className="ml-auto flex items-center gap-2">
+            {(openingByAccount.get(child.id)?.amount ?? 0) > 0 && (
+              <span className="text-xs tabular-nums text-emerald-700 dark:text-emerald-400" title="Opening balance">
+                {formatPKR(openingByAccount.get(child.id)!.amount)}
+              </span>
+            )}
+            {role === 'owner' && !child.is_header && (
+              <AccountOpeningBalanceButton
+                account={{ id: child.id, code: child.code, name: child.name, account_type: child.account_type }}
+                current={openingByAccount.get(child.id) ?? null}
+              />
+            )}
+            {child.is_system ? (
+              <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">system</span>
+            ) : (
+              <>
+                {!child.is_active && (
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground border rounded px-1.5 py-0.5">inactive</span>
+                )}
+                {role === 'owner' && <AccountRowActions account={child} accounts={pickerAccounts} />}
+              </>
+            )}
+          </div>
         </div>
         {renderChildren(child.code, depth + 1)}
       </div>
