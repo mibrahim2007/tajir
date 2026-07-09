@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -51,10 +52,12 @@ export async function createCustomerRefundAction(input: unknown): Promise<Action
     return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it first.', code: 'COA_NOT_CONFIGURED' }
   }
 
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'customer_refund', date)
   const { data: refund, error: insertError } = await admin
     .from('customer_refunds')
     .insert({
       tenant_id:      tenantId,
+      serial_number:  serialNumber,
       customer_id:    customerId,
       amount:         amount,
       currency_code:  currencyCode,

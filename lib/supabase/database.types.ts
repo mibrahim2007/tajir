@@ -97,6 +97,7 @@ export type Database = {
           id: string
           payment_method_note: string | null
           pkr_equivalent: number
+          serial_number: string | null
           supplier_id: string
           tenant_id: string
         }
@@ -110,6 +111,7 @@ export type Database = {
           id?: string
           payment_method_note?: string | null
           pkr_equivalent: number
+          serial_number?: string | null
           supplier_id: string
           tenant_id: string
         }
@@ -123,6 +125,7 @@ export type Database = {
           id?: string
           payment_method_note?: string | null
           pkr_equivalent?: number
+          serial_number?: string | null
           supplier_id?: string
           tenant_id?: string
         }
@@ -162,6 +165,7 @@ export type Database = {
           id: string
           payment_method_note: string | null
           pkr_equivalent: number
+          serial_number: string | null
           tenant_id: string
         }
         Insert: {
@@ -175,6 +179,7 @@ export type Database = {
           id?: string
           payment_method_note?: string | null
           pkr_equivalent: number
+          serial_number?: string | null
           tenant_id: string
         }
         Update: {
@@ -188,6 +193,7 @@ export type Database = {
           id?: string
           payment_method_note?: string | null
           pkr_equivalent?: number
+          serial_number?: string | null
           tenant_id?: string
         }
         Relationships: [
@@ -565,6 +571,7 @@ export type Database = {
           notes: string | null
           payment_method: string
           pkr_equivalent: number
+          serial_number: string | null
           tenant_id: string
         }
         Insert: {
@@ -578,6 +585,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string
           pkr_equivalent: number
+          serial_number?: string | null
           tenant_id: string
         }
         Update: {
@@ -591,6 +599,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string
           pkr_equivalent?: number
+          serial_number?: string | null
           tenant_id?: string
         }
         Relationships: [

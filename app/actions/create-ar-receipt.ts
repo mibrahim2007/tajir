@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -37,10 +38,12 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   const pkrEquivalent = currencyCode === 'USD' ? amount * exchangeRate : amount
 
   const admin = createAdminClient()
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'ar_receipt', date)
   const { data: receipt, error } = await admin
     .from('ar_receipts')
     .insert({
       tenant_id: tenantId,
+      serial_number: serialNumber,
       customer_id: customerId,
       amount: amount,
       currency_code: currencyCode,

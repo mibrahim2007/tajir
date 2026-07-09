@@ -1,6 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export type DocType = 'purchase_order' | 'sale_invoice' | 'purchase_return' | 'sale_return'
+export type DocType =
+  | 'purchase_order'
+  | 'sale_invoice'
+  | 'purchase_return'
+  | 'sale_return'
+  | 'ar_receipt'
+  | 'ap_payment'
+  | 'customer_refund'
 
 /**
  * Allocates the next tenant- and document-type-scoped serial number.

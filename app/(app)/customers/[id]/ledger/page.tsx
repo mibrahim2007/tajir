@@ -35,7 +35,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
     admin.from('ar_receipts')
-      .select('id, date, customer_id, amount, currency_code, pkr_equivalent, payment_method_note')
+      .select('id, date, customer_id, amount, currency_code, pkr_equivalent, payment_method_note, serial_number')
       .eq('customer_id', id)
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
@@ -50,7 +50,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
     admin.from('customer_refunds')
-      .select('id, date, customer_id, amount, currency_code, pkr_equivalent, payment_method, notes')
+      .select('id, date, customer_id, amount, currency_code, pkr_equivalent, payment_method, notes, serial_number')
       .eq('customer_id', id)
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
@@ -120,7 +120,8 @@ export default async function CustomerLedgerPage({ params }: Props) {
       // Refund increases the AR balance (we paid them back, so credit is consumed)
       runningBalance += amount
       const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'
-      rows.push({ id: item.entry.id, kind: 'refund', date: item.date, description: `Customer Refund — ${method}${item.entry.notes ? ` (${item.entry.notes})` : ''}`, debit: amount, credit: 0, balance: runningBalance })
+      const ref = item.entry.serial_number ? `${item.entry.serial_number} · ` : ''
+      rows.push({ id: item.entry.id, kind: 'refund', date: item.date, description: `${ref}Customer Refund — ${method}${item.entry.notes ? ` (${item.entry.notes})` : ''}`, debit: amount, credit: 0, balance: runningBalance })
     } else {
       const amount = item.entry.pkr_equivalent
       runningBalance -= amount
@@ -128,7 +129,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
         id: item.entry.id,
         kind: 'receipt',
         date: item.date,
-        description: `Receipt${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
+        description: `${item.entry.serial_number ? `${item.entry.serial_number} · ` : ''}Receipt${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
         debit: 0,
         credit: amount,
         balance: runningBalance,

@@ -40,7 +40,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid')
       .eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ap_payments')
-      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note')
+      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note, serial_number')
       .eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('purchase_returns')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, reason')
@@ -126,7 +126,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
         id: item.entry.id,
         kind: 'payment',
         date: item.date,
-        description: `Payment${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
+        description: `${item.entry.serial_number ? `${item.entry.serial_number} · ` : ''}Payment${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
         debit: 0,
         credit: paid,
         balance: runningBalance,

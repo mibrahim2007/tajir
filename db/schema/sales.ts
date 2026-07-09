@@ -33,6 +33,7 @@ export const salesOrders = pgTable('sales_orders', {
 export const arReceipts = pgTable('ar_receipts', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   tenantId:           uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  serialNumber:       text('serial_number'),
   customerId:         uuid('customer_id').notNull().references(() => tajirCustomers.id),
   amount:             numeric('amount', { precision: 15, scale: 2 }).notNull(),
   currencyCode:       char('currency_code', { length: 3 }).notNull().default('PKR'),
