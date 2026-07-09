@@ -50,25 +50,29 @@ export const ALL_MODULES: ModuleKey[] = [
 ]
 
 export const MODULE_META: Record<ModuleKey, { label: string; section: string; icon: React.ElementType; href: string }> = {
-  inventory:        { label: 'Inventory',         section: 'Trading',     icon: Package,       href: '/inventory' },
-  purchases:        { label: 'Purchases',          section: 'Trading',     icon: ShoppingCart,  href: '/purchases' },
-  purchase_returns: { label: 'Purchase Returns',   section: 'Trading',     icon: Undo2,         href: '/purchase-returns' },
-  sales:            { label: 'Sales',              section: 'Trading',     icon: ShoppingBag,   href: '/sales' },
-  sale_returns:     { label: 'Sale Returns',       section: 'Trading',     icon: RefreshCcw,    href: '/sale-returns' },
-  gatepasses:       { label: 'Gatepasses',         section: 'Trading',     icon: ClipboardList, href: '/gatepasses' },
-  locations:        { label: 'Locations',          section: 'Trading',     icon: MapPin,        href: '/locations' },
-  stock_transfers:  { label: 'Stock Transfers',    section: 'Trading',     icon: ArrowLeftRight, href: '/stock-transfers' },
-  customers:        { label: 'Customers',          section: 'Finance',     icon: Users,         href: '/customers' },
-  receipts:         { label: 'Receipts',           section: 'Finance',     icon: ArrowDownLeft, href: '/receipts' },
-  credit_notes:     { label: 'Credit Notes',       section: 'Finance',     icon: FileMinus,     href: '/credit-notes' },
-  suppliers:        { label: 'Suppliers',          section: 'Finance',     icon: Truck,         href: '/suppliers' },
-  payments:         { label: 'Payments',           section: 'Finance',     icon: ArrowUpRight,  href: '/payments' },
-  debit_notes:      { label: 'Debit Notes',        section: 'Finance',     icon: FilePlus,      href: '/debit-notes' },
-  pricing:          { label: 'Pricing',            section: 'Finance',     icon: Tag,           href: '/pricing' },
-  expenses:         { label: 'Expenses',           section: 'Finance',     icon: Receipt,       href: '/expenses' },
-  accounts:         { label: 'Accounts',           section: 'Accounting',  icon: BookOpen,      href: '/accounts' },
-  vouchers:         { label: 'Vouchers',           section: 'Accounting',  icon: PenLine,       href: '/vouchers' },
-  reports:          { label: 'Reports',            section: 'Accounting',  icon: BarChart2,     href: '/reports' },
+  // ── Sales (selling to customers) ──
+  sales:            { label: 'Sales',              section: 'Sales',        icon: ShoppingBag,   href: '/sales' },
+  sale_returns:     { label: 'Sale Returns',       section: 'Sales',        icon: RefreshCcw,    href: '/sale-returns' },
+  customers:        { label: 'Customers',          section: 'Sales',        icon: Users,         href: '/customers' },
+  receipts:         { label: 'Receipts',           section: 'Sales',        icon: ArrowDownLeft, href: '/receipts' },
+  credit_notes:     { label: 'Credit Notes',       section: 'Sales',        icon: FileMinus,     href: '/credit-notes' },
+  pricing:          { label: 'Pricing',            section: 'Sales',        icon: Tag,           href: '/pricing' },
+  // ── Procurement (buying from suppliers) ──
+  purchases:        { label: 'Purchases',          section: 'Procurement',  icon: ShoppingCart,  href: '/purchases' },
+  purchase_returns: { label: 'Purchase Returns',   section: 'Procurement',  icon: Undo2,         href: '/purchase-returns' },
+  suppliers:        { label: 'Suppliers',          section: 'Procurement',  icon: Truck,         href: '/suppliers' },
+  payments:         { label: 'Payments',           section: 'Procurement',  icon: ArrowUpRight,  href: '/payments' },
+  debit_notes:      { label: 'Debit Notes',        section: 'Procurement',  icon: FilePlus,      href: '/debit-notes' },
+  // ── Inventory (stock) ──
+  inventory:        { label: 'Inventory',          section: 'Inventory',    icon: Package,       href: '/inventory' },
+  stock_transfers:  { label: 'Stock Transfers',    section: 'Inventory',    icon: ArrowLeftRight, href: '/stock-transfers' },
+  locations:        { label: 'Locations',          section: 'Inventory',    icon: MapPin,        href: '/locations' },
+  gatepasses:       { label: 'Gatepasses',         section: 'Inventory',    icon: ClipboardList, href: '/gatepasses' },
+  // ── Accounts (accounting & reporting) ──
+  accounts:         { label: 'Accounts',           section: 'Accounts',     icon: BookOpen,      href: '/accounts' },
+  vouchers:         { label: 'Vouchers',           section: 'Accounts',     icon: PenLine,       href: '/vouchers' },
+  reports:          { label: 'Reports',            section: 'Accounts',     icon: BarChart2,     href: '/reports' },
+  expenses:         { label: 'Expenses',           section: 'Accounts',     icon: Receipt,       href: '/expenses' },
 }
 
 /** Modules enabled by default when tenant has no features config */

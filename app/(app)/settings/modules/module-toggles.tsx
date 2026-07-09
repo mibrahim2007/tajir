@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { updateTenantFeaturesAction } from '@/app/actions/update-tenant-features'
 import { ALL_MODULES, MODULE_META, type ModuleKey } from '@/lib/modules'
 
-const SECTIONS = ['Trading', 'Finance', 'Accounting'] as const
+const SECTIONS = ['Sales', 'Procurement', 'Inventory', 'Accounts'] as const
 
 type Props = {
   initialEnabled: ModuleKey[]

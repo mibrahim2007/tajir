@@ -41,7 +41,7 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
     links: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   });
 
-  const sections = ["Trading", "Finance", "Accounting"] as const;
+  const sections = ["Sales", "Procurement", "Inventory", "Accounts"] as const;
   for (const section of sections) {
     const links = (Object.entries(MODULE_META) as [ModuleKey, typeof MODULE_META[ModuleKey]][])
       .filter(([key, m]) => m.section === section && enabled.has(key))
@@ -51,7 +51,7 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
 
   if (role === "owner") {
     groups.push({
-      title: "Settings",
+      title: "Admin",
       links: [
         { href: "/item-types",                label: "Item Types",        icon: Layers },
         { href: "/settings/team",             label: "Team",              icon: UsersRound },

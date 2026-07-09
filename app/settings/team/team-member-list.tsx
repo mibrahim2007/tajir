@@ -70,7 +70,7 @@ function StatusBadge({ isActive }: { isActive: boolean }) {
   )
 }
 
-const SECTIONS = ['Trading', 'Finance', 'Accounting'] as const
+const SECTIONS = ['Sales', 'Procurement', 'Inventory', 'Accounts'] as const
 
 function PermissionEditor({
   member,
