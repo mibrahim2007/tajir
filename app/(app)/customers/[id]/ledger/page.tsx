@@ -9,6 +9,7 @@ import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
+import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -27,6 +28,11 @@ export default async function CustomerLedgerPage({ params }: Props) {
     .single()
 
   if (!customerRow) notFound()
+
+  const [nextReceiptSerial, nextRefundSerial] = await Promise.all([
+    peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today),
+    peekNextDocumentSerial(admin, tenantId, 'customer_refund', today),
+  ])
 
   const [{ data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }] = await Promise.all([
     admin.from('sales_orders')
@@ -157,10 +163,10 @@ export default async function CustomerLedgerPage({ params }: Props) {
           <ExportButton href={`/api/export/customer-ledger/${id}`} label="Export" />
           {runningBalance < 0 && (
             <RoleGate allowedRoles={['owner']}>
-              <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} />
+              <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} />
             </RoleGate>
           )}
-          <RecordReceiptForm customerId={id} today={today} />
+          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} />
         </div>
       </div>
 

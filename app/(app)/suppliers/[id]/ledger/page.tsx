@@ -9,6 +9,7 @@ import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
+import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -27,6 +28,8 @@ export default async function SupplierLedgerPage({ params }: Props) {
     .single()
 
   if (!supplierRow) notFound()
+
+  const nextPaymentSerial = await peekNextDocumentSerial(admin, tenantId, 'ap_payment', today)
 
   const [
     { data: rawPurchases },
@@ -156,7 +159,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
           <ReceivePaymentForm supplierId={id} today={today} />
-          <RecordPaymentForm supplierId={id} today={today} />
+          <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} />
         </div>
       </div>
 

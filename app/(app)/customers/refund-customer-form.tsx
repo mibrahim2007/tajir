@@ -25,10 +25,11 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function RefundCustomerForm({ customerId, today, creditAmount }: {
+export function RefundCustomerForm({ customerId, today, creditAmount, nextSerial }: {
   customerId:   string
   today:        string
   creditAmount: number
+  nextSerial?:  string | null
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -68,6 +69,13 @@ export function RefundCustomerForm({ customerId, today, creditAmount }: {
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+            {nextSerial && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Serial No.</label>
+                <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+              </div>
+            )}
 
             <CurrencyInput
               amountName="amount"
