@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSupplierForm } from './create-supplier-form'
 import { SuppliersList } from './suppliers-list'
+import { SupplierGuide } from './supplier-guide'
 
 export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
@@ -57,7 +58,10 @@ export default async function SuppliersPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Suppliers</h1>
           <p className="text-sm text-muted-foreground mt-1">{suppliers.length} supplier{suppliers.length !== 1 ? 's' : ''}</p>
         </div>
-        <CreateSupplierForm />
+        <div className="flex items-center gap-2">
+          <SupplierGuide />
+          <CreateSupplierForm />
+        </div>
       </div>
 
       {suppliers.length === 0 ? (
