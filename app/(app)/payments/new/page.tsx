@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { CreatePaymentForm } from './create-payment-form'
 
 export default async function NewPaymentPage() {
@@ -34,6 +35,7 @@ export default async function NewPaymentPage() {
   const returns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
+  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ap_payment', today)
 
   // Compute outstanding per supplier
   const supplierList = suppliers.map((s) => {
@@ -66,7 +68,7 @@ export default async function NewPaymentPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Payment</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
       </div>
-      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} />
+      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} />
     </div>
   )
 }

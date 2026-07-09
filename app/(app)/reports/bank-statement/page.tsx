@@ -53,7 +53,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
     const [receiptsRes, paymentsRes, journalRes] = await Promise.all([
       // Customer receipts tagged to this bank
       admin.from('ar_receipts')
-        .select('id, date, pkr_equivalent, payment_method_note, cheque_number, tajir_customers(name)')
+        .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, tajir_customers(name)')
         .eq('bank_id', bankId)
         .eq('tenant_id', tenantId)
         .gte('date', from)
@@ -62,7 +62,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
 
       // Supplier payments tagged to this bank
       admin.from('ap_payments')
-        .select('id, date, pkr_equivalent, payment_method_note, cheque_number, suppliers(name)')
+        .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, suppliers(name)')
         .eq('bank_id', bankId)
         .eq('tenant_id', tenantId)
         .gte('date', from)
@@ -81,11 +81,11 @@ export default async function BankStatementPage({ searchParams }: { searchParams
 
     type RawReceipt = {
       id: string; date: string; pkr_equivalent: string; payment_method_note: string | null
-      cheque_number: string | null; tajir_customers: { name: string } | null
+      cheque_number: string | null; serial_number: string | null; tajir_customers: { name: string } | null
     }
     type RawPayment = {
       id: string; date: string; pkr_equivalent: string; payment_method_note: string | null
-      cheque_number: string | null; suppliers: { name: string } | null
+      cheque_number: string | null; serial_number: string | null; suppliers: { name: string } | null
     }
     type RawJournalLine = { debit: string; credit: string }
     type RawJournal = {
@@ -104,7 +104,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
       chequeNumber: r.cheque_number ?? '',
       deposit: parseFloat(r.pkr_equivalent),
       withdrawal: 0,
-      voucherNumber: '',
+      voucherNumber: r.serial_number ?? '',
     }))
 
     const paymentRows: TxnRow[] = ((paymentsRes.data ?? []) as unknown as RawPayment[]).map((p) => ({
@@ -117,7 +117,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
       chequeNumber: p.cheque_number ?? '',
       deposit: 0,
       withdrawal: parseFloat(p.pkr_equivalent),
-      voucherNumber: '',
+      voucherNumber: p.serial_number ?? '',
     }))
 
     const journalRows: TxnRow[] = ((journalRes.data ?? []) as unknown as RawJournal[]).map((je) => {

@@ -29,7 +29,10 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   if (!supplierRow) notFound()
 
-  const nextPaymentSerial = await peekNextDocumentSerial(admin, tenantId, 'ap_payment', today)
+  const [nextPaymentSerial, nextReceiveSerial] = await Promise.all([
+    peekNextDocumentSerial(admin, tenantId, 'ap_payment', today),
+    peekNextDocumentSerial(admin, tenantId, 'supplier_refund', today),
+  ])
 
   const [
     { data: rawPurchases },
@@ -52,7 +55,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
       .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, reason, reference')
       .eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('supplier_refunds')
-      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method, notes')
+      .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method, notes, serial_number')
       .eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
@@ -120,7 +123,8 @@ export default async function SupplierLedgerPage({ params }: Props) {
       const amount = item.entry.pkr_equivalent
       runningBalance += amount
       const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'
-      const desc = `Payment Received${item.entry.notes ? ` — ${item.entry.notes}` : ''} (${method})`
+      const ref = item.entry.serial_number ? `${item.entry.serial_number} · ` : ''
+      const desc = `${ref}Payment Received${item.entry.notes ? ` — ${item.entry.notes}` : ''} (${method})`
       rows.push({ id: item.entry.id, kind: 'supplier_refund', date: item.date, description: desc, debit: amount, credit: 0, balance: runningBalance })
     } else {
       const paid = item.entry.pkr_equivalent
@@ -158,7 +162,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
         <div className="flex gap-2 flex-wrap">
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
-          <ReceivePaymentForm supplierId={id} today={today} />
+          <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} />
           <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} />
         </div>
       </div>

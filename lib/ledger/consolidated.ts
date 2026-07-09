@@ -69,15 +69,15 @@ export async function buildConsolidatedLedger(
     admin.from('tajir_customers').select('opening_balance_pkr_equivalent, created_at').eq('id', customerId).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('suppliers').select('opening_balance_pkr_equivalent, created_at').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('sales_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent').eq('customer_id', customerId).eq('tenant_id', tenantId),
-    admin.from('ar_receipts').select('id, date, pkr_equivalent, payment_method_note').eq('customer_id', customerId).eq('tenant_id', tenantId),
+    admin.from('ar_receipts').select('id, date, pkr_equivalent, payment_method_note, serial_number').eq('customer_id', customerId).eq('tenant_id', tenantId),
     admin.from('sale_returns').select('id, date, stock_item_id, quantity, pkr_equivalent, reason').eq('customer_id', customerId).eq('tenant_id', tenantId),
     admin.from('credit_notes').select('id, date, pkr_equivalent, reason, reference').eq('customer_id', customerId).eq('tenant_id', tenantId),
-    admin.from('customer_refunds').select('id, date, pkr_equivalent, payment_method, notes').eq('customer_id', customerId).eq('tenant_id', tenantId),
+    admin.from('customer_refunds').select('id, date, pkr_equivalent, payment_method, notes, serial_number').eq('customer_id', customerId).eq('tenant_id', tenantId),
     admin.from('purchase_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
-    admin.from('ap_payments').select('id, date, pkr_equivalent, payment_method_note').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
+    admin.from('ap_payments').select('id, date, pkr_equivalent, payment_method_note, serial_number').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('purchase_returns').select('id, date, stock_item_id, quantity, pkr_equivalent, reason').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('debit_notes').select('id, date, pkr_equivalent, reason, reference').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
-    admin.from('supplier_refunds').select('id, date, pkr_equivalent, payment_method, notes').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
+    admin.from('supplier_refunds').select('id, date, pkr_equivalent, payment_method, notes, serial_number').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     preloadedLots ? Promise.resolve({ data: null }) : admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
@@ -95,7 +95,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'customer', kind: 'sale', date: e.date, description: `Sale — ${itemName(e.stock_item_id)} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: e.pkr_equivalent, credit: 0 })
   }
   for (const e of rawReceipts ?? []) {
-    entries.push({ id: e.id, side: 'customer', kind: 'receipt', date: e.date, description: `Receipt${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: 0, credit: e.pkr_equivalent })
+    entries.push({ id: e.id, side: 'customer', kind: 'receipt', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Receipt${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawSaleReturns ?? []) {
     entries.push({ id: e.id, side: 'customer', kind: 'sale_return', date: e.date, description: `Sale Return — ${itemName(e.stock_item_id)} (${e.quantity}${e.reason ? ` — ${e.reason}` : ''})`, debit: 0, credit: e.pkr_equivalent })
@@ -104,7 +104,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'customer', kind: 'credit_note', date: e.date, description: `Credit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawCustomerRefunds ?? []) {
-    entries.push({ id: e.id, side: 'customer', kind: 'customer_refund', date: e.date, description: `Customer Refund — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
+    entries.push({ id: e.id, side: 'customer', kind: 'customer_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Customer Refund — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
   }
 
   // ── Supplier side (AP polarity: debit = we owe them more) ──
@@ -117,7 +117,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'supplier', kind: 'purchase', date: e.date, description: `Purchase — ${itemName(e.stock_item_id)} (${e.quantity} @ ${e.currency_code} ${e.rate})`, debit: net, credit: 0 })
   }
   for (const e of rawPayments ?? []) {
-    entries.push({ id: e.id, side: 'supplier', kind: 'payment', date: e.date, description: `Payment${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: 0, credit: e.pkr_equivalent })
+    entries.push({ id: e.id, side: 'supplier', kind: 'payment', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Payment${e.payment_method_note ? ` — ${e.payment_method_note}` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawPurchaseReturns ?? []) {
     entries.push({ id: e.id, side: 'supplier', kind: 'purchase_return', date: e.date, description: `Purchase Return — ${itemName(e.stock_item_id)} (${e.quantity}${e.reason ? ` — ${e.reason}` : ''})`, debit: 0, credit: e.pkr_equivalent })
@@ -126,7 +126,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'supplier', kind: 'debit_note', date: e.date, description: `Debit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawSupplierRefunds ?? []) {
-    entries.push({ id: e.id, side: 'supplier', kind: 'supplier_refund', date: e.date, description: `Payment Received from Supplier — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
+    entries.push({ id: e.id, side: 'supplier', kind: 'supplier_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Payment Received from Supplier — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
   }
 
   // Component balances in each party's own frame.

@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { CreateReceiptForm } from './create-receipt-form'
 
 export default async function NewReceiptPage() {
@@ -34,6 +35,7 @@ export default async function NewReceiptPage() {
   const returns = rawReturns ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
+  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today)
 
   // Compute outstanding per customer
   const customerList = customers.map((c) => {
@@ -65,7 +67,7 @@ export default async function NewReceiptPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
       </div>
-      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} />
+      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} nextSerial={nextSerial} />
     </div>
   )
 }

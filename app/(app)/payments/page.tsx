@@ -14,7 +14,7 @@ export default async function PaymentsPage() {
 
   const [{ data: rawPayments }, { data: rawSuppliers }] = await Promise.all([
     admin.from('ap_payments')
-      .select('id, supplier_id, date, amount, currency_code, pkr_equivalent, payment_method_note')
+      .select('id, serial_number, supplier_id, date, amount, currency_code, pkr_equivalent, payment_method_note')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false }),
     admin.from('suppliers')
@@ -46,6 +46,7 @@ export default async function PaymentsPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
+                <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
                 <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
                 <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
                 <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Note</th>
@@ -56,6 +57,9 @@ export default async function PaymentsPage() {
             <tbody className="divide-y">
               {payments.map((p) => (
                 <tr key={p.id} className="hover:bg-secondary/50 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">
+                    {p.serial_number ?? '—'}
+                  </td>
                   <td className="px-4 py-3 whitespace-nowrap text-xs">
                     {formatPKTDate(p.date + 'T00:00:00')}
                   </td>

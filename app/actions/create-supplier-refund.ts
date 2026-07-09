@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -39,10 +40,12 @@ export async function createSupplierRefundAction(input: unknown): Promise<Action
 
   const admin = createAdminClient()
 
+  const serialNumber = await nextDocumentSerial(admin, tenantId, 'supplier_refund', date)
   const { data: refund, error: insertError } = await admin
     .from('supplier_refunds')
     .insert({
       tenant_id:      tenantId,
+      serial_number:  serialNumber,
       supplier_id:    supplierId,
       amount:         amount,
       currency_code:  currencyCode,

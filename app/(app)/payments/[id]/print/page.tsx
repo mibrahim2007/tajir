@@ -18,7 +18,7 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
 
   const [{ data: payment }, tenant] = await Promise.all([
     admin.from('ap_payments')
-      .select('id, date, created_at, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note, cheque_number, bank_id')
+      .select('id, serial_number, date, created_at, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note, cheque_number, bank_id')
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .single(),
@@ -77,6 +77,12 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
             <span className="text-gray-500 w-24 shrink-0">Date</span>
             <span className="font-semibold">{formatPKTDate(new Date(payment.date))}</span>
           </div>
+          {payment.serial_number && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 w-28 shrink-0">Serial No.</span>
+              <span className="font-mono font-semibold">{payment.serial_number}</span>
+            </div>
+          )}
           <div className="flex gap-2">
             <span className="text-gray-500 w-28 shrink-0">Supplier</span>
             <span className="font-semibold">{supplier?.name ?? '—'}</span>

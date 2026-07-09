@@ -30,6 +30,7 @@ type Props = {
   customers:       Customer[]
   salesByCustomer: Record<string, Sale[]>
   banks:           Bank[]
+  nextSerial?:     string | null
 }
 
 const schema = z.object({
@@ -46,7 +47,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: Props) {
+export function CreateReceiptForm({ today, customers, salesByCustomer, banks, nextSerial }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -97,6 +98,14 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks }: 
                 <CardTitle className="text-base">Receipt Details</CardTitle>
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-4">
+
+                {nextSerial && (
+                  <div className="space-y-1">
+                    <Label>Serial No.</Label>
+                    <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                    <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+                  </div>
+                )}
 
                 {/* Customer */}
                 <div className="space-y-1">

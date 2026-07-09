@@ -1993,6 +1993,7 @@ export type Database = {
           notes: string | null
           payment_method: string
           pkr_equivalent: number
+          serial_number: string | null
           supplier_id: string
           tenant_id: string
         }
@@ -2006,6 +2007,7 @@ export type Database = {
           notes?: string | null
           payment_method: string
           pkr_equivalent: number
+          serial_number?: string | null
           supplier_id: string
           tenant_id: string
         }
@@ -2019,6 +2021,7 @@ export type Database = {
           notes?: string | null
           payment_method?: string
           pkr_equivalent?: number
+          serial_number?: string | null
           supplier_id?: string
           tenant_id?: string
         }
