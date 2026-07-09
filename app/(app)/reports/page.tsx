@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
+import { ReportsGuide } from './reports-guide'
 
 const reports = [
   { href: '/reports/pending-balance', label: 'Pending Balance', description: 'Purchase and sale orders not yet fully received or dispatched via gatepass. Shows order qty, received qty, and remaining balance.', icon: ClipboardList },
@@ -27,9 +28,12 @@ export default async function ReportsPage() {
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-extrabold tracking-tight">Reports</h1>
-        <p className="text-sm text-muted-foreground mt-1">Generate and export business reports.</p>
+      <div className="mb-6 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground mt-1">Generate and export business reports.</p>
+        </div>
+        <ReportsGuide />
       </div>
 
       <div className="grid gap-3">

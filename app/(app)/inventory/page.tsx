@@ -11,6 +11,7 @@ import { BulkLabelPrint } from './bulk-label-print'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteInventoryLotAction } from '@/app/actions/delete-inventory-lot'
+import { InventoryGuide } from './inventory-guide'
 
 const PAGE_SIZE = 50
 
@@ -65,6 +66,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <InventoryGuide />
           <CreateItemsByTypeWrapper itemTypes={safeItemTypes} />
           <CreateLotFormWrapper itemTypes={safeItemTypes} />
         </div>
