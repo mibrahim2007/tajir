@@ -2,6 +2,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateCustomerForm } from './create-customer-form'
 import { CustomersList } from './customers-list'
+import { CustomerGuide } from './customer-guide'
 
 export default async function CustomersPage() {
   const { tenantId } = await requireAuth()
@@ -57,7 +58,10 @@ export default async function CustomersPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Customers</h1>
           <p className="text-sm text-muted-foreground mt-1">{customers.length} customer{customers.length !== 1 ? 's' : ''}</p>
         </div>
-        <CreateCustomerForm />
+        <div className="flex items-center gap-2">
+          <CustomerGuide />
+          <CreateCustomerForm />
+        </div>
       </div>
 
       {customers.length === 0 ? (
