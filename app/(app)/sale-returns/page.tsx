@@ -78,35 +78,35 @@ export default async function SaleReturnsPage({ searchParams }: { searchParams: 
           </p>
         </div>
       ) : (
-        <div className="@container bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-muted/50 border-b">
               <tr>
-                <th className="text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
-                <th className="@max-xl:hidden text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
-                <th className="text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
-                <th className="@max-2xl:hidden text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                <th className="@max-4xl:hidden text-right px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
-                <th className="@max-4xl:hidden text-right px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
-                <th className="text-right px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
-                <th className="@max-4xl:hidden text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
-                <th className="@max-5xl:hidden text-left px-2 @2xl:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
-                <th className="px-2 @2xl:px-3 py-3" />
+                <th className="text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
+                <th className="max-sm:hidden text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                <th className="text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Customer</th>
+                <th className="max-sm:hidden text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                <th className="max-md:hidden text-right px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                <th className="max-xl:hidden text-right px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
+                <th className="text-right px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
+                <th className="max-xl:hidden text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
+                <th className="max-xl:hidden text-left px-2 sm:px-3 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
+                <th className="px-2 sm:px-3 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y">
               {returns.map((r) => (
                 <tr key={r.id} className="hover:bg-secondary/50 transition-colors align-top">
-                  <td className="px-2 @2xl:px-3 py-3 font-medium tabular-nums break-words @xl:whitespace-nowrap">{r.serial_number ?? '—'}</td>
-                  <td className="@max-xl:hidden px-2 @2xl:px-3 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
-                  <td className="px-2 @2xl:px-3 py-3 break-words">{customerMap.get(r.customer_id) ?? '—'}</td>
-                  <td className="@max-2xl:hidden px-2 @2xl:px-3 py-3 break-words">{lotMap.get(r.stock_item_id) ?? '—'}</td>
-                  <td className="@max-4xl:hidden px-2 @2xl:px-3 py-3 text-right tabular-nums">{r.quantity}</td>
-                  <td className="@max-4xl:hidden px-2 @2xl:px-3 py-3 text-right tabular-nums whitespace-nowrap">{r.currency_code} {r.rate}</td>
-                  <td className="px-2 @2xl:px-3 py-3 text-right tabular-nums whitespace-nowrap">{formatPKR(r.pkr_equivalent)}</td>
-                  <td className="@max-4xl:hidden px-2 @2xl:px-3 py-3 text-muted-foreground text-xs break-words">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
-                  <td className="@max-5xl:hidden px-2 @2xl:px-3 py-3 text-muted-foreground text-xs break-words">{r.reason ?? '—'}</td>
-                  <td className="px-2 @2xl:px-3 py-3">
+                  <td className="px-2 sm:px-3 py-3 font-medium tabular-nums break-words sm:whitespace-nowrap">{r.serial_number ?? '—'}</td>
+                  <td className="max-sm:hidden px-2 sm:px-3 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
+                  <td className="px-2 sm:px-3 py-3 break-words">{customerMap.get(r.customer_id) ?? '—'}</td>
+                  <td className="max-sm:hidden px-2 sm:px-3 py-3 break-words">{lotMap.get(r.stock_item_id) ?? '—'}</td>
+                  <td className="max-md:hidden px-2 sm:px-3 py-3 text-right tabular-nums">{r.quantity}</td>
+                  <td className="max-xl:hidden px-2 sm:px-3 py-3 text-right tabular-nums whitespace-nowrap">{r.currency_code} {r.rate}</td>
+                  <td className="px-2 sm:px-3 py-3 text-right tabular-nums whitespace-nowrap">{formatPKR(r.pkr_equivalent)}</td>
+                  <td className="max-xl:hidden px-2 sm:px-3 py-3 text-muted-foreground text-xs break-words">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
+                  <td className="max-xl:hidden px-2 sm:px-3 py-3 text-muted-foreground text-xs break-words">{r.reason ?? '—'}</td>
+                  <td className="px-2 sm:px-3 py-3">
                     <RoleGate allowedRoles={['owner']}>
                       <div className="flex items-center gap-1">
                         <EditSaleReturnForm
