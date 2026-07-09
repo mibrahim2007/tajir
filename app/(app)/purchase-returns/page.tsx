@@ -32,8 +32,25 @@ export default async function PurchaseReturnsPage() {
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
 
+  const rowActions = (r: (typeof returns)[number]) => (
+    <RoleGate allowedRoles={['owner']}>
+      <div className="flex items-center gap-1">
+        <EditPurchaseReturnForm
+          ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null }}
+          suppliers={supplierList}
+          lots={lotList}
+          locations={locationList}
+        />
+        <DeleteButton
+          description="Delete this purchase return? Stock quantity will be restored."
+          onDelete={deletePurchaseReturnAction.bind(null, { id: r.id })}
+        />
+      </div>
+    </RoleGate>
+  )
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-3 sm:p-6 max-w-6xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Purchase Returns</h1>
@@ -49,57 +66,80 @@ export default async function PurchaseReturnsPage() {
           <p className="text-muted-foreground text-sm">No purchase returns yet.</p>
         </div>
       ) : (
-        <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+        <>
+          {/* Mobile (< md): stacked cards — everything fits, actions always visible */}
+          <div className="md:hidden divide-y divide-border rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+            {returns.map((r) => (
+              <div key={r.id} className="p-4 flex flex-col gap-2">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium tabular-nums break-words">{r.serial_number ?? '—'}</div>
+                    <div className="text-xs text-muted-foreground">{formatPKTDate(new Date(r.date))}</div>
+                  </div>
+                  <div className="shrink-0">{rowActions(r)}</div>
+                </div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  <dt className="text-muted-foreground">Supplier</dt>
+                  <dd className="text-right break-words">{supplierMap.get(r.supplier_id) ?? '—'}</dd>
+                  <dt className="text-muted-foreground">Item</dt>
+                  <dd className="text-right break-words">{lotMap.get(r.stock_item_id) ?? '—'} × {r.quantity}</dd>
+                  <dt className="text-muted-foreground">Rate</dt>
+                  <dd className="text-right tabular-nums">{r.currency_code} {r.rate}</dd>
+                  <dt className="text-muted-foreground">Amount</dt>
+                  <dd className="text-right font-semibold tabular-nums">{formatPKR(r.pkr_equivalent)}</dd>
+                  {r.location_id && (
+                    <>
+                      <dt className="text-muted-foreground">Location</dt>
+                      <dd className="text-right break-words">{locationMap.get(r.location_id) ?? '—'}</dd>
+                    </>
+                  )}
+                  {r.reason && (
+                    <>
+                      <dt className="text-muted-foreground">Reason</dt>
+                      <dd className="text-right break-words">{r.reason}</dd>
+                    </>
+                  )}
+                </dl>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop (>= md): table. px-2 keeps it inside the page width; Rate/Location/Reason appear at xl. */}
+          <div className="max-md:hidden bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-muted/50 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
-                  <th className="text-right px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
-                  <th className="px-4 py-3 w-16" />
+                  <th className="text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Serial #</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Date</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Supplier</th>
+                  <th className="text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                  <th className="text-right px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Qty</th>
+                  <th className="max-xl:hidden text-right px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Rate</th>
+                  <th className="text-right px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">PKR Total</th>
+                  <th className="max-xl:hidden text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Location</th>
+                  <th className="max-xl:hidden text-left px-2 py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reason</th>
+                  <th className="px-2 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {returns.map((r) => (
-                  <tr key={r.id} className="hover:bg-secondary/50 transition-colors">
-                    <td className="px-4 py-3 whitespace-nowrap font-medium tabular-nums">{r.serial_number ?? '—'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
-                    <td className="px-4 py-3">{supplierMap.get(r.supplier_id) ?? '—'}</td>
-                    <td className="px-4 py-3">{lotMap.get(r.stock_item_id) ?? '—'}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.quantity}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{r.currency_code} {r.rate}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{formatPKR(r.pkr_equivalent)}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{r.reason ?? '—'}</td>
-                    <td className="px-4 py-3">
-                      <RoleGate allowedRoles={['owner']}>
-                        <div className="flex items-center gap-1">
-                          <EditPurchaseReturnForm
-                            ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null }}
-                            suppliers={supplierList}
-                            lots={lotList}
-                            locations={locationList}
-                          />
-                          <DeleteButton
-                            description="Delete this purchase return? Stock quantity will be restored."
-                            onDelete={deletePurchaseReturnAction.bind(null, { id: r.id })}
-                          />
-                        </div>
-                      </RoleGate>
-                    </td>
+                  <tr key={r.id} className="hover:bg-secondary/50 transition-colors align-top">
+                    <td className="px-2 py-3 font-medium tabular-nums whitespace-nowrap">{r.serial_number ?? '—'}</td>
+                    <td className="px-2 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
+                    <td className="px-2 py-3 break-words">{supplierMap.get(r.supplier_id) ?? '—'}</td>
+                    <td className="px-2 py-3 break-words">{lotMap.get(r.stock_item_id) ?? '—'}</td>
+                    <td className="px-2 py-3 text-right tabular-nums">{r.quantity}</td>
+                    <td className="max-xl:hidden px-2 py-3 text-right tabular-nums whitespace-nowrap">{r.currency_code} {r.rate}</td>
+                    <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">{formatPKR(r.pkr_equivalent)}</td>
+                    <td className="max-xl:hidden px-2 py-3 text-muted-foreground text-xs break-words">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>
+                    <td className="max-xl:hidden px-2 py-3 text-muted-foreground text-xs break-words">{r.reason ?? '—'}</td>
+                    <td className="px-2 py-3">{rowActions(r)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        </div>
+        </>
       )}
     </div>
   )
