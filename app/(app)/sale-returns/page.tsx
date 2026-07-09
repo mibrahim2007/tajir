@@ -97,8 +97,8 @@ export default async function SaleReturnsPage({ searchParams }: { searchParams: 
             <tbody className="divide-y">
               {returns.map((r) => (
                 <tr key={r.id} className="hover:bg-secondary/50 transition-colors align-top">
-                  <td className="px-2 sm:px-4 py-3 font-medium tabular-nums break-words">{r.serial_number ?? '—'}</td>
-                  <td className="px-2 sm:px-4 py-3 break-words">{formatPKTDate(new Date(r.date))}</td>
+                  <td className="px-2 sm:px-4 py-3 font-medium tabular-nums whitespace-nowrap">{r.serial_number ?? '—'}</td>
+                  <td className="px-2 sm:px-4 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
                   <td className="px-2 sm:px-4 py-3 break-words">{customerMap.get(r.customer_id) ?? '—'}</td>
                   <td className="px-2 sm:px-4 py-3 break-words">{lotMap.get(r.stock_item_id) ?? '—'}</td>
                   <td className="max-sm:hidden px-2 sm:px-4 py-3 text-right tabular-nums">{r.quantity}</td>
