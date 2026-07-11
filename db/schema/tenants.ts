@@ -9,6 +9,7 @@ export type Role = (typeof roleEnum)[number]
 export const tenants = pgTable('tenants', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull(),
+  ntn: text('ntn'),
   subscriptionStatus: text('subscription_status')
     .$type<SubscriptionStatus>()
     .notNull()

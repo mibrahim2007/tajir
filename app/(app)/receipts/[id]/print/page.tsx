@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getTenant } from '@/lib/auth/get-tenant'
+import { PrintVoucherHeader } from '@/components/print-voucher-header'
 import { Button } from '@/components/ui/button'
 import { PrintButton } from './print-button'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
@@ -62,10 +63,7 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
       <div className="max-w-2xl mx-auto px-8 py-10 print:px-4 print:py-6 print:max-w-none">
 
         {/* Header */}
-        <div className="text-center mb-6 pb-4 border-b-2 border-black">
-          <p className="text-xl font-extrabold tracking-wide uppercase">{tenant.name}</p>
-          <p className="text-3xl font-bold tracking-widest uppercase mt-1">Receipt Voucher</p>
-        </div>
+        <PrintVoucherHeader name={tenant.name} ntn={tenant.ntn} title="Receipt Voucher" />
 
         {/* Meta grid */}
         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
