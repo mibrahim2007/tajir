@@ -27,7 +27,8 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
 
   const lines = watch('lines') ?? []
   const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
-  const rootError = (formState.errors.lines as { message?: string } | undefined)?.message
+  const linesError = formState.errors.lines as { message?: string; root?: { message?: string } } | undefined
+  const rootError = linesError?.message ?? linesError?.root?.message
 
   return (
     <div className="space-y-2">

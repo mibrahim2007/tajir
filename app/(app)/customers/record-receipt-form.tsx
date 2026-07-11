@@ -21,7 +21,10 @@ const lineSchema = z.object({
   transactionType: z.enum(['cash', 'pdc', 'online']),
   chequeNumber:    z.string().optional().default(''),
   bankId:          z.string().optional().default(''),
-  amount:          z.coerce.number().positive('Amount must be positive'),
+  amount:          z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
+    z.coerce.number().min(0),
+  ),
 })
 
 const schema = z.object({
@@ -30,6 +33,9 @@ const schema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
   lines: z.array(lineSchema).min(1, 'Add at least one tender line'),
+}).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
+  message: 'Enter a positive amount for at least one tender line',
+  path: ['lines'],
 })
 
 type FormValues = z.infer<typeof schema>
@@ -62,7 +68,7 @@ export function RecordReceiptForm({ customerId, today, nextSerial, banks = [] }:
         exchangeRate: values.exchangeRate,
         date: values.date,
         paymentMethodNote: values.paymentMethodNote,
-        lines: values.lines.map((l) => ({
+        lines: values.lines.filter((l) => (Number(l.amount) || 0) > 0).map((l) => ({
           transactionType: l.transactionType,
           chequeNumber: l.chequeNumber || undefined,
           bankId: l.bankId || undefined,
@@ -87,7 +93,7 @@ export function RecordReceiptForm({ customerId, today, nextSerial, banks = [] }:
           <SheetDescription>Record a payment received from this customer.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
             {nextSerial && (
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">Serial No.</label>

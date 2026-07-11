@@ -47,7 +47,12 @@ const lineSchema = z.object({
   transactionType: z.enum(['cash', 'pdc', 'online']),
   chequeNumber:    z.string().optional().default(''),
   bankId:          z.string().optional().default(''),
-  amount:          z.coerce.number().positive('Amount must be positive'),
+  // Blank/NaN amounts (e.g. an untouched extra line) become 0 and are dropped
+  // on submit; the form-level refine below requires at least one positive line.
+  amount:          z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
+    z.coerce.number().min(0),
+  ),
 })
 
 const schema = z.object({
@@ -57,6 +62,9 @@ const schema = z.object({
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
   lines:             z.array(lineSchema).min(1, 'Add at least one tender line'),
+}).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
+  message: 'Enter a positive amount for at least one tender line',
+  path: ['lines'],
 })
 
 type FormValues = z.infer<typeof schema>
@@ -104,7 +112,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
         exchangeRate: values.exchangeRate,
         date: values.date,
         paymentMethodNote: values.paymentMethodNote,
-        lines: values.lines.map((l) => ({
+        lines: values.lines.filter((l) => (Number(l.amount) || 0) > 0).map((l) => ({
           transactionType: l.transactionType,
           chequeNumber: l.chequeNumber || undefined,
           bankId: l.bankId || undefined,
@@ -125,7 +133,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
 
   return (
     <FormProvider {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
+      <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext}>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
