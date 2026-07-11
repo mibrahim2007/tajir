@@ -32,6 +32,15 @@ export async function deleteArReceiptAction(input: unknown): Promise<ActionResul
 
   if (!receipt) return { success: false, error: 'Receipt not found', code: 'NOT_FOUND' }
 
+  // Remove the GL journal entry first (its lines cascade); then the receipt
+  // (its tender lines cascade). Keeps the ledger from drifting on delete.
+  await admin
+    .from('tajir_journal_entries')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('source_type', 'ar_receipt')
+    .eq('source_id', id)
+
   const { error } = await admin
     .from('ar_receipts')
     .delete()

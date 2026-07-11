@@ -86,6 +86,42 @@ export type Database = {
         }
         Relationships: []
       }
+      ap_payment_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          payment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          payment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          payment_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       ap_payments: {
         Row: {
           amount: number
@@ -152,6 +188,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ar_receipt_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          receipt_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          receipt_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          receipt_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: []
       }
       ar_receipts: {
         Row: {

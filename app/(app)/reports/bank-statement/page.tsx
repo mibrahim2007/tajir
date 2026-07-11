@@ -51,9 +51,9 @@ export default async function BankStatementPage({ searchParams }: { searchParams
   let priorMovement = 0
 
   if (bankId && selectedBank) {
-    const [receiptsRes, paymentsRes, journalRes] = await Promise.all([
-      // Customer receipts tagged to this bank (from inception through `to` so we
-      // can carry pre-period movement into the opening balance)
+    const [receiptsRes, paymentsRes, journalRes, receiptLinesRes, paymentLinesRes] = await Promise.all([
+      // Legacy single-tender receipts tagged to this bank on the header (lined
+      // receipts carry a null header bank_id, so there is no double count).
       admin.from('ar_receipts')
         .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, tajir_customers(name)')
         .eq('bank_id', bankId)
@@ -61,7 +61,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
         .lte('date', to)
         .order('date'),
 
-      // Supplier payments tagged to this bank
+      // Legacy single-tender payments tagged to this bank on the header
       admin.from('ap_payments')
         .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, suppliers(name)')
         .eq('bank_id', bankId)
@@ -76,6 +76,18 @@ export default async function BankStatementPage({ searchParams }: { searchParams
         .eq('tenant_id', tenantId)
         .lte('date', to)
         .order('date'),
+
+      // Multi-tender receipt lines whose bank is this bank
+      admin.from('ar_receipt_lines')
+        .select('id, amount, cheque_number, receipt:ar_receipts!inner(id, date, amount, pkr_equivalent, serial_number, tajir_customers(name))')
+        .eq('bank_id', bankId)
+        .eq('tenant_id', tenantId),
+
+      // Multi-tender payment lines whose bank is this bank
+      admin.from('ap_payment_lines')
+        .select('id, amount, cheque_number, payment:ap_payments!inner(id, date, amount, pkr_equivalent, serial_number, suppliers(name))')
+        .eq('bank_id', bankId)
+        .eq('tenant_id', tenantId),
     ])
 
     type RawReceipt = {
@@ -153,7 +165,52 @@ export default async function BankStatementPage({ searchParams }: { searchParams
       }
     })
 
-    const allRows = [...receiptRows, ...paymentRows, ...journalRows]
+    type RawReceiptLine = {
+      id: string; amount: string; cheque_number: string | null
+      receipt: { id: string; date: string; amount: string; pkr_equivalent: string; serial_number: string | null; tajir_customers: { name: string } | null } | null
+    }
+    type RawPaymentLine = {
+      id: string; amount: string; cheque_number: string | null
+      payment: { id: string; date: string; amount: string; pkr_equivalent: string; serial_number: string | null; suppliers: { name: string } | null } | null
+    }
+
+    // PKR value of a tender line = line amount × the parent's currency rate.
+    const pkrRate = (amount: string, pkrEquivalent: string) => {
+      const a = parseFloat(amount)
+      return a > 0 ? parseFloat(pkrEquivalent) / a : 1
+    }
+
+    const receiptLineRows: TxnRow[] = ((receiptLinesRes.data ?? []) as unknown as RawReceiptLine[])
+      .filter((l) => l.receipt && l.receipt.date <= to)
+      .map((l) => ({
+        key: `rcl-${l.id}`,
+        date: l.receipt!.date,
+        type: 'Receipt' as const,
+        party: l.receipt!.tajir_customers?.name ?? '—',
+        description: '',
+        reference: '',
+        chequeNumber: l.cheque_number ?? '',
+        deposit: parseFloat(l.amount) * pkrRate(l.receipt!.amount, l.receipt!.pkr_equivalent),
+        withdrawal: 0,
+        voucherNumber: l.receipt!.serial_number ?? '',
+      }))
+
+    const paymentLineRows: TxnRow[] = ((paymentLinesRes.data ?? []) as unknown as RawPaymentLine[])
+      .filter((l) => l.payment && l.payment.date <= to)
+      .map((l) => ({
+        key: `pml-${l.id}`,
+        date: l.payment!.date,
+        type: 'Payment' as const,
+        party: l.payment!.suppliers?.name ?? '—',
+        description: '',
+        reference: '',
+        chequeNumber: l.cheque_number ?? '',
+        deposit: 0,
+        withdrawal: parseFloat(l.amount) * pkrRate(l.payment!.amount, l.payment!.pkr_equivalent),
+        voucherNumber: l.payment!.serial_number ?? '',
+      }))
+
+    const allRows = [...receiptRows, ...paymentRows, ...journalRows, ...receiptLineRows, ...paymentLineRows]
       .sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
 
     // Movement before the reporting window rolls into the opening balance so the

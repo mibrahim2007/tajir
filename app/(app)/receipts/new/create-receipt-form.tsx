@@ -11,11 +11,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CurrencyInput } from '@/components/currency-input'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
+import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
-import { MONEY_ACCOUNTS } from '@/lib/constants/money-accounts'
+import { editArReceiptAction } from '@/app/actions/edit-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
@@ -31,24 +31,41 @@ type Props = {
   salesByCustomer: Record<string, Sale[]>
   banks:           Bank[]
   nextSerial?:     string | null
+  mode?:           'create' | 'edit'
+  receiptId?:      string
+  initial?: {
+    customerId:        string
+    currencyCode:      'PKR' | 'USD'
+    exchangeRate:      number
+    date:              string
+    paymentMethodNote: string
+    lines:             TenderLine[]
+  }
 }
+
+const lineSchema = z.object({
+  transactionType: z.enum(['cash', 'pdc', 'online']),
+  chequeNumber:    z.string().optional().default(''),
+  bankId:          z.string().optional().default(''),
+  amount:          z.coerce.number().positive('Amount must be positive'),
+})
 
 const schema = z.object({
   customerId:        z.string().uuid('Select a customer'),
-  amount:            z.number().positive('Amount must be positive'),
   currencyCode:      z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:      z.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
-  chequeNumber:      z.string().optional(),
-  bankId:            z.string().optional(),
-  moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
+  lines:             z.array(lineSchema).min(1, 'Add at least one tender line'),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function CreateReceiptForm({ today, customers, salesByCustomer, banks, nextSerial }: Props) {
+const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
+
+export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSerial, mode = 'create', receiptId, initial }: Props) {
   const router = useRouter()
+  const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const uploaderRef = useRef<FileUploaderHandle>(null)
@@ -62,27 +79,47 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { customerId: '', amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', chequeNumber: '', bankId: '', moneyAccount: 'cash_in_hand' },
+    defaultValues: initial ?? {
+      customerId: '', currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', lines: [{ ...emptyLine }],
+    },
   })
 
-  const selectedCustomerId  = form.watch('customerId')
-  const watchedAmount        = form.watch('amount')
-  const watchedCurrency      = form.watch('currencyCode')
-  const watchedExchangeRate  = form.watch('exchangeRate')
+  const selectedCustomerId = form.watch('customerId')
+  const watchedCurrency     = form.watch('currencyCode')
+  const watchedExchangeRate = form.watch('exchangeRate')
+  const watchedLines        = form.watch('lines')
 
-  const selectedCustomer    = customerFull.find((c) => c.id === selectedCustomerId)
-  const customerSales       = selectedCustomerId ? (salesByCustomer[selectedCustomerId] ?? []) : []
-  const er                  = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
-  const amountPkr           = (watchedAmount || 0) * er
+  const selectedCustomer = customerFull.find((c) => c.id === selectedCustomerId)
+  const customerSales    = selectedCustomerId ? (salesByCustomer[selectedCustomerId] ?? []) : []
+  const er               = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
+  const amountTotal      = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  const amountPkr        = amountTotal * er
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createArReceiptAction({ ...values, chequeNumber: values.chequeNumber || undefined, bankId: values.bankId || undefined })
+      const payload = {
+        currencyCode: values.currencyCode,
+        exchangeRate: values.exchangeRate,
+        date: values.date,
+        paymentMethodNote: values.paymentMethodNote,
+        lines: values.lines.map((l) => ({
+          transactionType: l.transactionType,
+          chequeNumber: l.chequeNumber || undefined,
+          bankId: l.bankId || undefined,
+          amount: l.amount,
+        })),
+      }
+      const result = isEdit && receiptId
+        ? await editArReceiptAction({ id: receiptId, ...payload })
+        : await createArReceiptAction({ customerId: values.customerId, ...payload })
       if (!result.success) { setServerError(result.error); return }
-      await uploaderRef.current?.uploadFiles(result.data.id, 'ar_receipt')
+      if (!isEdit && 'data' in result && result.data) {
+        await uploaderRef.current?.uploadFiles(result.data.id, 'ar_receipt')
+      }
       router.push('/receipts')
+      router.refresh()
     })
   }
 
@@ -99,7 +136,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-4">
 
-                {nextSerial && (
+                {nextSerial && !isEdit && (
                   <div className="space-y-1">
                     <Label>Serial No.</Label>
                     <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
@@ -110,31 +147,35 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
                 {/* Customer */}
                 <div className="space-y-1">
                   <Label>Customer <span className="text-destructive">*</span></Label>
-                  <Controller
-                    control={form.control}
-                    name="customerId"
-                    render={({ field, fieldState }) => (
-                      <>
-                        <ItemPickerDialog
-                          items={customerPickerItems}
-                          value={field.value}
-                          onSelect={field.onChange}
-                          placeholder="Select customer…"
-                          title="Select Customer"
-                          createLabel="New Customer"
-                          onCreateSuccess={(item) => setCustomerFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
-                          quickCreate={(onSuccess, onCancel) => (
-                            <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
-                          )}
-                        />
-                        {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
-                      </>
-                    )}
-                  />
+                  {isEdit ? (
+                    <Input value={selectedCustomer?.name ?? '—'} disabled readOnly className="min-h-[44px]" />
+                  ) : (
+                    <Controller
+                      control={form.control}
+                      name="customerId"
+                      render={({ field, fieldState }) => (
+                        <>
+                          <ItemPickerDialog
+                            items={customerPickerItems}
+                            value={field.value}
+                            onSelect={field.onChange}
+                            placeholder="Select customer…"
+                            title="Select Customer"
+                            createLabel="New Customer"
+                            onCreateSuccess={(item) => setCustomerFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
+                            quickCreate={(onSuccess, onCancel) => (
+                              <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
+                            )}
+                          />
+                          {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
+                        </>
+                      )}
+                    />
+                  )}
                 </div>
 
                 {/* Outstanding reference */}
-                {selectedCustomer && (
+                {selectedCustomer && !isEdit && (
                   <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">Outstanding balance</span>
@@ -158,63 +199,45 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
                   </div>
                 )}
 
-                <CurrencyInput amountName="amount" currencyName="currencyCode" exchangeRateName="exchangeRate" label="Amount Received" required />
-
-                <div className="space-y-1">
-                  <Label>Date <span className="text-destructive">*</span></Label>
-                  <Input type="date" {...form.register('date')} className="min-h-[44px]" />
-                  {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <Label>Received in <span className="text-destructive">*</span></Label>
-                  <Controller
-                    control={form.control}
-                    name="moneyAccount"
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {MONEY_ACCOUNTS.map((a) => (
-                            <SelectItem key={a.value} value={a.value}>{a.label} ({a.code})</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <Label>Cheque No.</Label>
-                    <Input placeholder="e.g. 001234" {...form.register('chequeNumber')} className="min-h-[44px]" />
+                    <Label>Date <span className="text-destructive">*</span></Label>
+                    <Input type="date" {...form.register('date')} className="min-h-[44px]" />
+                    {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                   </div>
                   <div className="space-y-1">
-                    <Label>Note</Label>
-                    <Input placeholder="e.g. Bank transfer…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
-                  </div>
-                </div>
-
-                {banks.length > 0 && (
-                  <div className="space-y-1">
-                    <Label>Bank (optional)</Label>
+                    <Label>Currency</Label>
                     <Controller
                       control={form.control}
-                      name="bankId"
+                      name="currencyCode"
                       render={({ field }) => (
-                        <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="__none__">Cash / no bank</SelectItem>
-                            {banks.map((b) => (
-                              <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
-                            ))}
+                            <SelectItem value="PKR">PKR</SelectItem>
+                            <SelectItem value="USD">USD</SelectItem>
                           </SelectContent>
                         </Select>
                       )}
                     />
                   </div>
+                </div>
+
+                {watchedCurrency === 'USD' && (
+                  <div className="space-y-1">
+                    <Label>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></Label>
+                    <Input type="number" step="0.01" min="1" {...form.register('exchangeRate', { valueAsNumber: true })} className="min-h-[44px]" />
+                  </div>
                 )}
+
+                <Separator />
+
+                <TenderLinesField banks={banks} currency={watchedCurrency} />
+
+                <div className="space-y-1">
+                  <Label>Note</Label>
+                  <Input placeholder="e.g. Advance against invoice…" {...form.register('paymentMethodNote')} className="min-h-[44px]" />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -232,12 +255,14 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
                         <span className="text-muted-foreground">Customer</span>
                         <span className="font-medium text-right max-w-[140px] truncate">{selectedCustomer.name}</span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Outstanding</span>
-                        <span className={`tabular-nums font-medium ${selectedCustomer.outstanding > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                          Rs {fmt(selectedCustomer.outstanding)}
-                        </span>
-                      </div>
+                      {!isEdit && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Outstanding</span>
+                          <span className={`tabular-nums font-medium ${selectedCustomer.outstanding > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                            Rs {fmt(selectedCustomer.outstanding)}
+                          </span>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <p className="text-xs text-muted-foreground">Select a customer to see balance.</p>
@@ -255,7 +280,7 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
 
                 <div className="space-y-2">
                   <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending}>
-                    {isPending ? 'Saving…' : 'Record Receipt'}
+                    {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Record Receipt'}
                   </Button>
                   <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.back()}>
                     Cancel
@@ -264,9 +289,11 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
 
                 {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
 
-                <div className="mt-4 pt-4 border-t">
-                  <FileUploader ref={uploaderRef} />
-                </div>
+                {!isEdit && (
+                  <div className="mt-4 pt-4 border-t">
+                    <FileUploader ref={uploaderRef} />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -276,3 +303,6 @@ export function CreateReceiptForm({ today, customers, salesByCustomer, banks, ne
     </FormProvider>
   )
 }
+
+// Backwards-compatible alias for the create page.
+export const CreateReceiptForm = ReceiptForm

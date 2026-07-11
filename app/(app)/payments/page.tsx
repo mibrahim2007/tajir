@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Plus, Printer } from 'lucide-react'
+import { Plus, Printer, Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,11 @@ export default async function PaymentsPage() {
         </Button>
       </Link>
       <RoleGate allowedRoles={['owner']}>
+        <Link href={`/payments/${p.id}/edit`}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </Link>
         <DeletePaymentButton id={p.id} />
       </RoleGate>
     </div>

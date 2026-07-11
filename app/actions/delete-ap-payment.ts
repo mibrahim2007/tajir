@@ -32,6 +32,15 @@ export async function deleteApPaymentAction(input: unknown): Promise<ActionResul
 
   if (!payment) return { success: false, error: 'Payment not found', code: 'NOT_FOUND' }
 
+  // Remove the GL journal entry first (its lines cascade); then the payment
+  // (its tender lines cascade). Keeps the ledger from drifting on delete.
+  await admin
+    .from('tajir_journal_entries')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('source_type', 'ap_payment')
+    .eq('source_id', id)
+
   const { error } = await admin
     .from('ap_payments')
     .delete()

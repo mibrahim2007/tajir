@@ -32,6 +32,8 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
     { data: supplier },
     { data: bank },
     { data: journalEntry },
+    { data: rawLines },
+    { data: allBanks },
   ] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('id', payment.supplier_id).single(),
     payment.bank_id
@@ -42,7 +44,21 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
       .eq('source_id', id)
       .eq('source_type', 'ap_payment')
       .single(),
+    admin.from('ap_payment_lines')
+      .select('transaction_type, cheque_number, bank_id, amount, line_no')
+      .eq('payment_id', id).eq('tenant_id', tenantId).order('line_no'),
+    admin.from('banks').select('id, name').eq('tenant_id', tenantId),
   ])
+
+  const bankMap = new Map((allBanks ?? []).map((b) => [b.id, b.name]))
+  const TENDER_LABELS: Record<string, string> = { cash: 'Cash', pdc: 'PDC', online: 'Online' }
+  const lines = (rawLines ?? []).map((l) => ({
+    type: TENDER_LABELS[l.transaction_type] ?? l.transaction_type,
+    cheque: l.cheque_number ?? '',
+    bank: l.bank_id ? (bankMap.get(l.bank_id) ?? '—') : '',
+    amount: Number(l.amount),
+  }))
+  const hasLines = lines.length > 0
 
   const amount     = payment.amount
   const pkrAmount  = payment.pkr_equivalent
@@ -143,6 +159,30 @@ export default async function PrintPaymentPage({ params }: { params: Promise<{ i
             </tr>
           </tfoot>
         </table>
+
+        {/* Tender breakdown */}
+        {hasLines && (
+          <table className="w-full text-sm mb-8 border border-gray-300">
+            <thead className="bg-gray-100 print:bg-gray-100">
+              <tr>
+                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-24">Type</th>
+                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Cheque No.</th>
+                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Bank</th>
+                <th className="text-right px-4 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-32">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={i}>
+                  <td className="px-4 py-2 border-r border-t border-gray-200">{l.type}</td>
+                  <td className="px-4 py-2 border-r border-t border-gray-200 font-mono">{l.cheque || '—'}</td>
+                  <td className="px-4 py-2 border-r border-t border-gray-200">{l.bank || '—'}</td>
+                  <td className="px-4 py-2 border-t border-gray-200 text-right tabular-nums">{fmt(l.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
 
         {/* Signatures */}
         <div className="flex justify-between mt-16 pt-4 text-sm text-center">
