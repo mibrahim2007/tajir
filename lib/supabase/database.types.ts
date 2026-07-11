@@ -349,6 +349,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          opening_balance: number
           tenant_id: string
         }
         Insert: {
@@ -357,6 +358,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          opening_balance?: number
           tenant_id: string
         }
         Update: {
@@ -365,6 +367,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          opening_balance?: number
           tenant_id?: string
         }
         Relationships: [

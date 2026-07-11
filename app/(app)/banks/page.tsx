@@ -8,7 +8,7 @@ export default async function BanksPage() {
 
   const { data: banks } = await admin
     .from('banks')
-    .select('id, name, account_number, branch')
+    .select('id, name, account_number, branch, opening_balance')
     .eq('tenant_id', tenantId)
     .order('created_at')
 

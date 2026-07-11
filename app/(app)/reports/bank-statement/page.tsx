@@ -40,7 +40,7 @@ export default async function BankStatementPage({ searchParams }: { searchParams
 
   const { data: rawBanks } = await admin
     .from('banks')
-    .select('id, name, account_number, branch')
+    .select('id, name, account_number, branch, opening_balance')
     .eq('tenant_id', tenantId)
     .order('name')
 
@@ -48,15 +48,16 @@ export default async function BankStatementPage({ searchParams }: { searchParams
   const selectedBank = banks.find((b) => b.id === bankId)
 
   let rows: TxnRow[] = []
+  let priorMovement = 0
 
   if (bankId && selectedBank) {
     const [receiptsRes, paymentsRes, journalRes] = await Promise.all([
-      // Customer receipts tagged to this bank
+      // Customer receipts tagged to this bank (from inception through `to` so we
+      // can carry pre-period movement into the opening balance)
       admin.from('ar_receipts')
         .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, tajir_customers(name)')
         .eq('bank_id', bankId)
         .eq('tenant_id', tenantId)
-        .gte('date', from)
         .lte('date', to)
         .order('date'),
 
@@ -65,7 +66,6 @@ export default async function BankStatementPage({ searchParams }: { searchParams
         .select('id, date, pkr_equivalent, payment_method_note, cheque_number, serial_number, suppliers(name)')
         .eq('bank_id', bankId)
         .eq('tenant_id', tenantId)
-        .gte('date', from)
         .lte('date', to)
         .order('date'),
 
@@ -74,7 +74,6 @@ export default async function BankStatementPage({ searchParams }: { searchParams
         .select('id, date, description, reference, voucher_number, source_type, tajir_journal_entry_lines(debit, credit)')
         .eq('bank_id', bankId)
         .eq('tenant_id', tenantId)
-        .gte('date', from)
         .lte('date', to)
         .order('date'),
     ])
@@ -154,16 +153,27 @@ export default async function BankStatementPage({ searchParams }: { searchParams
       }
     })
 
-    rows = [...receiptRows, ...paymentRows, ...journalRows]
+    const allRows = [...receiptRows, ...paymentRows, ...journalRows]
       .sort((a, b) => a.date.localeCompare(b.date) || a.key.localeCompare(b.key))
+
+    // Movement before the reporting window rolls into the opening balance so the
+    // running balance is a true account balance, not just a period total.
+    priorMovement = allRows
+      .filter((r) => r.date < from)
+      .reduce((s, r) => s + r.deposit - r.withdrawal, 0)
+
+    rows = allRows.filter((r) => r.date >= from)
   }
+
+  // The bank's configured opening balance plus any movement before `from`.
+  const openingBalance = (selectedBank ? Number(selectedBank.opening_balance) : 0) + priorMovement
 
   const totalDeposits    = rows.reduce((s, r) => s + r.deposit, 0)
   const totalWithdrawals = rows.reduce((s, r) => s + r.withdrawal, 0)
-  const netBalance       = totalDeposits - totalWithdrawals
+  const closingBalance   = openingBalance + totalDeposits - totalWithdrawals
 
-  // Compute running balance
-  let running = 0
+  // Running balance starts from the opening balance
+  let running = openingBalance
   const rowsWithBalance = rows.map((r) => {
     running += r.deposit - r.withdrawal
     return { ...r, balance: running }
@@ -236,10 +246,10 @@ export default async function BankStatementPage({ searchParams }: { searchParams
                 {rows.filter(r => r.withdrawal > 0).length} transaction{rows.filter(r => r.withdrawal > 0).length !== 1 ? 's' : ''}
               </p>
             </div>
-            <div className={`rounded-xl border p-4 text-white shadow-sm bg-gradient-to-br ${netBalance >= 0 ? 'from-indigo-500 to-purple-600' : 'from-orange-500 to-amber-600'}`}>
-              <p className="text-xs text-white/85">Net Balance</p>
-              <p className="text-lg font-bold tabular-nums mt-1">{formatPKR(netBalance)}</p>
-              <p className="text-xs text-white/70 mt-0.5">{dateLabel}</p>
+            <div className={`rounded-xl border p-4 text-white shadow-sm bg-gradient-to-br ${closingBalance >= 0 ? 'from-indigo-500 to-purple-600' : 'from-orange-500 to-amber-600'}`}>
+              <p className="text-xs text-white/85">Closing Balance</p>
+              <p className="text-lg font-bold tabular-nums mt-1">{formatPKR(closingBalance)}</p>
+              <p className="text-xs text-white/70 mt-0.5">Opening {formatPKR(openingBalance)}</p>
             </div>
           </div>
 
@@ -268,6 +278,19 @@ export default async function BankStatementPage({ searchParams }: { searchParams
                     </tr>
                   </thead>
                   <tbody className="divide-y">
+                    <tr className="bg-muted/20">
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                        {formatPKTDate(from + 'T00:00:00')}
+                      </td>
+                      <td className="px-3 py-2.5 text-xs font-medium text-muted-foreground" colSpan={5}>
+                        Opening Balance{priorMovement !== 0 ? ' (incl. earlier movement)' : ''}
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
+                      <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
+                      <td className={`px-3 py-2.5 text-right tabular-nums font-semibold ${openingBalance < 0 ? 'text-rose-600' : 'text-foreground'}`}>
+                        {formatPKR(openingBalance)}
+                      </td>
+                    </tr>
                     {rowsWithBalance.map((row) => (
                       <tr key={row.key} className="hover:bg-muted/20 transition-colors">
                         <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
@@ -303,12 +326,12 @@ export default async function BankStatementPage({ searchParams }: { searchParams
                   <tfoot className="border-t bg-muted/30">
                     <tr className="font-semibold">
                       <td className="px-3 py-3 text-right" colSpan={6}>
-                        Total ({rows.length} transaction{rows.length !== 1 ? 's' : ''})
+                        Closing Balance ({rows.length} transaction{rows.length !== 1 ? 's' : ''})
                       </td>
                       <td className="px-3 py-3 text-right tabular-nums text-emerald-600">{formatPKR(totalDeposits)}</td>
                       <td className="px-3 py-3 text-right tabular-nums text-rose-600">{formatPKR(totalWithdrawals)}</td>
-                      <td className={`px-3 py-3 text-right tabular-nums ${netBalance < 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
-                        {formatPKR(netBalance)}
+                      <td className={`px-3 py-3 text-right tabular-nums ${closingBalance < 0 ? 'text-rose-600' : 'text-indigo-600'}`}>
+                        {formatPKR(closingBalance)}
                       </td>
                     </tr>
                   </tfoot>

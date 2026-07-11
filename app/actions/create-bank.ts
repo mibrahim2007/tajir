@@ -6,9 +6,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
-  name:          z.string().min(1, 'Bank name is required'),
-  accountNumber: z.string().optional(),
-  branch:        z.string().optional(),
+  name:           z.string().min(1, 'Bank name is required'),
+  accountNumber:  z.string().optional(),
+  branch:         z.string().optional(),
+  openingBalance: z.coerce.number().default(0),
 })
 
 export async function createBankAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -18,12 +19,12 @@ export async function createBankAction(input: unknown): Promise<ActionResult<{ i
   const { role, tenantId } = await requireAuth()
   if (role !== 'owner') return { success: false, error: 'Only owners can manage banks', code: 'UNAUTHORIZED' }
 
-  const { name, accountNumber, branch } = parsed.data
+  const { name, accountNumber, branch, openingBalance } = parsed.data
   const admin = createAdminClient()
 
   const { data, error } = await admin
     .from('banks')
-    .insert({ tenant_id: tenantId, name, account_number: accountNumber || null, branch: branch || null })
+    .insert({ tenant_id: tenantId, name, account_number: accountNumber || null, branch: branch || null, opening_balance: openingBalance })
     .select('id')
     .single()
 
