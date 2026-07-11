@@ -63,6 +63,9 @@ export default async function CustomerLedgerPage({ params }: Props) {
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
+  const { data: rawBanks } = await admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name')
+  const banks = rawBanks ?? []
+
   const sales = rawSales ?? []
   const receipts = rawReceipts ?? []
   const saleReturns = rawReturns ?? []
@@ -166,7 +169,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
               <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} />
             </RoleGate>
           )}
-          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} />
+          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} banks={banks} />
         </div>
       </div>
 

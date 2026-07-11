@@ -60,6 +60,9 @@ export default async function SupplierLedgerPage({ params }: Props) {
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
   ])
 
+  const { data: rawBanks } = await admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name')
+  const banks = rawBanks ?? []
+
   const purchases     = rawPurchases  ?? []
   const payments      = rawPayments   ?? []
   const purchaseReturns = rawReturns  ?? []
@@ -163,7 +166,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
           <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} />
-          <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} />
+          <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} banks={banks} />
         </div>
       </div>
 

@@ -10,23 +10,36 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CurrencyInput } from '@/components/currency-input'
+import { Separator } from '@/components/ui/separator'
+import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
-import { MONEY_ACCOUNTS } from '@/lib/constants/money-accounts'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
+type Bank = { id: string; name: string; account_number: string | null }
+
+const lineSchema = z.object({
+  transactionType: z.enum(['cash', 'pdc', 'online']),
+  chequeNumber:    z.string().optional().default(''),
+  bankId:          z.string().optional().default(''),
+  amount:          z.coerce.number().positive('Amount must be positive'),
+})
+
 const schema = z.object({
-  amount: z.number().positive('Amount must be positive'),
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
-  moneyAccount: z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
+  lines: z.array(lineSchema).min(1, 'Add at least one tender line'),
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function RecordPaymentForm({ supplierId, today, nextSerial }: { supplierId: string; today: string; nextSerial?: string | null }) {
+const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
+const freshDefaults = (today: string): FormValues => ({
+  currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', lines: [{ ...emptyLine }],
+})
+
+export function RecordPaymentForm({ supplierId, today, nextSerial, banks = [] }: { supplierId: string; today: string; nextSerial?: string | null; banks?: Bank[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -35,15 +48,29 @@ export function RecordPaymentForm({ supplierId, today, nextSerial }: { supplierI
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', moneyAccount: 'cash_in_hand' },
+    defaultValues: freshDefaults(today),
   })
+
+  const watchedCurrency = form.watch('currencyCode')
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createApPaymentAction({ ...values, supplierId })
+      const result = await createApPaymentAction({
+        supplierId,
+        currencyCode: values.currencyCode,
+        exchangeRate: values.exchangeRate,
+        date: values.date,
+        paymentMethodNote: values.paymentMethodNote,
+        lines: values.lines.map((l) => ({
+          transactionType: l.transactionType,
+          chequeNumber: l.chequeNumber || undefined,
+          bankId: l.bankId || undefined,
+          amount: l.amount,
+        })),
+      })
       if (!result.success) { setServerError(result.error); return }
-      form.reset({ amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', moneyAccount: 'cash_in_hand' })
+      form.reset(freshDefaults(today))
       setOpen(false)
       router.refresh()
     })
@@ -54,29 +81,22 @@ export function RecordPaymentForm({ supplierId, today, nextSerial }: { supplierI
       <SheetTrigger asChild>
         <Button variant="outline" className="min-h-[44px]">Record Payment</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Record Payment</SheetTitle>
           <SheetDescription>Record a payment made to this supplier.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
-              {nextSerial && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium leading-none">Serial No.</label>
-                  <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                  <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-                </div>
-              )}
+            {nextSerial && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Serial No.</label>
+                <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+              </div>
+            )}
 
-              <CurrencyInput
-                amountName="amount"
-                currencyName="currencyCode"
-                exchangeRateName="exchangeRate"
-                label="Amount"
-                required
-              />
-
+            <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
@@ -84,38 +104,47 @@ export function RecordPaymentForm({ supplierId, today, nextSerial }: { supplierI
                   <FormMessage />
                 </FormItem>
               )} />
-
-              <FormField control={form.control} name="moneyAccount" render={({ field }) => (
+              <FormField control={form.control} name="currencyCode" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Paid from <span className="text-destructive">*</span></FormLabel>
+                  <FormLabel>Currency</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                    </FormControl>
+                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
-                      {MONEY_ACCOUNTS.map((a) => (
-                        <SelectItem key={a.value} value={a.value}>{a.label} ({a.code})</SelectItem>
-                      ))}
+                      <SelectItem value="PKR">PKR</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
                     </SelectContent>
                   </Select>
-                  <FormMessage />
                 </FormItem>
               )} />
+            </div>
 
-              <FormField control={form.control} name="paymentMethodNote" render={({ field }) => (
+            {watchedCurrency === 'USD' && (
+              <FormField control={form.control} name="exchangeRate" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Payment Method / Note</FormLabel>
-                  <FormControl><Input placeholder="e.g. Bank transfer, Cheque #123" {...field} /></FormControl>
-                  <FormMessage />
+                  <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
+                  <FormControl><Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
                 </FormItem>
               )} />
+            )}
 
-              {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-              <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-                {isPending ? 'Recording…' : 'Record Payment'}
-              </Button>
-            </form>
-          </Form>
+            <Separator />
+
+            <TenderLinesField banks={banks} currency={watchedCurrency} />
+
+            <FormField control={form.control} name="paymentMethodNote" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Note (optional)</FormLabel>
+                <FormControl><Input placeholder="e.g. Advance against invoice…" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+              {isPending ? 'Recording…' : 'Record Payment'}
+            </Button>
+          </form>
+        </Form>
       </SheetContent>
     </Sheet>
   )
