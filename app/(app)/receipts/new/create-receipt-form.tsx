@@ -126,8 +126,9 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSeri
       if (!isEdit && 'data' in result && result.data) {
         await uploaderRef.current?.uploadFiles(result.data.id, 'ar_receipt')
       }
+      // Navigate to the list. Do NOT call router.refresh() after push — inside a
+      // transition that keeps isPending true forever, hanging the Save button.
       router.push('/receipts')
-      router.refresh()
     })
   }
 

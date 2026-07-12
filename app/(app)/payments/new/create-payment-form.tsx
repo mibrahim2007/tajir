@@ -126,8 +126,9 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
       if (!isEdit && 'data' in result && result.data) {
         await uploaderRef.current?.uploadFiles(result.data.id, 'ap_payment')
       }
+      // Navigate to the list. Do NOT call router.refresh() after push — inside a
+      // transition that keeps isPending true forever, hanging the Save button.
       router.push('/payments')
-      router.refresh()
     })
   }
 
