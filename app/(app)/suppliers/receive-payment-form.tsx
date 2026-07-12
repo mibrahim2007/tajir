@@ -10,22 +10,42 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { CurrencyInput } from '@/components/currency-input'
+import { Separator } from '@/components/ui/separator'
+import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
 import { createSupplierRefundAction } from '@/app/actions/create-supplier-refund'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
+type Bank = { id: string; name: string; account_number: string | null }
+
+const lineSchema = z.object({
+  transactionType: z.enum(['cash', 'pdc', 'online']),
+  chequeNumber:    z.string().optional().default(''),
+  bankId:          z.string().optional().default(''),
+  amount:          z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
+    z.coerce.number().min(0),
+  ),
+})
+
 const schema = z.object({
-  amount:        z.number().positive('Amount must be positive'),
-  currencyCode:  z.enum(['PKR', 'USD']).default('PKR'),
-  exchangeRate:  z.number().positive().default(1),
-  date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
-  paymentMethod: z.enum(['cash', 'bank_transfer']),
-  notes:         z.string().optional(),
+  currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
+  exchangeRate: z.number().positive().default(1),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  notes: z.string().optional(),
+  lines: z.array(lineSchema).min(1, 'Add at least one tender line'),
+}).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
+  message: 'Enter a positive amount for at least one tender line',
+  path: ['lines'],
 })
 
 type FormValues = z.infer<typeof schema>
 
-export function ReceivePaymentForm({ supplierId, today, nextSerial }: { supplierId: string; today: string; nextSerial?: string | null }) {
+const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
+const freshDefaults = (today: string): FormValues => ({
+  currencyCode: 'PKR', exchangeRate: 1, date: today, notes: '', lines: [{ ...emptyLine }],
+})
+
+export function ReceivePaymentForm({ supplierId, today, nextSerial, banks = [] }: { supplierId: string; today: string; nextSerial?: string | null; banks?: Bank[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -34,15 +54,29 @@ export function ReceivePaymentForm({ supplierId, today, nextSerial }: { supplier
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethod: 'cash', notes: '' },
+    defaultValues: freshDefaults(today),
   })
+
+  const watchedCurrency = form.watch('currencyCode')
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createSupplierRefundAction({ ...values, supplierId })
+      const result = await createSupplierRefundAction({
+        supplierId,
+        currencyCode: values.currencyCode,
+        exchangeRate: values.exchangeRate,
+        date: values.date,
+        notes: values.notes,
+        lines: values.lines.filter((l) => (Number(l.amount) || 0) > 0).map((l) => ({
+          transactionType: l.transactionType,
+          chequeNumber: l.chequeNumber || undefined,
+          bankId: l.bankId || undefined,
+          amount: l.amount,
+        })),
+      })
       if (!result.success) { setServerError(result.error); return }
-      form.reset({ amount: 0, currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethod: 'cash', notes: '' })
+      form.reset(freshDefaults(today))
       setOpen(false)
       router.refresh()
     })
@@ -58,7 +92,7 @@ export function ReceivePaymentForm({ supplierId, today, nextSerial }: { supplier
           Receive Payment
         </Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Receive Payment from Supplier</SheetTitle>
           <SheetDescription>
@@ -66,7 +100,7 @@ export function ReceivePaymentForm({ supplierId, today, nextSerial }: { supplier
           </SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
             {nextSerial && (
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">Serial No.</label>
@@ -75,37 +109,40 @@ export function ReceivePaymentForm({ supplierId, today, nextSerial }: { supplier
               </div>
             )}
 
-            <CurrencyInput
-              amountName="amount"
-              currencyName="currencyCode"
-              exchangeRateName="exchangeRate"
-              label="Amount Received"
-              required
-            />
+            <div className="grid grid-cols-2 gap-3">
+              <FormField control={form.control} name="date" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
+                  <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="currencyCode" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Currency</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="PKR">PKR</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormItem>
+              )} />
+            </div>
 
-            <FormField control={form.control} name="paymentMethod" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Payment Method <span className="text-destructive">*</span></FormLabel>
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )} />
+            {watchedCurrency === 'USD' && (
+              <FormField control={form.control} name="exchangeRate" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
+                  <FormControl><Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                </FormItem>
+              )} />
+            )}
 
-            <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+            <Separator />
+
+            <TenderLinesField banks={banks} currency={watchedCurrency} />
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem>

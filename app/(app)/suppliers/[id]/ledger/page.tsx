@@ -125,7 +125,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
       // Money received FROM supplier — increases (or restores) our balance
       const amount = item.entry.pkr_equivalent
       runningBalance += amount
-      const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'
+      const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : item.entry.payment_method === 'cash' ? 'Cash' : 'Mixed'
       const ref = item.entry.serial_number ? `${item.entry.serial_number} · ` : ''
       const desc = `${ref}Payment Received${item.entry.notes ? ` — ${item.entry.notes}` : ''} (${method})`
       rows.push({ id: item.entry.id, kind: 'supplier_refund', date: item.date, description: desc, debit: amount, credit: 0, balance: runningBalance })
@@ -165,7 +165,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
         <div className="flex gap-2 flex-wrap">
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
-          <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} />
+          <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} banks={banks} />
           <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} banks={banks} />
         </div>
       </div>

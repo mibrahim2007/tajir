@@ -126,7 +126,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'supplier', kind: 'debit_note', date: e.date, description: `Debit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawSupplierRefunds ?? []) {
-    entries.push({ id: e.id, side: 'supplier', kind: 'supplier_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Payment Received from Supplier — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
+    entries.push({ id: e.id, side: 'supplier', kind: 'supplier_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Payment Received from Supplier — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : e.payment_method === 'cash' ? 'Cash' : 'Mixed'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
   }
 
   // Component balances in each party's own frame.
