@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { Plus, AlertTriangle, Printer, Pencil, RotateCcw } from 'lucide-react'
+import { Plus, AlertTriangle, Printer, Pencil, RotateCcw, FileText } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -172,6 +172,11 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
       <Link href={item.type === 'invoice' ? `/sales/invoice/${item.invoiceId}/print` : `/sales/${item.soloOrder!.id}/print`}>
         <Button variant="ghost" size="icon-sm" title="Print" aria-label="Print"><Printer className="size-4" /></Button>
       </Link>
+      {item.type === 'invoice' && (
+        <Link href={`/sales/invoice/${item.invoiceId}/report`}>
+          <Button variant="ghost" size="icon-sm" title="A4 report" aria-label="A4 report" className="text-muted-foreground"><FileText className="size-4" /></Button>
+        </Link>
+      )}
       <RoleGate allowedRoles={['owner']}>
         <Link href={item.type === 'solo' ? `/sale-returns/new?so=${item.soloOrder!.id}` : `/sale-returns/new`}>
           <Button variant="ghost" size="icon-sm" title="Record return" aria-label="Record return" className="text-muted-foreground"><RotateCcw className="size-4" /></Button>
