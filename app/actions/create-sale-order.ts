@@ -103,7 +103,7 @@ export async function createSaleOrderAction(input: unknown): Promise<
 
   // Auto-post GL: DR Accounts Receivable, CR Sales Revenue + DR COGS, CR Inventory
   await postJournalEntry({
-    tenantId, date, description: 'Sale Invoice', sourceType: 'sale_order', sourceId: order.id, prefix: 'SI',
+    tenantId, date, description: 'Sale Invoice', reference: serialNumber, sourceType: 'sale_order', sourceId: order.id, prefix: 'SI',
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: pkrEquivalent, credit: 0, customerId },
       { accountSystemKey: 'sales_revenue',       debit: 0, credit: pkrEquivalent, customerId },

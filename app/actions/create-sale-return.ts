@@ -121,7 +121,8 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
   await postJournalEntry({
     tenantId,
     date,
-    description:  `Sale Return${reason ? ` — ${reason}` : ''}`,
+    description:  'Sale Return',
+    reference:    serialNumber,
     sourceType:   'sale_return',
     sourceId:     ret.id,
     prefix:       'SR',

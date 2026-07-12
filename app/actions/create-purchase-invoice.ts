@@ -101,7 +101,7 @@ export async function createPurchaseInvoiceAction(
 
   // Single GL entry for the whole invoice
   await postJournalEntry({
-    tenantId, date, description: 'Purchase Invoice',
+    tenantId, date, description: 'Purchase Invoice', reference: serialNumber,
     sourceType: 'purchase_invoice', sourceId: invoiceId, prefix: 'PI',
     lines: [
       ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),

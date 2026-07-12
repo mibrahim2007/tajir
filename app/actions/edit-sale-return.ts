@@ -38,7 +38,7 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
 
   const { data: existing } = await admin
     .from('sale_returns')
-    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code')
+    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code, serial_number')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -102,7 +102,8 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
 
   await postJournalEntry({
     tenantId, date,
-    description: `Sale Return${reason ? ` — ${reason}` : ''}`,
+    description: 'Sale Return',
+    reference: existing.serial_number ?? undefined,
     sourceType: 'sale_return',
     sourceId: id,
     prefix: 'SR',

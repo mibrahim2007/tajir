@@ -192,7 +192,7 @@ export async function editSaleInvoiceAction(
   }
 
   await postJournalEntry({
-    tenantId, date, description: 'Sale Invoice',
+    tenantId, date, description: 'Sale Invoice', reference: serialNumber ?? undefined,
     sourceType: 'sale_invoice', sourceId: invoiceId, prefix: 'SI',
     voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [

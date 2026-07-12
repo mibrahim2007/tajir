@@ -80,6 +80,7 @@ export async function createCustomerRefundAction(input: unknown): Promise<Action
     tenantId,
     date,
     description: `Customer Refund${notes ? ` — ${notes}` : ''} (${paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'Cash'})`,
+    reference:   serialNumber,
     sourceType:  'customer_refund',
     sourceId:    refund.id,
     prefix:      'RF',

@@ -73,7 +73,8 @@ export async function createDebitNoteAction(input: unknown): Promise<ActionResul
   await postJournalEntry({
     tenantId,
     date,
-    description: `Debit Note${reason ? ` — ${reason}` : ''}${reference ? ` (Ref: ${reference})` : ''}`,
+    description: 'Debit Note',
+    reference:   reference || undefined,
     sourceType:  'debit_note',
     sourceId:    note.id,
     prefix:      'DN',

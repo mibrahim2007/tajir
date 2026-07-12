@@ -100,7 +100,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
 
   await postJournalEntry({
-    tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
+    tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
     lines: [
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),
       { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId },

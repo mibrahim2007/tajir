@@ -14,7 +14,7 @@ type PostJournalEntryParams = {
   tenantId: string
   date: string
   description: string
-  reference?: string
+  reference?: string | null
   sourceType: string
   sourceId: string
   prefix: string
@@ -44,6 +44,24 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const missingKeys = systemKeys.filter((k) => !accountMap.has(k))
   if (missingKeys.length > 0) return // partial CoA — skip silently
 
+  // Resolve the party (customer or supplier) named on the entry so the stored
+  // narration reads "Party — DocNo — Date — Type" and the reference holds the
+  // source document number.
+  const partyCustomerId = lines.find((l) => l.customerId)?.customerId
+  const partySupplierId = lines.find((l) => l.supplierId)?.supplierId
+  let partyName: string | null = null
+  if (partyCustomerId) {
+    const { data: cust } = await admin
+      .from('tajir_customers').select('name').eq('id', partyCustomerId).eq('tenant_id', tenantId).maybeSingle()
+    partyName = cust?.name ?? null
+  } else if (partySupplierId) {
+    const { data: supp } = await admin
+      .from('suppliers').select('name').eq('id', partySupplierId).eq('tenant_id', tenantId).maybeSingle()
+    partyName = supp?.name ?? null
+  }
+
+  const fullDescription = [partyName, reference, date, description].filter(Boolean).join(' — ')
+
   // Reuse the caller-supplied voucher (edits) or draw the next one atomically
   let voucherNumber = reuseVoucher ?? null
   if (!voucherNumber) {
@@ -60,7 +78,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
       tenant_id:      tenantId,
       voucher_number: voucherNumber,
       date,
-      description,
+      description:    fullDescription,
       reference:      reference ?? null,
       source_type:    sourceType,
       source_id:      sourceId,

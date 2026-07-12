@@ -68,6 +68,7 @@ export async function createSupplierRefundAction(input: unknown): Promise<Action
     tenantId,
     date,
     description: `Supplier Refund${notes ? ` — ${notes}` : ''} (${paymentMethod === 'bank_transfer' ? 'Bank Transfer' : 'Cash'})`,
+    reference:   serialNumber,
     sourceType:  'supplier_refund',
     sourceId:    refund.id,
     prefix:      'SR',

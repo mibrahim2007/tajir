@@ -73,7 +73,8 @@ export async function createCreditNoteAction(input: unknown): Promise<ActionResu
   await postJournalEntry({
     tenantId,
     date,
-    description: `Credit Note${reason ? ` — ${reason}` : ''}${reference ? ` (Ref: ${reference})` : ''}`,
+    description: 'Credit Note',
+    reference:   reference || undefined,
     sourceType:  'credit_note',
     sourceId:    note.id,
     prefix:      'CN',

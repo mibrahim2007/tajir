@@ -137,7 +137,7 @@ export async function createSaleInvoiceAction(
 
   // Single GL entry for the whole invoice
   await postJournalEntry({
-    tenantId, date, description: 'Sale Invoice',
+    tenantId, date, description: 'Sale Invoice', reference: serialNumber,
     sourceType: 'sale_invoice', sourceId: invoiceId, prefix: 'SI',
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },

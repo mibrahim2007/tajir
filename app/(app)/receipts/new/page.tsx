@@ -8,7 +8,7 @@ export default async function NewReceiptPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
     admin.from('tajir_customers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -23,6 +23,12 @@ export default async function NewReceiptPage() {
     admin.from('sale_returns')
       .select('id, customer_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
+    admin.from('credit_notes')
+      .select('id, customer_id, pkr_equivalent')
+      .eq('tenant_id', tenantId),
+    admin.from('customer_refunds')
+      .select('id, customer_id, pkr_equivalent')
+      .eq('tenant_id', tenantId),
     admin.from('inventory_lots')
       .select('id, name')
       .eq('tenant_id', tenantId),
@@ -33,17 +39,25 @@ export default async function NewReceiptPage() {
   const sales = rawSales ?? []
   const receipts = rawReceipts ?? []
   const returns = rawReturns ?? []
+  const creditNotes = rawCreditNotes ?? []
+  const refunds = rawRefunds ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
   const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today)
 
-  // Compute outstanding per customer
+  // Compute outstanding per customer — mirror the customer-ledger balance
+  // (lib/ledger/consolidated.ts): opening + sales − receipts − returns
+  // − credit notes + refunds. A refund settles the customer's credit balance,
+  // so it pulls the balance back up toward zero; omitting it makes a
+  // fully-settled customer read as a negative (credit) outstanding.
   const customerList = customers.map((c) => {
     const opening = c.opening_balance_pkr_equivalent  ?? 0
     const billed = sales.filter((s) => s.customer_id === c.id).reduce((sum, s) => sum + s.pkr_equivalent, 0)
     const received = receipts.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
     const returned = returns.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
-    return { id: c.id, name: c.name, outstanding: opening + billed - received - returned }
+    const credited = creditNotes.filter((n) => n.customer_id === c.id).reduce((sum, n) => sum + n.pkr_equivalent, 0)
+    const refunded = refunds.filter((r) => r.customer_id === c.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
+    return { id: c.id, name: c.name, outstanding: opening + billed - received - returned - credited + refunded }
   })
 
   // Group sales by customer (most recent first, last 5 per customer)

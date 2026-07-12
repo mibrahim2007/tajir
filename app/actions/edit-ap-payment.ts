@@ -44,7 +44,7 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
 
   const { data: existing } = await admin
     .from('ap_payments')
-    .select('supplier_id, amount, pkr_equivalent, date')
+    .select('supplier_id, serial_number, amount, pkr_equivalent, date')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -80,7 +80,7 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
 
   const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
   await postJournalEntry({
-    tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, sourceType: 'ap_payment', sourceId: id, prefix: 'PM',
+    tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ap_payment', sourceId: id, prefix: 'PM',
     voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId: existing.supplier_id },

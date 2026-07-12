@@ -44,7 +44,7 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   const { data: existing } = await admin
     .from('ar_receipts')
-    .select('customer_id, amount, pkr_equivalent, date')
+    .select('customer_id, serial_number, amount, pkr_equivalent, date')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -80,7 +80,7 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
   await postJournalEntry({
-    tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, sourceType: 'ar_receipt', sourceId: id, prefix: 'RC',
+    tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ar_receipt', sourceId: id, prefix: 'RC',
     voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),

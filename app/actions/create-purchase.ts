@@ -82,7 +82,7 @@ export async function createPurchaseAction(input: unknown): Promise<ActionResult
 
   // Auto-post GL: DR Inventory, CR Accounts Payable
   await postJournalEntry({
-    tenantId, date, description: 'Purchase Invoice', sourceType: 'purchase_order', sourceId: order.id, prefix: 'PI',
+    tenantId, date, description: 'Purchase Invoice', reference: serialNumber, sourceType: 'purchase_order', sourceId: order.id, prefix: 'PI',
     lines: [
       { accountSystemKey: 'inventory',        debit: pkrEquivalent, credit: 0, stockItemId },
       { accountSystemKey: 'accounts_payable', debit: 0, credit: pkrEquivalent, supplierId },

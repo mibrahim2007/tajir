@@ -8,7 +8,7 @@ export default async function NewPaymentPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
     admin.from('suppliers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -23,6 +23,12 @@ export default async function NewPaymentPage() {
     admin.from('purchase_returns')
       .select('id, supplier_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
+    admin.from('debit_notes')
+      .select('id, supplier_id, pkr_equivalent')
+      .eq('tenant_id', tenantId),
+    admin.from('supplier_refunds')
+      .select('id, supplier_id, pkr_equivalent')
+      .eq('tenant_id', tenantId),
     admin.from('inventory_lots')
       .select('id, name')
       .eq('tenant_id', tenantId),
@@ -33,17 +39,25 @@ export default async function NewPaymentPage() {
   const purchases = rawPurchases ?? []
   const payments = rawPayments ?? []
   const returns = rawReturns ?? []
+  const debitNotes = rawDebitNotes ?? []
+  const refunds = rawRefunds ?? []
   const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
   const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ap_payment', today)
 
-  // Compute outstanding per supplier
+  // Compute outstanding per supplier — mirror the supplier-ledger balance
+  // (lib/ledger/consolidated.ts): opening + purchases(net of advance) − payments
+  // − returns − debit notes + supplier refunds. A refund received from the
+  // supplier settles our debit balance with them, pulling the balance back up
+  // toward zero; omitting it makes a fully-settled supplier read as negative.
   const supplierList = suppliers.map((s) => {
     const opening = s.opening_balance_pkr_equivalent  ?? 0
     const purchased = purchases.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent - p.advance_paid, 0)
     const paid = payments.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent, 0)
     const returned = returns.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
-    return { id: s.id, name: s.name, outstanding: opening + purchased - paid - returned }
+    const debited = debitNotes.filter((n) => n.supplier_id === s.id).reduce((sum, n) => sum + n.pkr_equivalent, 0)
+    const refunded = refunds.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
+    return { id: s.id, name: s.name, outstanding: opening + purchased - paid - returned - debited + refunded }
   })
 
   // Group purchases by supplier (most recent first, last 5 per supplier)

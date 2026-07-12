@@ -97,7 +97,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
 
   await postJournalEntry({
-    tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',
+    tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',
     lines: [
       { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId },
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: 0, credit: leg.pkr })),
