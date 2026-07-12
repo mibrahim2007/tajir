@@ -73,7 +73,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                   name={`lines.${i}.transactionType`}
                   render={({ field: f }) => (
                     <Select value={f.value} onValueChange={f.onChange}>
-                      <SelectTrigger className="min-h-[44px] sm:min-h-[40px] min-w-0"><SelectValue /></SelectTrigger>
+                      <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {TENDER_TYPES.map((t) => (
                           <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -101,7 +101,10 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                   name={`lines.${i}.bankId`}
                   render={({ field: f }) => (
                     <Select value={f.value || '__none__'} onValueChange={(v) => f.onChange(v === '__none__' ? '' : v)} disabled={bankDisabled}>
-                      <SelectTrigger className="min-h-[44px] sm:min-h-[40px] min-w-0 [&>span]:truncate"><SelectValue placeholder="Bank" /></SelectTrigger>
+                      {/* w-full overrides the trigger's default w-fit so a long bank
+                          name can't grow the trigger past its column; the value span
+                          is forced to a truncating block. */}
+                      <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate"><SelectValue placeholder="Bank" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">No bank</SelectItem>
                         {banks.map((b) => (
