@@ -106,9 +106,25 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
   }
 
   const selectedAccount = accounts.find((a) => a.id === accountId)
+  const isDebitNormalAcc = ['asset', 'expense'].includes(selectedAccount?.account_type ?? 'asset')
 
-  // Compute running balance per account (if single account selected)
-  let runningBalance = 0
+  // Opening balance (single-account view) = net movement on the account for all
+  // posted entries dated before `from`, on the account's normal side.
+  let openingBalance = 0
+  if (accountId) {
+    const { data: priorLines } = await admin
+      .from('tajir_journal_entry_lines')
+      .select('debit, credit, tajir_journal_entries!inner(date)')
+      .eq('tenant_id', tenantId)
+      .eq('account_id', accountId)
+      .lt('tajir_journal_entries.date', from)
+    openingBalance = ((priorLines ?? []) as unknown as { debit: number; credit: number }[])
+      .reduce((s, l) => s + (isDebitNormalAcc ? Number(l.debit) - Number(l.credit) : Number(l.credit) - Number(l.debit)), 0)
+  }
+
+  // Running balance seeded from the opening balance so it reads as a true
+  // account balance carried across the period, not just a period total.
+  let runningBalance = openingBalance
   const withBalance = rows.map((row) => {
     const isDebitNormal = ['asset', 'expense'].includes(
       accountMap.get(row.accountId)?.account_type ?? 'asset'
@@ -119,6 +135,10 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
 
   const totalDebit = rows.reduce((s, r) => s + r.debit, 0)
   const totalCredit = rows.reduce((s, r) => s + r.credit, 0)
+  const fmtBal = (n: number) => `${formatPKR(Math.abs(n))}${n < 0 ? ' Cr' : ' Dr'}`
+  // For a selected account, show the table whenever there is opening balance or
+  // in-range activity (so a carried-forward balance is visible on its own).
+  const showTable = rows.length > 0 || (!!accountId && openingBalance !== 0)
   const dateLabel = `${formatPKTDate(from + 'T00:00:00')} – ${formatPKTDate(to + 'T00:00:00')}`
 
   return (
@@ -128,6 +148,7 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
           <h1 className="text-2xl font-semibold">General Ledger</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {selectedAccount ? `${selectedAccount.code} — ${selectedAccount.name} · ` : ''}{dateLabel}
+            {selectedAccount ? ` · Opening ${fmtBal(openingBalance)}` : ''}
           </p>
         </div>
         <div className="flex gap-2 print:hidden">
@@ -139,7 +160,7 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
         <GeneralLedgerFilters from={from} to={to} accountId={accountId} accounts={accounts} />
       </Suspense>
 
-      {rows.length === 0 ? (
+      {!showTable ? (
         <div className="rounded-lg border border-dashed p-12 text-center mt-4">
           <p className="text-muted-foreground text-sm">
             No GL entries in this date range{accountId ? ' for the selected account' : ''}.
@@ -162,6 +183,21 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
                 </tr>
               </thead>
               <tbody className="divide-y">
+                {accountId && (
+                  <tr className="bg-muted/20">
+                    <td className="px-3 py-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                      {formatPKTDate(from + 'T00:00:00')}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs font-medium text-muted-foreground" colSpan={3}>
+                      Opening Balance
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
+                    <td className="px-3 py-2.5 text-right text-muted-foreground">—</td>
+                    <td className={`px-3 py-2.5 text-right tabular-nums font-medium ${openingBalance < 0 ? 'text-destructive' : ''}`}>
+                      {fmtBal(openingBalance)}
+                    </td>
+                  </tr>
+                )}
                 {withBalance.map((row) => (
                   <tr key={row.lineId} className="hover:bg-muted/20 transition-colors">
                     <td className="px-3 py-2.5 whitespace-nowrap text-xs">
@@ -201,13 +237,13 @@ export default async function GeneralLedgerPage({ searchParams }: { searchParams
               <tfoot className="border-t bg-muted/30">
                 <tr className="font-semibold">
                   <td className="px-3 py-3 text-right" colSpan={accountId ? 4 : 5}>
-                    Total ({rows.length} entries)
+                    {accountId ? `Closing Balance (${rows.length} entr${rows.length === 1 ? 'y' : 'ies'})` : `Total (${rows.length} entries)`}
                   </td>
                   <td className="px-3 py-3 text-right tabular-nums">{formatPKR(totalDebit)}</td>
                   <td className="px-3 py-3 text-right tabular-nums">{formatPKR(totalCredit)}</td>
                   {accountId && (
                     <td className="px-3 py-3 text-right tabular-nums">
-                      {formatPKR(Math.abs(runningBalance))}{runningBalance < 0 ? ' Cr' : ' Dr'}
+                      {fmtBal(runningBalance)}
                     </td>
                   )}
                 </tr>
