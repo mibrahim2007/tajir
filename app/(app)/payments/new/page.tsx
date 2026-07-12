@@ -46,11 +46,11 @@ export default async function NewPaymentPage() {
     return { id: s.id, name: s.name, outstanding: opening + purchased - paid - returned }
   })
 
-  // Group purchases by supplier (most recent first, limit 10 per supplier)
+  // Group purchases by supplier (most recent first, last 5 per supplier)
   const purchasesBySupplier: Record<string, { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number; advancePaid: number }[]> = {}
   for (const p of purchases) {
     if (!purchasesBySupplier[p.supplier_id]) purchasesBySupplier[p.supplier_id] = []
-    if (purchasesBySupplier[p.supplier_id].length < 10) {
+    if (purchasesBySupplier[p.supplier_id].length < 5) {
       purchasesBySupplier[p.supplier_id].push({
         id: p.id,
         date: p.date,

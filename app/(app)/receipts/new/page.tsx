@@ -46,11 +46,11 @@ export default async function NewReceiptPage() {
     return { id: c.id, name: c.name, outstanding: opening + billed - received - returned }
   })
 
-  // Group sales by customer (most recent first, limit 10 per customer)
+  // Group sales by customer (most recent first, last 5 per customer)
   const salesByCustomer: Record<string, { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number }[]> = {}
   for (const s of sales) {
     if (!salesByCustomer[s.customer_id]) salesByCustomer[s.customer_id] = []
-    if (salesByCustomer[s.customer_id].length < 10) {
+    if (salesByCustomer[s.customer_id].length < 5) {
       salesByCustomer[s.customer_id].push({
         id: s.id,
         date: s.date,
