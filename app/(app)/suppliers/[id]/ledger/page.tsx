@@ -1,9 +1,12 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
+import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { RecordPaymentForm } from '@/app/(app)/suppliers/record-payment-form'
 import { ReceivePaymentForm } from '@/app/(app)/suppliers/receive-payment-form'
 import { EditApPaymentForm } from '@/app/(app)/suppliers/edit-ap-payment-form'
+import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/export-button'
 import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
@@ -220,6 +223,15 @@ export default async function SupplierLedgerPage({ params }: Props) {
                       {row.kind === 'payment' && row.rawPayment && (
                         <RoleGate allowedRoles={['owner']}>
                           <EditApPaymentForm payment={row.rawPayment} />
+                        </RoleGate>
+                      )}
+                      {row.kind === 'supplier_refund' && (
+                        <RoleGate allowedRoles={['owner']}>
+                          <Link href={`/supplier-refunds/${row.id}/edit`}>
+                            <Button variant="ghost" size="sm" className="min-h-[44px]" title="Edit refund">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
                         </RoleGate>
                       )}
                     </td>
