@@ -104,7 +104,7 @@ export async function buildConsolidatedLedger(
     entries.push({ id: e.id, side: 'customer', kind: 'credit_note', date: e.date, description: `Credit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`, debit: 0, credit: e.pkr_equivalent })
   }
   for (const e of rawCustomerRefunds ?? []) {
-    entries.push({ id: e.id, side: 'customer', kind: 'customer_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Customer Refund — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
+    entries.push({ id: e.id, side: 'customer', kind: 'customer_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Customer Refund — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : e.payment_method === 'cash' ? 'Cash' : 'Mixed'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
   }
 
   // ── Supplier side (AP polarity: debit = we owe them more) ──

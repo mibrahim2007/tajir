@@ -634,6 +634,42 @@ export type Database = {
           },
         ]
       }
+      customer_refund_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          refund_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          refund_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          refund_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: []
+      }
       customer_refunds: {
         Row: {
           amount: number
@@ -644,7 +680,7 @@ export type Database = {
           exchange_rate: number
           id: string
           notes: string | null
-          payment_method: string
+          payment_method: string | null
           pkr_equivalent: number
           serial_number: string | null
           tenant_id: string
@@ -658,7 +694,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           notes?: string | null
-          payment_method?: string
+          payment_method?: string | null
           pkr_equivalent: number
           serial_number?: string | null
           tenant_id: string
@@ -672,7 +708,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           notes?: string | null
-          payment_method?: string
+          payment_method?: string | null
           pkr_equivalent?: number
           serial_number?: string | null
           tenant_id?: string

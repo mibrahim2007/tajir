@@ -128,7 +128,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
       const amount = item.entry.pkr_equivalent
       // Refund increases the AR balance (we paid them back, so credit is consumed)
       runningBalance += amount
-      const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Cash'
+      const method = item.entry.payment_method === 'bank_transfer' ? 'Bank Transfer' : item.entry.payment_method === 'cash' ? 'Cash' : 'Mixed'
       const ref = item.entry.serial_number ? `${item.entry.serial_number} · ` : ''
       rows.push({ id: item.entry.id, kind: 'refund', date: item.date, description: `${ref}Customer Refund — ${method}${item.entry.notes ? ` (${item.entry.notes})` : ''}`, debit: amount, credit: 0, balance: runningBalance })
     } else {
@@ -166,7 +166,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
           <ExportButton href={`/api/export/customer-ledger/${id}`} label="Export" />
           {runningBalance < 0 && (
             <RoleGate allowedRoles={['owner']}>
-              <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} />
+              <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} banks={banks} />
             </RoleGate>
           )}
           <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} banks={banks} />
