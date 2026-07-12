@@ -37,8 +37,10 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
         <span className="text-xs text-muted-foreground">{currency !== 'PKR' ? `Amounts in ${currency}` : 'Cash · PDC · Online'}</span>
       </div>
 
-      {/* Column headers (desktop) */}
-      <div className="hidden sm:grid grid-cols-[120px_1fr_1fr_120px_36px] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+      {/* Column headers (desktop). minmax(0,…) lets columns shrink so long
+          bank names never push the grid past the container; Bank gets the most
+          relative width since its text is longest. */}
+      <div className="hidden sm:grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.6fr)_110px_36px] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         <span>Type</span>
         <span>Cheque No.</span>
         <span>Bank</span>
@@ -52,13 +54,13 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           const chequeDisabled = type === 'cash'
           const bankDisabled   = type === 'cash'
           return (
-            <div key={field.id} className="grid grid-cols-2 sm:grid-cols-[120px_1fr_1fr_120px_36px] gap-2 items-start">
+            <div key={field.id} className="grid grid-cols-2 sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.6fr)_110px_36px] gap-2 items-start">
               <Controller
                 control={control}
                 name={`lines.${i}.transactionType`}
                 render={({ field: f }) => (
                   <Select value={f.value} onValueChange={f.onChange}>
-                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px]"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px] min-w-0"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TENDER_TYPES.map((t) => (
                         <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
@@ -71,7 +73,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
               <Input
                 placeholder={chequeDisabled ? '—' : 'Cheque No.'}
                 disabled={chequeDisabled}
-                className="min-h-[44px] sm:min-h-[40px]"
+                className="min-h-[44px] sm:min-h-[40px] min-w-0"
                 {...register(`lines.${i}.chequeNumber`)}
               />
 
@@ -80,7 +82,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                 name={`lines.${i}.bankId`}
                 render={({ field: f }) => (
                   <Select value={f.value || '__none__'} onValueChange={(v) => f.onChange(v === '__none__' ? '' : v)} disabled={bankDisabled}>
-                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px]"><SelectValue placeholder="Bank" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px] min-w-0 [&>span]:truncate"><SelectValue placeholder="Bank" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none__">No bank</SelectItem>
                       {banks.map((b) => (
@@ -97,7 +99,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                 min="0"
                 inputMode="decimal"
                 placeholder="0.00"
-                className="min-h-[44px] sm:min-h-[40px] text-right"
+                className="min-h-[44px] sm:min-h-[40px] text-right min-w-0"
                 {...register(`lines.${i}.amount`, { valueAsNumber: true })}
               />
 
