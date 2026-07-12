@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { PartyTransactionHistory, type TxnHistoryItem } from '@/components/party-transaction-history'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { editArReceiptAction } from '@/app/actions/edit-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
@@ -31,6 +32,7 @@ type Props = {
   salesByCustomer: Record<string, Sale[]>
   banks:           Bank[]
   nextSerial?:     string | null
+  historyByCustomer?: Record<string, TxnHistoryItem[]>
   mode?:           'create' | 'edit'
   receiptId?:      string
   initial?: {
@@ -71,7 +73,7 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
 
-export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSerial, mode = 'create', receiptId, initial }: Props) {
+export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
@@ -99,6 +101,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSeri
 
   const selectedCustomer = customerFull.find((c) => c.id === selectedCustomerId)
   const customerSales    = selectedCustomerId ? (salesByCustomer[selectedCustomerId] ?? []) : []
+  const customerHistory  = selectedCustomerId ? (historyByCustomer?.[selectedCustomerId] ?? []) : []
   const er               = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountTotal      = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const amountPkr        = amountTotal * er
@@ -251,8 +254,11 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSeri
             </Card>
           </div>
 
-          {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6">
+          {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
+          <div className="lg:sticky lg:top-6 space-y-4">
+            {selectedCustomer && !isEdit && (
+              <PartyTransactionHistory items={customerHistory} />
+            )}
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Receipt Summary</p>

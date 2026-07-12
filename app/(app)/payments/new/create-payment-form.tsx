@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateSupplier } from '@/components/quick-create-forms'
 import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { PartyTransactionHistory, type TxnHistoryItem } from '@/components/party-transaction-history'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
 import { editApPaymentAction } from '@/app/actions/edit-ap-payment'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
@@ -31,6 +32,7 @@ type Props = {
   purchasesBySupplier: Record<string, Purchase[]>
   banks:               Bank[]
   nextSerial?:         string | null
+  historyBySupplier?:  Record<string, TxnHistoryItem[]>
   mode?:               'create' | 'edit'
   paymentId?:          string
   initial?: {
@@ -71,7 +73,7 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
 
-export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, nextSerial, mode = 'create', paymentId, initial }: Props) {
+export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, nextSerial, historyBySupplier, mode = 'create', paymentId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
@@ -99,6 +101,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
 
   const selectedSupplier  = supplierFull.find((s) => s.id === selectedSupplierId)
   const supplierPurchases = selectedSupplierId ? (purchasesBySupplier[selectedSupplierId] ?? []) : []
+  const supplierHistory   = selectedSupplierId ? (historyBySupplier?.[selectedSupplierId] ?? []) : []
   const er                = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountTotal       = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const amountPkr         = amountTotal * er
@@ -254,8 +257,11 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
             </Card>
           </div>
 
-          {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6">
+          {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
+          <div className="lg:sticky lg:top-6 space-y-4">
+            {selectedSupplier && !isEdit && (
+              <PartyTransactionHistory items={supplierHistory} />
+            )}
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Payment Summary</p>

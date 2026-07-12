@@ -18,10 +18,10 @@ export default async function NewReceiptPage() {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false }),
     admin.from('ar_receipts')
-      .select('customer_id, pkr_equivalent')
+      .select('id, customer_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
     admin.from('sale_returns')
-      .select('customer_id, pkr_equivalent')
+      .select('id, customer_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
     admin.from('inventory_lots')
       .select('id, name')
@@ -61,13 +61,27 @@ export default async function NewReceiptPage() {
     }
   }
 
+  // Combined transaction history per customer (invoices, receipts, returns),
+  // most recent first, capped at 15 rows.
+  const historyByCustomer: Record<string, { id: string; date: string; type: string; amount: number; direction: 'up' | 'down' }[]> = {}
+  const pushHistory = (cid: string, item: { id: string; date: string; type: string; amount: number; direction: 'up' | 'down' }) => {
+    (historyByCustomer[cid] ??= []).push(item)
+  }
+  for (const s of sales)     pushHistory(s.customer_id, { id: `sale-${s.id}`,   date: s.date, type: 'Sale',    amount: s.pkr_equivalent, direction: 'up' })
+  for (const r of receipts)  pushHistory(r.customer_id, { id: `rcpt-${r.id}`,   date: r.date, type: 'Receipt', amount: r.pkr_equivalent, direction: 'down' })
+  for (const rt of returns)  pushHistory(rt.customer_id, { id: `ret-${rt.id}`,  date: rt.date, type: 'Return',  amount: rt.pkr_equivalent, direction: 'down' })
+  for (const cid of Object.keys(historyByCustomer)) {
+    historyByCustomer[cid].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+    historyByCustomer[cid] = historyByCustomer[cid].slice(0, 15)
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
       </div>
-      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} nextSerial={nextSerial} />
+      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} nextSerial={nextSerial} historyByCustomer={historyByCustomer} />
     </div>
   )
 }

@@ -18,10 +18,10 @@ export default async function NewPaymentPage() {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false }),
     admin.from('ap_payments')
-      .select('supplier_id, pkr_equivalent')
+      .select('id, supplier_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
     admin.from('purchase_returns')
-      .select('supplier_id, pkr_equivalent')
+      .select('id, supplier_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId),
     admin.from('inventory_lots')
       .select('id, name')
@@ -62,13 +62,27 @@ export default async function NewPaymentPage() {
     }
   }
 
+  // Combined transaction history per supplier (bills, payments, returns),
+  // most recent first, capped at 15 rows.
+  const historyBySupplier: Record<string, { id: string; date: string; type: string; amount: number; direction: 'up' | 'down' }[]> = {}
+  const pushHistory = (sid: string, item: { id: string; date: string; type: string; amount: number; direction: 'up' | 'down' }) => {
+    (historyBySupplier[sid] ??= []).push(item)
+  }
+  for (const p of purchases)  pushHistory(p.supplier_id, { id: `pur-${p.id}`,  date: p.date, type: 'Purchase', amount: p.pkr_equivalent, direction: 'up' })
+  for (const pm of payments)  pushHistory(pm.supplier_id, { id: `pay-${pm.id}`, date: pm.date, type: 'Payment',  amount: pm.pkr_equivalent, direction: 'down' })
+  for (const rt of returns)   pushHistory(rt.supplier_id, { id: `ret-${rt.id}`, date: rt.date, type: 'Return',   amount: rt.pkr_equivalent, direction: 'down' })
+  for (const sid of Object.keys(historyBySupplier)) {
+    historyBySupplier[sid].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
+    historyBySupplier[sid] = historyBySupplier[sid].slice(0, 15)
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Payment</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
       </div>
-      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} />
+      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} historyBySupplier={historyBySupplier} />
     </div>
   )
 }
