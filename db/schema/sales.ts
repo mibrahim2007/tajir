@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, date, timestamp, char, boolean } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, numeric, date, timestamp, char, boolean, integer } from 'drizzle-orm/pg-core'
 import { tenants } from './tenants'
 import { inventoryLots } from './inventory'
 
@@ -25,6 +25,8 @@ export const salesOrders = pgTable('sales_orders', {
   pkrEquivalent:  numeric('pkr_equivalent', { precision: 15, scale: 2 }).notNull(),
   date:           date('date').notNull(),
   paymentDueDate: date('payment_due_date'),
+  // Payment terms in days; when set, payment_due_date = date + due_days.
+  dueDays:        integer('due_days'),
   notes:          text('notes'),
   confirmedAt:    timestamp('confirmed_at', { withTimezone: true }),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

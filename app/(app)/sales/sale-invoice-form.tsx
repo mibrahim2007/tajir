@@ -26,9 +26,17 @@ import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null }
+type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service' }
 type PricingRule = { customerId: string; stockItemId: string; rate: number }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
+
+// Adds a whole number of days to a yyyy-mm-dd date, returning yyyy-mm-dd.
+function addDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + days)
+  return dt.toISOString().split('T')[0]
+}
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
@@ -41,6 +49,11 @@ const baseSchema = z.object({
   customerId:      z.string().uuid('Select a customer'),
   date:            z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal('')),
+  // Payment terms in days; drives paymentDueDate = date + dueDays.
+  dueDays:         z.preprocess(
+                     (v) => (v === '' || v === null || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+                     z.coerce.number().int().min(0).max(3650).optional(),
+                   ),
   notes:           z.string().optional(),
   currencyCode:    z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:    z.number().positive().default(1),
@@ -88,15 +101,27 @@ export function SaleInvoiceForm({
 
   const requireLocation = locations.length > 0
 
+  // Non-stockable service items (e.g. freight): always pickable, never
+  // location-bound, and excluded from stock/oversell checks.
+  const serviceItemIds = useMemo(
+    () => new Set(stockItems.filter((s) => s.itemNature === 'service').map((s) => s.id)),
+    [stockItems],
+  )
+
   // Local state so newly created items appear immediately
   const [customerList, setCustomerList] = useState<PickerItem[]>(
     customers.map((c) => ({ id: c.id, name: c.name }))
   )
+  // A location is only required when the invoice dispatches a stockable item;
+  // an all-service invoice (e.g. a pure freight charge) needs no location.
   const formSchema = useMemo(
     () => requireLocation
-      ? baseSchema.refine(d => !!d.locationId, { message: 'Select a location', path: ['locationId'] })
+      ? baseSchema.refine(
+          (d) => !!d.locationId || !d.lines.some((l) => l.stockItemId && !serviceItemIds.has(l.stockItemId)),
+          { message: 'Select a location', path: ['locationId'] },
+        )
       : baseSchema,
-    [requireLocation],
+    [requireLocation, serviceItemIds],
   )
 
   // Merged party list: customers + suppliers, each with an identity badge. Both
@@ -109,7 +134,7 @@ export function SaleInvoiceForm({
   const form = useForm<SaleFormValues>({
     resolver: zodResolver(formSchema) as Resolver<SaleFormValues>,
     defaultValues: initialValues ?? {
-      customerId: '', date: today, paymentDueDate: '', notes: '',
+      customerId: '', date: today, paymentDueDate: '', dueDays: undefined, notes: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
     },
@@ -140,6 +165,20 @@ export function SaleInvoiceForm({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedCustomer])
 
+  // Due Days → Payment Due date. Whenever the sale date or due-days changes and
+  // due-days is set, recompute paymentDueDate = date + dueDays.
+  const watchedDate    = form.watch('date')
+  const watchedDueDays = form.watch('dueDays')
+  useEffect(() => {
+    if (watchedDueDays === undefined || watchedDueDays === null || Number.isNaN(watchedDueDays)) return
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(watchedDate)) return
+    const due = addDays(watchedDate, watchedDueDays)
+    if (due !== form.getValues('paymentDueDate')) {
+      form.setValue('paymentDueDate', due, { shouldDirty: true })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedDate, watchedDueDays])
+
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
 
   // Computed inline (not memoised): react-hook-form's watch() mutates the lines
@@ -169,6 +208,8 @@ export function SaleInvoiceForm({
   const stockPickerItems = useMemo(() => {
     return stockItems
       .filter(s => {
+        // Service items aren't stocked, so they're pickable regardless of location.
+        if (s.itemNature === 'service') return true
         if (!locStockMap) return true
         if (selectedItemIds.has(s.id)) return true
         return (locStockMap[s.id] ?? 0) > 0
@@ -176,9 +217,11 @@ export function SaleInvoiceForm({
       .map(s => ({
         id: s.id,
         name: s.name,
-        meta: locStockMap
-          ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
-          : `${s.currentQuantity.toLocaleString()} avail.`,
+        meta: s.itemNature === 'service'
+          ? 'Service'
+          : locStockMap
+            ? `${(locStockMap[s.id] ?? 0).toLocaleString()} avail.`
+            : `${s.currentQuantity.toLocaleString()} avail.`,
       }))
   }, [stockItems, locStockMap, selectedItemIds])
 
@@ -222,6 +265,7 @@ export function SaleInvoiceForm({
         customerId,
         date:           values.date,
         paymentDueDate: values.paymentDueDate || undefined,
+        dueDays:        values.dueDays,
         currencyCode:   values.currencyCode,
         exchangeRate:   values.exchangeRate,
         locationId:     values.locationId || undefined,
@@ -356,6 +400,21 @@ export function SaleInvoiceForm({
                     </FormItem>
                   )} />
 
+                  <FormField control={form.control} name="dueDays" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Due Days</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number" min="0" step="1" inputMode="numeric" placeholder="e.g. 30"
+                          value={field.value ?? ''}
+                          onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.valueAsNumber)}
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Auto-sets Payment Due = Sale Date + days.</p>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
                   <FormField control={form.control} name="paymentDueDate" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Payment Due</FormLabel>
@@ -462,10 +521,11 @@ export function SaleInvoiceForm({
                             const line      = watchedLines[index] ?? {}
                             const amount    = (line.quantity || 0) * (line.rate || 0) * er * (1 - (line.discountPct || 0) / 100)
                             const item      = stockItems.find((s) => s.id === line.stockItemId)
+                            const isServiceLine = item?.itemNature === 'service'
                             const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
                             const ratePKR   = (line.rate || 0) * er
                             const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
-                            const avail  = item
+                            const avail  = item && !isServiceLine
                               ? (locStockMap ? (locStockMap[item.id] ?? 0) : item.currentQuantity)
                               : null
 
@@ -490,6 +550,9 @@ export function SaleInvoiceForm({
                                           title="Select Stock Item"
                                         />
                                         {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
+                                        {isServiceLine && (
+                                          <p className="text-xs text-muted-foreground mt-0.5">Service — not stocked</p>
+                                        )}
                                         {avail !== null && (
                                           <p className="text-xs text-muted-foreground mt-0.5">
                                             Avail{locStockMap ? ' at location' : ''}: {avail.toLocaleString()}

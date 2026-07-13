@@ -6,6 +6,11 @@ import { itemTypes } from './item-types'
 export const inventoryTypeValues = ['Combed', 'Carded'] as const
 export type InventoryType = (typeof inventoryTypeValues)[number]
 
+// Inventory = stockable goods (default). Service = non-stockable line (e.g.
+// freight recharged to a customer); sales of service items skip stock/COGS.
+export const itemNatureValues = ['inventory', 'service'] as const
+export type ItemNature = (typeof itemNatureValues)[number]
+
 export const inventoryLots = pgTable(
   'inventory_lots',
   {
@@ -40,12 +45,15 @@ export const inventoryLots = pgTable(
     // FK to locations added via ALTER TABLE; kept as a plain uuid to avoid a
     // schema import cycle (mirrors defaultSupplierId).
     locationId: uuid('location_id'),
+    // 'inventory' (stockable) or 'service' (non-stockable). See itemNatureValues.
+    itemNature: text('item_nature').notNull().default('inventory'),
   },
   (table) => [
     unique('uq_inventory_lots_tenant_name').on(table.tenantId, table.name),
     unique('uq_inventory_lots_tenant_sku').on(table.tenantId, table.sku),
     check('inventory_lots_current_quantity_check', sql`${table.currentQuantity} >= 0`),
     check('inventory_lots_type_check', sql`${table.type} = ANY (ARRAY['Combed'::text, 'Carded'::text])`),
+    check('inventory_lots_item_nature_check', sql`${table.itemNature} = ANY (ARRAY['inventory'::text, 'service'::text])`),
   ],
 )
 

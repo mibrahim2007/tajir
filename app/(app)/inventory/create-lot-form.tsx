@@ -59,6 +59,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
     resolver: zodResolver(createLotSchema),
     defaultValues: {
       name: '',
+      itemNature: 'inventory',
       sku: '',
       code: '',
       count: '',
@@ -70,6 +71,8 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
       confirmDuplicateLot: false,
     },
   })
+
+  const isService = form.watch('itemNature') === 'service'
 
   const submit = (values: CreateLotInput, confirm = false) => {
     startTransition(async () => {
@@ -134,6 +137,33 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
 
               <FormField
                 control={form.control}
+                name="itemNature"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Item Nature <span className="text-destructive">*</span></FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger className="min-h-[44px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="inventory">Inventory (stockable)</SelectItem>
+                        <SelectItem value="service">Service (non-stockable)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {isService
+                        ? 'Not stocked. Use for charges like freight — sold without a location and with no effect on inventory.'
+                        : 'Stockable goods tracked by quantity and location.'}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="sku"
                 render={({ field }) => (
                   <FormItem>
@@ -161,6 +191,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                 )}
               />
 
+              {!isService && (
               <FormField
                 control={form.control}
                 name="count"
@@ -174,6 +205,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                   </FormItem>
                 )}
               />
+              )}
 
               <FormField
                 control={form.control}
@@ -233,6 +265,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                 )}
               />
 
+              {!isService && (
               <FormField
                 control={form.control}
                 name="fiber"
@@ -246,7 +279,9 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                   </FormItem>
                 )}
               />
+              )}
 
+              {!isService && (
               <FormField
                 control={form.control}
                 name="lot"
@@ -260,6 +295,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                   </FormItem>
                 )}
               />
+              )}
 
               {serverError && <p className="text-sm text-destructive">{serverError}</p>}
 

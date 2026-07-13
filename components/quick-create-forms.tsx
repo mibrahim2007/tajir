@@ -115,7 +115,7 @@ export function QuickCreateLot({ onSuccess, onCancel }: QuickCreateProps) {
     if (!name.trim()) { setError('Name is required'); return }
     start(async () => {
       setError(null)
-      const result = await createInventoryLotAction({ name: name.trim(), count: count.trim() || undefined })
+      const result = await createInventoryLotAction({ name: name.trim(), itemNature: 'inventory', count: count.trim() || undefined })
       if (!result.success) { setError(result.error); return }
       onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() || undefined })
     })
