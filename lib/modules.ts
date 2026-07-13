@@ -18,6 +18,7 @@ import {
   BookOpen,
   PenLine,
   BarChart2,
+  HandCoins,
 } from 'lucide-react'
 
 export type ModuleKey =
@@ -40,13 +41,14 @@ export type ModuleKey =
   | 'accounts'
   | 'vouchers'
   | 'reports'
+  | 'employees'
 
 export const ALL_MODULES: ModuleKey[] = [
   'inventory', 'purchases', 'purchase_returns', 'sales', 'sale_returns',
   'gatepasses', 'locations', 'stock_transfers',
   'customers', 'receipts', 'credit_notes', 'suppliers', 'payments',
   'debit_notes', 'pricing', 'expenses',
-  'accounts', 'vouchers', 'reports',
+  'accounts', 'vouchers', 'reports', 'employees',
 ]
 
 export const MODULE_META: Record<ModuleKey, { label: string; section: string; icon: React.ElementType; href: string }> = {
@@ -73,6 +75,7 @@ export const MODULE_META: Record<ModuleKey, { label: string; section: string; ic
   vouchers:         { label: 'Vouchers',           section: 'Accounts',     icon: PenLine,       href: '/vouchers' },
   reports:          { label: 'Reports',            section: 'Accounts',     icon: BarChart2,     href: '/reports' },
   expenses:         { label: 'Expenses',           section: 'Accounts',     icon: Receipt,       href: '/expenses' },
+  employees:        { label: 'Employees',          section: 'Accounts',     icon: HandCoins,     href: '/employees' },
 }
 
 /** Modules enabled by default when tenant has no features config */
@@ -82,7 +85,7 @@ export const DEFAULT_TENANT_FEATURES = new Set<ModuleKey>(ALL_MODULES)
 export const DEFAULT_ASSISTANT_PERMISSIONS = new Set<ModuleKey>([
   'inventory', 'purchases', 'purchase_returns', 'sales', 'sale_returns',
   'gatepasses', 'stock_transfers',
-  'receipts', 'payments',
+  'receipts', 'payments', 'employees',
 ])
 
 export function parseTenantFeatures(raw: unknown): Set<ModuleKey> {

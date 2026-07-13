@@ -8,6 +8,7 @@ type JournalLine = {
   customerId?: string
   supplierId?: string
   stockItemId?: string
+  employeeId?: string
 }
 
 type PostJournalEntryParams = {
@@ -49,6 +50,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   // source document number.
   const partyCustomerId = lines.find((l) => l.customerId)?.customerId
   const partySupplierId = lines.find((l) => l.supplierId)?.supplierId
+  const partyEmployeeId = lines.find((l) => l.employeeId)?.employeeId
   let partyName: string | null = null
   if (partyCustomerId) {
     const { data: cust } = await admin
@@ -58,6 +60,10 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
     const { data: supp } = await admin
       .from('suppliers').select('name').eq('id', partySupplierId).eq('tenant_id', tenantId).maybeSingle()
     partyName = supp?.name ?? null
+  } else if (partyEmployeeId) {
+    const { data: emp } = await admin
+      .from('employees').select('name').eq('id', partyEmployeeId).eq('tenant_id', tenantId).maybeSingle()
+    partyName = emp?.name ?? null
   }
 
   const fullDescription = [partyName, reference, date, description].filter(Boolean).join(' — ')
@@ -99,6 +105,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
     customer_id:      l.customerId ?? null,
     supplier_id:      l.supplierId ?? null,
     stock_item_id:    l.stockItemId ?? null,
+    employee_id:      l.employeeId ?? null,
   }))
 
   await admin.from('tajir_journal_entry_lines').insert(lineRows)

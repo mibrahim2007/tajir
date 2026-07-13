@@ -1,6 +1,3 @@
-// Generated from the live Supabase schema (project npawiohdvkjzfyrxfufm).
-// Do not edit by hand. Regenerate with the Supabase CLI/MCP after schema changes:
-//   supabase gen types typescript --project-id <id> > lib/supabase/database.types.ts
 export type Json =
   | string
   | number
@@ -120,7 +117,29 @@ export type Database = {
           tenant_id?: string
           transaction_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ap_payment_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ap_payments: {
         Row: {
@@ -223,7 +242,29 @@ export type Database = {
           tenant_id?: string
           transaction_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ar_receipt_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_lines_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ar_receipts: {
         Row: {
@@ -668,7 +709,15 @@ export type Database = {
           tenant_id?: string
           transaction_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customer_refund_lines_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "customer_refunds"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_refunds: {
         Row: {
@@ -866,6 +915,125 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "document_serials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_loans: {
+        Row: {
+          created_at: string
+          currency_code: string
+          disbursement_date: string
+          employee_id: string
+          exchange_rate: number
+          first_due_date: string | null
+          frequency: string
+          id: string
+          installment_amount: number | null
+          installment_count: number | null
+          notes: string | null
+          pkr_equivalent: number
+          principal: number
+          serial_number: string | null
+          status: string
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency_code?: string
+          disbursement_date: string
+          employee_id: string
+          exchange_rate?: number
+          first_due_date?: string | null
+          frequency?: string
+          id?: string
+          installment_amount?: number | null
+          installment_count?: number | null
+          notes?: string | null
+          pkr_equivalent: number
+          principal: number
+          serial_number?: string | null
+          status?: string
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          currency_code?: string
+          disbursement_date?: string
+          employee_id?: string
+          exchange_rate?: number
+          first_due_date?: string | null
+          frequency?: string
+          id?: string
+          installment_amount?: number | null
+          installment_count?: number | null
+          notes?: string | null
+          pkr_equivalent?: number
+          principal?: number
+          serial_number?: string | null
+          status?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_loans_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_loans_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          cnic: string | null
+          created_at: string
+          designation: string | null
+          employee_code: string | null
+          id: string
+          is_active: boolean
+          monthly_salary: number
+          name: string
+          phone: string | null
+          tenant_id: string
+        }
+        Insert: {
+          cnic?: string | null
+          created_at?: string
+          designation?: string | null
+          employee_code?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          name: string
+          phone?: string | null
+          tenant_id: string
+        }
+        Update: {
+          cnic?: string | null
+          created_at?: string
+          designation?: string | null
+          employee_code?: string | null
+          id?: string
+          is_active?: boolean
+          monthly_salary?: number
+          name?: string
+          phone?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1333,6 +1501,237 @@ export type Database = {
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_disbursement_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          loan_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          loan_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          loan_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_disbursement_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_disbursement_lines_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_disbursement_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_installments: {
+        Row: {
+          amount: number
+          created_at: string
+          due_date: string
+          id: string
+          installment_no: number
+          loan_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          due_date: string
+          id?: string
+          installment_no: number
+          loan_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          due_date?: string
+          id?: string
+          installment_no?: number
+          loan_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_installments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_installments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_repayment_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          repayment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          repayment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          repayment_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayment_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayment_lines_repayment_id_fkey"
+            columns: ["repayment_id"]
+            isOneToOne: false
+            referencedRelation: "loan_repayments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayment_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loan_repayments: {
+        Row: {
+          amount: number
+          created_at: string
+          currency_code: string
+          date: string
+          employee_id: string
+          exchange_rate: number
+          id: string
+          loan_id: string | null
+          payment_method_note: string | null
+          pkr_equivalent: number
+          serial_number: string | null
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency_code?: string
+          date: string
+          employee_id: string
+          exchange_rate?: number
+          id?: string
+          loan_id?: string | null
+          payment_method_note?: string | null
+          pkr_equivalent: number
+          serial_number?: string | null
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency_code?: string
+          date?: string
+          employee_id?: string
+          exchange_rate?: number
+          id?: string
+          loan_id?: string | null
+          payment_method_note?: string | null
+          pkr_equivalent?: number
+          serial_number?: string | null
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -2133,7 +2532,15 @@ export type Database = {
           tenant_id?: string
           transaction_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "supplier_refund_lines_refund_id_fkey"
+            columns: ["refund_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_refunds"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_refunds: {
         Row: {
@@ -2421,6 +2828,7 @@ export type Database = {
           customer_id: string | null
           debit: number
           description: string | null
+          employee_id: string | null
           id: string
           journal_entry_id: string
           stock_item_id: string | null
@@ -2434,6 +2842,7 @@ export type Database = {
           customer_id?: string | null
           debit?: number
           description?: string | null
+          employee_id?: string | null
           id?: string
           journal_entry_id: string
           stock_item_id?: string | null
@@ -2447,6 +2856,7 @@ export type Database = {
           customer_id?: string | null
           debit?: number
           description?: string | null
+          employee_id?: string | null
           id?: string
           journal_entry_id?: string
           stock_item_id?: string | null
@@ -2466,6 +2876,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "tajir_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tajir_journal_entry_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {

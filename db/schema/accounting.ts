@@ -4,6 +4,7 @@ import { tajirCustomers } from './sales'
 import { suppliers, purchaseOrders } from './purchases'
 import { inventoryLots } from './inventory'
 import { salesOrders } from './sales'
+import { employees } from './employees'
 
 export const chartOfAccounts = pgTable('chart_of_accounts', {
   id:          uuid('id').primaryKey().defaultRandom(),
@@ -48,6 +49,7 @@ export const journalEntryLines = pgTable('tajir_journal_entry_lines', {
   customerId:     uuid('customer_id').references(() => tajirCustomers.id),
   supplierId:     uuid('supplier_id').references(() => suppliers.id),
   stockItemId:    uuid('stock_item_id').references(() => inventoryLots.id),
+  employeeId:     uuid('employee_id').references(() => employees.id),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
