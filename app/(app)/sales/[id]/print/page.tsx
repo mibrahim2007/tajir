@@ -1,12 +1,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { getTenant } from '@/lib/auth/get-tenant'
-import { PrintVoucherHeader } from '@/components/print-voucher-header'
 import { Button } from '@/components/ui/button'
-import { PrintButton } from './print-button'
-import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
+import { PrintButton } from '@/components/print-button'
+import { SendWhatsAppButton } from '@/components/send-whatsapp-button'
+import { SaleInvoiceDocument } from '@/components/sale-invoice-document'
+import { loadSaleOrder } from '@/lib/sales/load-sale-invoice'
+import { signSaleShareToken } from '@/lib/sales/invoice-share-token'
+import { getBaseUrl } from '@/lib/utils/base-url'
+import { toWaNumber } from '@/lib/utils/phone'
 
 function fmt(n: number) {
   return n.toLocaleString('en-PK', { maximumFractionDigits: 2 })
@@ -15,54 +17,18 @@ function fmt(n: number) {
 export default async function PrintSalePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const { tenantId } = await requireAuth()
-  const admin = createAdminClient()
 
-  const [{ data: order }, tenant] = await Promise.all([
-    admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes')
-      .eq('id', id).eq('tenant_id', tenantId).single(),
-    getTenant(tenantId),
-  ])
+  const invoice = await loadSaleOrder(id, { includeCostWarnings: true })
+  if (!invoice) notFound()
+  // Tenant isolation: the loader keys purely on the order id, so verify ownership here.
+  if (invoice.tenantId !== tenantId) notFound()
 
-  if (!order) notFound()
-
-  const [
-    { data: customer },
-    { data: stockItem },
-    { data: journalEntry },
-    { data: rawPurchases },
-  ] = await Promise.all([
-    admin.from('tajir_customers').select('id, name').eq('id', order.customer_id).single(),
-    admin.from('inventory_lots').select('id, name, unit_of_measure').eq('id', order.stock_item_id).single(),
-    admin.from('tajir_journal_entries')
-      .select('voucher_number')
-      .eq('source_id', id)
-      .eq('source_type', 'sale_order')
-      .single(),
-    admin.from('purchase_orders')
-      .select('stock_item_id, pkr_equivalent, quantity')
-      .eq('tenant_id', tenantId)
-      .eq('stock_item_id', order.stock_item_id)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false })
-      .limit(1),
-  ])
-
-  const qty      = order.quantity
-  const rate     = order.rate
-  const pkrTotal = order.pkr_equivalent
-  const er       = order.exchange_rate
-  const isUSD    = order.currency_code === 'USD'
-  const voucherNo = journalEntry?.voucher_number ?? `SO-${id.slice(-6).toUpperCase()}`
-  const entryTime = formatPKTDateTime(new Date(order.created_at)).split(', ')[1]
-
-  const lastPurchase = rawPurchases?.[0]
-  const costPerUnit  = lastPurchase
-    ? lastPurchase.pkr_equivalent / lastPurchase.quantity
-    : null
-  const saleRatePKR  = rate * er
-  const belowCost    = costPerUnit !== null && saleRatePKR < costPerUnit
-  const notes        = order.notes?.trim() || null
+  const shareUrl = `${getBaseUrl()}/i/${signSaleShareToken('order', id)}`
+  const waMessage =
+    `Assalam-o-Alaikum ${invoice.customerName},\n\n` +
+    `Sale Invoice ${invoice.voucherNo} from ${invoice.tenant.name}\n` +
+    `Amount: Rs ${fmt(invoice.totalPKR)}\n\n` +
+    `View / download your invoice:\n${shareUrl}`
 
   return (
     <div className="min-h-screen bg-white">
@@ -73,118 +39,12 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
         <Link href="/sales">
           <Button variant="ghost" size="sm">← Back</Button>
         </Link>
-        <span className="text-sm text-muted-foreground flex-1">Sale Invoice · {voucherNo}</span>
+        <span className="text-sm text-muted-foreground flex-1">Sale Invoice · {invoice.voucherNo}</span>
+        <SendWhatsAppButton waNumber={toWaNumber(invoice.customerPhone)} message={waMessage} />
         <PrintButton />
       </div>
 
-      {/* ── REPORT BODY ── */}
-      <div className="max-w-2xl mx-auto px-8 py-10 print:px-4 print:py-6 print:max-w-none">
-
-        {/* Header */}
-        <PrintVoucherHeader name={tenant.name} ntn={tenant.ntn} title="Sale Invoice" />
-
-        {/* Meta grid */}
-        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
-          <div className="flex gap-2">
-            <span className="text-gray-500 w-28 shrink-0">Serial No.</span>
-            <span className="font-mono font-bold">{order.serial_number ?? '—'}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-gray-500 w-24 shrink-0">Date</span>
-            <span className="font-semibold">{formatPKTDate(new Date(order.date))}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-gray-500 w-28 shrink-0">Voucher No.</span>
-            <span className="font-mono font-bold">{voucherNo}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-gray-500 w-28 shrink-0">Customer</span>
-            <span className="font-semibold">{customer?.name ?? '—'}</span>
-          </div>
-          <div className="flex gap-2">
-            <span className="text-gray-500 w-24 shrink-0">Entry Time</span>
-            <span className="font-semibold">{entryTime}</span>
-          </div>
-          {order.payment_due_date && (
-            <div className="flex gap-2">
-              <span className="text-gray-500 w-28 shrink-0">Payment Due</span>
-              <span className="font-semibold">{formatPKTDate(new Date(order.payment_due_date))}</span>
-            </div>
-          )}
-          {isUSD && (
-            <div className="flex gap-2">
-              <span className="text-gray-500 w-24 shrink-0">Exchange Rate</span>
-              <span className="font-semibold">1 USD = Rs {fmt(er)}</span>
-            </div>
-          )}
-        </div>
-
-        {/* Line items table */}
-        <table className="w-full text-sm mb-6 border border-gray-300">
-          <thead className="bg-gray-100 print:bg-gray-100">
-            <tr>
-              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-8">#</th>
-              <th className="text-left px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Stock Item</th>
-              <th className="text-right px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-24">Qty</th>
-              <th className="text-right px-3 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-32">Rate</th>
-              <th className="text-right px-3 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-36">Amount (PKR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="px-3 py-3 border-r border-gray-200 text-gray-500 tabular-nums">1</td>
-              <td className="px-3 py-3 border-r border-gray-200 font-medium">{stockItem?.name ?? '—'}</td>
-              <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockItem?.unit_of_measure ? <span className="ml-1 text-gray-500 text-xs">{stockItem.unit_of_measure}</span> : null}</td>
-              <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
-                {order.currency_code} {fmt(rate)}
-                {belowCost && costPerUnit && (
-                  <span className="block text-[10px] text-amber-600 print:text-amber-700">
-                    ⚠ Below cost (Rs {fmt(costPerUnit)})
-                  </span>
-                )}
-              </td>
-              <td className="px-3 py-3 text-right tabular-nums font-semibold">Rs {fmt(pkrTotal)}</td>
-            </tr>
-          </tbody>
-          <tfoot className="border-t-2 border-gray-300 bg-gray-100 print:bg-gray-100">
-            <tr>
-              <td colSpan={4} className="px-3 py-2 text-right font-semibold text-[11px] uppercase tracking-wide border-r border-gray-300">
-                Total
-              </td>
-              <td className="px-3 py-2 text-right font-extrabold tabular-nums">Rs {fmt(pkrTotal)}</td>
-            </tr>
-          </tfoot>
-        </table>
-
-        {/* Payment status */}
-        {order.payment_due_date && (
-          <div className="text-sm text-gray-500 mb-4">
-            Payment due by <span className="font-semibold text-gray-700">{formatPKTDate(new Date(order.payment_due_date))}</span>
-          </div>
-        )}
-
-        {/* Notes */}
-        {notes && (
-          <div className="text-sm mb-8 print:mb-6">
-            <p className="text-gray-500 font-semibold text-[11px] uppercase tracking-wide mb-1">Notes</p>
-            <p className="whitespace-pre-wrap text-gray-700 border border-gray-200 rounded px-3 py-2">{notes}</p>
-          </div>
-        )}
-
-        {/* Signature section */}
-        <div className="flex justify-between mt-16 print:mt-10 pt-4 text-sm text-center gap-4">
-          <div className="flex-1">
-            <div className="border-t border-black pt-2 text-gray-500">Accountant</div>
-          </div>
-          <div className="flex-1">
-            <div className="border-t border-black pt-2 text-gray-500">Customer Representative</div>
-          </div>
-          <div className="flex-1">
-            <div className="border-t border-black pt-2 text-gray-500">Authorized By</div>
-          </div>
-        </div>
-
-      </div>
+      <SaleInvoiceDocument invoice={invoice} showCostWarnings />
     </div>
   )
 }

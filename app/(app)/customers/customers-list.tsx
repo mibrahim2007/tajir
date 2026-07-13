@@ -12,6 +12,7 @@ import { formatPKR } from '@/lib/utils/currency'
 export type CustomerListItem = {
   id: string
   name: string
+  phone: string | null
   outstanding: number
 }
 
@@ -20,7 +21,7 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
 
   const q = query.trim().toLowerCase()
   const filtered = useMemo(
-    () => (q ? customers.filter((c) => c.name.toLowerCase().includes(q)) : customers),
+    () => (q ? customers.filter((c) => c.name.toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)) : customers),
     [customers, q],
   )
 
@@ -59,7 +60,10 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
             <tbody className="divide-y">
               {filtered.map((c) => (
                 <tr key={c.id} className="hover:bg-secondary/50 transition-colors">
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {c.name}
+                    {c.phone && <span className="block text-xs font-normal text-muted-foreground tabular-nums">{c.phone}</span>}
+                  </td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {c.outstanding < 0 ? (
                       <span className="inline-flex items-center gap-1.5">
@@ -83,7 +87,7 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                   <td className="px-4 py-3">
                     <RoleGate allowedRoles={['owner']}>
                       <div className="flex gap-1 justify-end">
-                        <EditCustomerForm id={c.id} currentName={c.name} />
+                        <EditCustomerForm id={c.id} currentName={c.name} currentPhone={c.phone} />
                         <DeleteButton
                           description={`Delete customer "${c.name}"? All associated sales and receipts will also be deleted.`}
                           onDelete={deleteCustomerAction.bind(null, { id: c.id })}

@@ -8,8 +8,9 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
-  id:   z.string().uuid(),
-  name: z.string().min(1, 'Name is required'),
+  id:    z.string().uuid(),
+  name:  z.string().min(1, 'Name is required'),
+  phone: z.string().trim().optional(),
 })
 
 export async function editCustomerAction(input: unknown): Promise<ActionResult<void>> {
@@ -22,13 +23,13 @@ export async function editCustomerAction(input: unknown): Promise<ActionResult<v
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, name } = parsed.data
+  const { id, name, phone } = parsed.data
 
   const admin = createAdminClient()
 
   const { data: existing } = await admin
     .from('tajir_customers')
-    .select('name')
+    .select('name, phone')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -37,13 +38,13 @@ export async function editCustomerAction(input: unknown): Promise<ActionResult<v
 
   const { error } = await admin
     .from('tajir_customers')
-    .update({ name })
+    .update({ name, phone: phone || null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 
   if (error) return { success: false, error: 'Failed to update customer', code: 'INTERNAL_ERROR' }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'tajir_customers', entityId: id, before: { name: existing.name }, after: { name } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'tajir_customers', entityId: id, before: { name: existing.name, phone: existing.phone }, after: { name, phone: phone || null } })
 
   return { success: true, data: undefined }
 }

@@ -6,6 +6,7 @@ export const tajirCustomers = pgTable('tajir_customers', {
   id:                           uuid('id').primaryKey().defaultRandom(),
   tenantId:                     uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   name:                         text('name').notNull(),
+  phone:                        text('phone'),
   openingBalance:               numeric('opening_balance', { precision: 15, scale: 2 }).notNull().default('0'),
   openingBalanceCurrency:       char('opening_balance_currency', { length: 3 }).notNull().default('PKR'),
   openingBalancePkrEquivalent:  numeric('opening_balance_pkr_equivalent', { precision: 15, scale: 2 }).notNull().default('0'),
