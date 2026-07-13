@@ -1023,6 +1023,7 @@ export type Database = {
           default_supplier_id: string | null
           fiber: string | null
           id: string
+          item_nature: string
           item_type_id: string | null
           location_id: string | null
           lot: string | null
@@ -1041,6 +1042,7 @@ export type Database = {
           default_supplier_id?: string | null
           fiber?: string | null
           id?: string
+          item_nature?: string
           item_type_id?: string | null
           location_id?: string | null
           lot?: string | null
@@ -1059,6 +1061,7 @@ export type Database = {
           default_supplier_id?: string | null
           fiber?: string | null
           id?: string
+          item_nature?: string
           item_type_id?: string | null
           location_id?: string | null
           lot?: string | null
@@ -1874,6 +1877,7 @@ export type Database = {
           currency_code: string
           customer_id: string
           date: string
+          due_days: number | null
           exchange_rate: number
           id: string
           invoice_id: string | null
@@ -1893,6 +1897,7 @@ export type Database = {
           currency_code: string
           customer_id: string
           date: string
+          due_days?: number | null
           exchange_rate?: number
           id?: string
           invoice_id?: string | null
@@ -1912,6 +1917,7 @@ export type Database = {
           currency_code?: string
           customer_id?: string
           date?: string
+          due_days?: number | null
           exchange_rate?: number
           id?: string
           invoice_id?: string | null

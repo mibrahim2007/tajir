@@ -21,6 +21,7 @@ const schema = z.object({
   customerId:     z.string().uuid('Invalid customer'),
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dueDays:        z.number().int().min(0).max(3650).optional(),
   currencyCode:   z.enum(['PKR', 'USD']),
   exchangeRate:   z.coerce.number().positive().default(1),
   locationId:     z.string().uuid().optional(),
@@ -53,7 +54,7 @@ export async function createSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, date, paymentDueDate, currencyCode, exchangeRate, locationId, notes, lines, allowOversell } = parsed.data
+  const { customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, notes, lines, allowOversell } = parsed.data
   const admin = createAdminClient()
 
   const { count: coaCount } = await admin
@@ -65,9 +66,11 @@ export async function createSaleInvoiceAction(
   // Check stock for all lines before inserting anything
   const stockIds = [...new Set(lines.map((l) => l.stockItemId))]
   const { data: lots } = await admin.from('inventory_lots')
-    .select('id, current_quantity').eq('tenant_id', tenantId).in('id', stockIds)
+    .select('id, current_quantity, item_nature').eq('tenant_id', tenantId).in('id', stockIds)
 
   const lotMap = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
+  // Service items are non-stockable: no stock check, deduction, or COGS.
+  const serviceIds = new Set((lots ?? []).filter((l) => l.item_nature === 'service').map((l) => l.id))
 
   // Aggregate requested quantities per stockItemId (same item may appear multiple times)
   const requestedMap = new Map<string, number>()
@@ -77,6 +80,7 @@ export async function createSaleInvoiceAction(
 
   const oversells: OversellInfo[] = []
   for (const [stockItemId, requested] of requestedMap) {
+    if (serviceIds.has(stockItemId)) continue
     const available = lotMap.get(stockItemId) ?? 0
     if (available < requested) {
       oversells.push({ stockItemId, available, requested })
@@ -94,10 +98,11 @@ export async function createSaleInvoiceAction(
   const invoiceId = crypto.randomUUID()
   // One serial for the whole invoice — shared across every line row.
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'sale_invoice', date)
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number; isService: boolean }[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
+    const isService = serviceIds.has(line.stockItemId)
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
     const pkrEquivalent = line.quantity * effectiveRate * (currencyCode === 'USD' ? exchangeRate : 1)
 
@@ -113,8 +118,10 @@ export async function createSaleInvoiceAction(
       pkr_equivalent:  pkrEquivalent,
       date,
       payment_due_date: paymentDueDate ?? null,
+      due_days:        dueDays ?? null,
       notes:           notes?.trim() ? notes.trim() : null,
-      location_id:     locationId ?? null,
+      // Service lines are not bound to a dispatch location.
+      location_id:     isService ? null : (locationId ?? null),
       invoice_id:      invoiceId,
       confirmed_at:    new Date().toISOString(),
     }).select('id').single()
@@ -122,18 +129,26 @@ export async function createSaleInvoiceAction(
     if (error || !order) {
       if (createdOrders.length > 0) {
         await admin.from('sales_orders').delete().in('id', createdOrders.map((o) => o.id))
+        // Restore stock only for the stockable lines we deducted.
         for (const o of createdOrders) {
-          await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: o.quantity })
+          if (!o.isService) {
+            await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: o.quantity })
+          }
         }
       }
       return { success: false, error: 'Failed to create sale line', code: 'INTERNAL_ERROR' }
     }
 
-    await admin.rpc('adjust_inventory_quantity', { p_lot_id: line.stockItemId, p_delta: -line.quantity })
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity })
+    if (!isService) {
+      await admin.rpc('adjust_inventory_quantity', { p_lot_id: line.stockItemId, p_delta: -line.quantity })
+    }
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity, isService })
   }
 
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
+  // Split revenue: stockable goods → Sales Revenue, service lines → Freight Income.
+  const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
+  const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
   // Single GL entry for the whole invoice
   await postJournalEntry({
@@ -141,9 +156,12 @@ export async function createSaleInvoiceAction(
     sourceType: 'sale_invoice', sourceId: invoiceId, prefix: 'SI',
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },
-      { accountSystemKey: 'sales_revenue',       debit: 0, credit: totalPKR, customerId },
-      ...createdOrders.map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
-      ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      ...(goodsRevenue   > 0 ? [{ accountSystemKey: 'sales_revenue',  debit: 0, credit: goodsRevenue,   customerId }] : []),
+      ...(serviceRevenue > 0 ? [{ accountSystemKey: 'freight_income', debit: 0, credit: serviceRevenue, customerId }] : []),
+      // COGS/inventory relief applies to stockable lines only; service lines
+      // (e.g. freight) have no cost of goods.
+      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
+      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
     ],
   })
 

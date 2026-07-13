@@ -16,11 +16,11 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, customer_id, location_id, notes')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, notes')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name, current_quantity, code, unit_of_measure').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, current_quantity, code, unit_of_measure, item_nature').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
@@ -57,6 +57,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
     id: l.id, name: l.name, currentQuantity: l.current_quantity, barcode: l.code ?? null, unitOfMeasure: l.unit_of_measure ?? null,
+    itemNature: (l.item_nature === 'service' ? 'service' : 'inventory') as 'inventory' | 'service',
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({ customerId: r.customer_id, stockItemId: r.stock_item_id, rate: r.rate }))
   const locations = rawLocs ?? []
@@ -70,10 +71,12 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     customerId:     first.customer_id,
     date:           first.date,
     paymentDueDate: first.payment_due_date ?? '',
+    dueDays:        first.due_days ?? undefined,
     notes:          invoiceLines.find((l) => l.notes && l.notes.trim())?.notes ?? '',
     currencyCode:   (first.currency_code === 'USD' ? 'USD' : 'PKR'),
     exchangeRate:   first.exchange_rate,
-    locationId:     first.location_id ?? '',
+    // Service lines store a null location; use the first stockable line's location.
+    locationId:     invoiceLines.find((l) => l.location_id)?.location_id ?? '',
     lines: invoiceLines.map((l) => ({
       stockItemId: l.stock_item_id,
       quantity:    l.quantity,

@@ -23,11 +23,14 @@ export async function createInventoryLotAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, sku, code, count, unitOfMeasure, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
+  const { name, itemNature, sku, code, count, unitOfMeasure, itemTypeId, fiber, lot, defaultSupplierId, confirmDuplicateLot } = parsed.data
+  const isService = itemNature === 'service'
 
   const admin = createAdminClient()
 
-  if (lot && !confirmDuplicateLot) {
+  // Service items carry no lot number, so the duplicate-lot guard only applies
+  // to stockable inventory items.
+  if (!isService && lot && !confirmDuplicateLot) {
     const { data: existing } = await admin
       .from('inventory_lots')
       .select('id')
@@ -46,15 +49,17 @@ export async function createInventoryLotAction(
     .insert({
       tenant_id: tenantId,
       name,
+      item_nature: itemNature,
       // Omit sku when blank so the DB default auto-mints the next TJR-NNNNNN.
       ...(sku ? { sku } : {}),
       code: code || null,
-      count: parseCount(count),
+      // Service items are non-stockable: drop textile/stock attributes.
+      count: isService ? null : parseCount(count),
       unit_of_measure: unitOfMeasure || null,
       item_type_id: itemTypeId || null,
-      fiber: fiber || null,
-      lot: lot || null,
-      default_supplier_id: defaultSupplierId || null,
+      fiber: isService ? null : (fiber || null),
+      lot: isService ? null : (lot || null),
+      default_supplier_id: isService ? null : (defaultSupplierId || null),
     })
     .select('id, sku')
     .single()
@@ -73,7 +78,7 @@ export async function createInventoryLotAction(
     action: 'create',
     entity: 'inventory_lots',
     entityId: newLot.id,
-    after: { name, count, unitOfMeasure, itemTypeId, fiber, lot },
+    after: { name, itemNature, count, unitOfMeasure, itemTypeId, fiber, lot },
   })
 
   return { success: true, data: newLot }

@@ -21,6 +21,7 @@ const schema = z.object({
   customerId:     z.string().uuid('Invalid customer'),
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dueDays:        z.number().int().min(0).max(3650).optional(),
   currencyCode:   z.enum(['PKR', 'USD']),
   exchangeRate:   z.coerce.number().positive().default(1),
   locationId:     z.string().uuid().optional(),
@@ -55,7 +56,7 @@ export async function editSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { invoiceId, customerId, date, paymentDueDate, currencyCode, exchangeRate, locationId, notes, lines } = parsed.data
+  const { invoiceId, customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, notes, lines } = parsed.data
   const admin = createAdminClient()
 
   // Existing lines for this invoice — the basis for reversing inventory & GL.
@@ -105,13 +106,16 @@ export async function editSaleInvoiceAction(
   const stockIds = [...new Set([...oldQtyByItem.keys(), ...newQtyByItem.keys()])]
   const { data: lots } = await admin
     .from('inventory_lots')
-    .select('id, current_quantity')
+    .select('id, current_quantity, item_nature')
     .eq('tenant_id', tenantId)
     .in('id', stockIds)
   const currentByItem = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
+  // Service items are non-stockable: no stock check, adjustment, or COGS.
+  const serviceIds = new Set((lots ?? []).filter((l) => l.item_nature === 'service').map((l) => l.id))
 
   const oversells: OversellInfo[] = []
   for (const [stockItemId, requested] of newQtyByItem) {
+    if (serviceIds.has(stockItemId)) continue
     const available = (currentByItem.get(stockItemId) ?? 0) + (oldQtyByItem.get(stockItemId) ?? 0)
     if (requested > available) oversells.push({ stockItemId, available, requested })
   }
@@ -123,9 +127,10 @@ export async function editSaleInvoiceAction(
   // ── Apply changes ──────────────────────────────────────────────
   // Insert the new lines FIRST (same invoice_id & serial) so the old rows stay
   // intact if an insert fails; only then delete the old rows.
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; isService: boolean }[] = []
 
   for (const line of lines) {
+    const isService = serviceIds.has(line.stockItemId)
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
     const pkrEquivalent = line.quantity * effectiveRate * (currencyCode === 'USD' ? exchangeRate : 1)
 
@@ -141,8 +146,10 @@ export async function editSaleInvoiceAction(
       pkr_equivalent:  pkrEquivalent,
       date,
       payment_due_date: paymentDueDate ?? null,
+      due_days:        dueDays ?? null,
       notes:           notes?.trim() ? notes.trim() : null,
-      location_id:     locationId ?? null,
+      // Service lines are not bound to a dispatch location.
+      location_id:     isService ? null : (locationId ?? null),
       invoice_id:      invoiceId,
       confirmed_at:    new Date().toISOString(),
     }).select('id').single()
@@ -154,7 +161,7 @@ export async function editSaleInvoiceAction(
       }
       return { success: false, error: 'Failed to update invoice', code: 'INTERNAL_ERROR' }
     }
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, isService })
   }
 
   // Remove the old rows now that the replacements exist. If this fails (e.g. a
@@ -168,7 +175,9 @@ export async function editSaleInvoiceAction(
   }
 
   // Net inventory adjustment per item: return old qty, deduct new qty.
+  // Service items never touched stock, so skip them.
   for (const stockItemId of stockIds) {
+    if (serviceIds.has(stockItemId)) continue
     const delta = (oldQtyByItem.get(stockItemId) ?? 0) - (newQtyByItem.get(stockItemId) ?? 0)
     if (delta !== 0) {
       await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: delta })
@@ -177,6 +186,9 @@ export async function editSaleInvoiceAction(
 
   // ── Re-post the GL entry with the new totals, keeping the voucher stable ──
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
+  // Split revenue: stockable goods → Sales Revenue, service lines → Freight Income.
+  const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
+  const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
   const { data: oldEntry } = await admin
     .from('tajir_journal_entries')
@@ -197,9 +209,11 @@ export async function editSaleInvoiceAction(
     voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },
-      { accountSystemKey: 'sales_revenue',       debit: 0, credit: totalPKR, customerId },
-      ...createdOrders.map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
-      ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      ...(goodsRevenue   > 0 ? [{ accountSystemKey: 'sales_revenue',  debit: 0, credit: goodsRevenue,   customerId }] : []),
+      ...(serviceRevenue > 0 ? [{ accountSystemKey: 'freight_income', debit: 0, credit: serviceRevenue, customerId }] : []),
+      // COGS/inventory relief applies to stockable lines only.
+      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
+      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
     ],
   })
 
