@@ -10,18 +10,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { editCustomerAction } from '@/app/actions/edit-customer'
 
-export function EditCustomerForm({ id, currentName }: { id: string; currentName: string }) {
+export function EditCustomerForm({ id, currentName, currentPhone }: { id: string; currentName: string; currentPhone?: string | null }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const form = useForm({ defaultValues: { name: currentName } })
+  const form = useForm({ defaultValues: { name: currentName, phone: currentPhone ?? '' } })
 
-  const onSubmit = (values: { name: string }) => {
+  const onSubmit = (values: { name: string; phone: string }) => {
     startTransition(async () => {
       setError(null)
-      const result = await editCustomerAction({ id, name: values.name })
+      const result = await editCustomerAction({ id, name: values.name, phone: values.phone })
       if (!result.success) { setError(result.error); return }
       setOpen(false)
       router.refresh()
@@ -41,6 +41,13 @@ export function EditCustomerForm({ id, currentName }: { id: string; currentName:
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp / Phone</FormLabel>
+                <FormControl><Input type="tel" inputMode="tel" placeholder="0300 1234567" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

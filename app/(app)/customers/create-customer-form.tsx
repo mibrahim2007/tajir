@@ -16,6 +16,7 @@ import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  phone: z.string().optional(),
   openingBalance: z.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
@@ -32,7 +33,7 @@ export function CreateCustomerForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: '', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
+    defaultValues: { name: '', phone: '', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
   })
 
   const onSubmit = (values: FormValues) => {
@@ -62,6 +63,14 @@ export function CreateCustomerForm() {
               <FormItem>
                 <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input placeholder="Customer name" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp / Phone</FormLabel>
+                <FormControl><Input type="tel" inputMode="tel" placeholder="0300 1234567" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

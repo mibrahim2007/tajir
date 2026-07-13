@@ -9,7 +9,7 @@ export default async function CustomersPage() {
   const admin = createAdminClient()
 
   const [{ data: allCustomers }, { data: allSales }, { data: allReceipts }, { data: allReturns }, { data: allCreditNotes }, { data: allRefunds }] = await Promise.all([
-    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+    admin.from('tajir_customers').select('id, name, phone, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('sales_orders').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
@@ -48,6 +48,7 @@ export default async function CustomersPage() {
   const customerItems = customers.map((c) => ({
     id: c.id,
     name: c.name,
+    phone: c.phone ?? null,
     outstanding: outstandingByCustomer.get(c.id) ?? 0,
   }))
 
