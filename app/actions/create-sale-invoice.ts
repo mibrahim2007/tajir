@@ -146,7 +146,9 @@ export async function createSaleInvoiceAction(
   }
 
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
-  // Split revenue: stockable goods → Sales Revenue, service lines → Freight Income.
+  // Split by nature: stockable goods → Sales Revenue; service lines (e.g. freight
+  // paid to a third party on the customer's behalf) are a pass-through recovered
+  // from the customer — see the freight legs below.
   const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
@@ -157,7 +159,14 @@ export async function createSaleInvoiceAction(
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },
       ...(goodsRevenue   > 0 ? [{ accountSystemKey: 'sales_revenue',  debit: 0, credit: goodsRevenue,   customerId }] : []),
-      ...(serviceRevenue > 0 ? [{ accountSystemKey: 'freight_income', debit: 0, credit: serviceRevenue, customerId }] : []),
+      // Freight pass-through: recover the service amount from the customer (the AR
+      // debit above already includes it) and pay the third party in cash, routed
+      // through the Freight Clearing control account. Nets to zero — no P&L impact.
+      ...(serviceRevenue > 0 ? [
+        { accountSystemKey: 'freight_clearing', debit: 0,              credit: serviceRevenue, customerId },
+        { accountSystemKey: 'freight_clearing', debit: serviceRevenue, credit: 0 },
+        { accountSystemKey: 'cash_in_hand',     debit: 0,              credit: serviceRevenue },
+      ] : []),
       // COGS/inventory relief applies to stockable lines only; service lines
       // (e.g. freight) have no cost of goods.
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),

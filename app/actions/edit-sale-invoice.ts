@@ -186,7 +186,8 @@ export async function editSaleInvoiceAction(
 
   // ── Re-post the GL entry with the new totals, keeping the voucher stable ──
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
-  // Split revenue: stockable goods → Sales Revenue, service lines → Freight Income.
+  // Split by nature: stockable goods → Sales Revenue; service lines are a freight
+  // pass-through recovered from the customer (see the freight legs below).
   const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
@@ -210,7 +211,13 @@ export async function editSaleInvoiceAction(
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },
       ...(goodsRevenue   > 0 ? [{ accountSystemKey: 'sales_revenue',  debit: 0, credit: goodsRevenue,   customerId }] : []),
-      ...(serviceRevenue > 0 ? [{ accountSystemKey: 'freight_income', debit: 0, credit: serviceRevenue, customerId }] : []),
+      // Freight pass-through: recover from the customer (in the AR debit above) and
+      // pay the third party in cash via the Freight Clearing control account.
+      ...(serviceRevenue > 0 ? [
+        { accountSystemKey: 'freight_clearing', debit: 0,              credit: serviceRevenue, customerId },
+        { accountSystemKey: 'freight_clearing', debit: serviceRevenue, credit: 0 },
+        { accountSystemKey: 'cash_in_hand',     debit: 0,              credit: serviceRevenue },
+      ] : []),
       // COGS/inventory relief applies to stockable lines only.
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
