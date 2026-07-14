@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { CreateSaleReturnForm } from './create-sale-return-form'
 
 export default async function NewSaleReturnPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
@@ -21,9 +22,10 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
+  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const customerList = rawCustomers ?? []
   const supplierList = rawSuppliers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
   const saleOrderList = (rawOrders ?? []).map((o) => ({
     id: o.id,
     date: o.date,

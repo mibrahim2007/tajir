@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition, useMemo } from 'react'
+import React, { useRef, useState, useTransition, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -21,12 +21,16 @@ import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
+import { YarnLineFields } from '@/components/yarn-line-fields'
 
 const lineSchema = z.object({
   stockItemId:  z.string().uuid('Select a stock item'),
   quantity:     z.number().positive('Enter quantity'),
   rate:         z.number().positive('Enter rate'),
   discountPct:  z.number().min(0).max(100).default(0),
+  yarnType:     z.string().optional().default(''),
+  yarnWeight:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  multiplyBy:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
 })
 
 const schema = z.object({
@@ -49,7 +53,7 @@ type Props = {
   today: string
   suppliers: { id: string; name: string }[]
   customers?: { id: string; name: string }[]
-  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null }[]
+  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean }[]
   locations: { id: string; name: string }[]
 }
 
@@ -74,13 +78,14 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     [customers, supplierList],
   )
   const lotPickerItems      = lotList
+  const yarnLotIds = useMemo(() => new Set(lots.filter((l) => l.isYarn).map((l) => l.id)), [lots])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       supplierId: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 }],
     },
   })
 
@@ -92,11 +97,16 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
 
+  // Yarn lines multiply the money amount by their Multiply By (default 1).
+  const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
+    l.stockItemId && yarnLotIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
+
   const { subtotal, discountTotal, netTotal } = useMemo(() => {
-    const sub  = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er, 0)
-    const disc = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * ((l.discountPct || 0) / 100), 0)
+    const sub  = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l), 0)
+    const disc = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l) * ((l.discountPct || 0) / 100), 0)
     return { subtotal: sub, discountTotal: disc, netTotal: sub - disc }
-  }, [watchedLines, er])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedLines, er, yarnLotIds])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
@@ -125,6 +135,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
           quantity:    l.quantity,
           rate:        l.rate,
           discountPct: l.discountPct,
+          yarnType:    l.yarnType || undefined,
+          yarnWeight:  Number.isFinite(l.yarnWeight) ? l.yarnWeight : undefined,
+          multiplyBy:  Number.isFinite(l.multiplyBy) ? l.multiplyBy : undefined,
         })),
       })
       if (!result.success) { setServerError(result.error); return }
@@ -258,10 +271,12 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                       <tbody className="divide-y">
                         {fields.map((field, index) => {
                           const line = watchedLines[index] ?? {}
-                          const gross  = (line.quantity || 0) * (line.rate || 0) * er
+                          const isYarnLine = !!line.stockItemId && yarnLotIds.has(line.stockItemId)
+                          const gross  = (line.quantity || 0) * (line.rate || 0) * er * lineMult(line)
                           const amount = gross * (1 - (line.discountPct || 0) / 100)
                           return (
-                            <tr key={field.id} className="align-top">
+                            <React.Fragment key={field.id}>
+                            <tr className="align-top">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
                               <td className="px-3 py-2 min-w-[180px]">
                                 <Controller
@@ -316,6 +331,15 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 </Button>
                               </td>
                             </tr>
+                            {isYarnLine && (
+                              <tr>
+                                <td />
+                                <td colSpan={6} className="px-3 pb-3">
+                                  <YarnLineFields index={index} />
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
                           )
                         })}
                       </tbody>
@@ -325,7 +349,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
                 <div className="mt-3">
                   <Button type="button" variant="outline" size="sm"
-                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0 })}
+                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })}
                     className="gap-1.5">
                     <Plus className="size-4" /> Add Line
                   </Button>

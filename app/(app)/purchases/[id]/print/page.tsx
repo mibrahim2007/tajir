@@ -19,7 +19,7 @@ export default async function PrintPurchasePage({ params }: { params: Promise<{ 
 
   const [{ data: order }, tenant] = await Promise.all([
     admin.from('purchase_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id, yarn_type, yarn_weight, multiply_by')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     getTenant(tenantId),
   ])
@@ -121,7 +121,18 @@ export default async function PrintPurchasePage({ params }: { params: Promise<{ 
           <tbody>
             <tr>
               <td className="px-3 py-3 border-r border-gray-200 text-gray-500 tabular-nums">1</td>
-              <td className="px-3 py-3 border-r border-gray-200 font-medium">{stockItem?.name ?? '—'}</td>
+              <td className="px-3 py-3 border-r border-gray-200 font-medium">
+                {stockItem?.name ?? '—'}
+                {(order.yarn_type || order.yarn_weight != null || (order.multiply_by != null && Number(order.multiply_by) !== 1)) && (
+                  <span className="block text-[10px] text-gray-500 font-normal">
+                    {[
+                      order.yarn_type,
+                      order.yarn_weight != null ? `Wt ${fmt(Number(order.yarn_weight))}` : null,
+                      order.multiply_by != null && Number(order.multiply_by) !== 1 ? `× ${fmt(Number(order.multiply_by))}` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                )}
+              </td>
               <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockItem?.unit_of_measure ? <span className="ml-1 text-gray-500 text-xs">{stockItem.unit_of_measure}</span> : null}</td>
               <td className="px-3 py-3 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
                 {order.currency_code} {fmt(rate)}

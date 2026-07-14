@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseReturnAction } from '@/app/actions/delete-purchase-return'
+import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { EditPurchaseReturnForm } from './edit-purchase-return-form'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
@@ -15,7 +16,7 @@ export default async function PurchaseReturnsPage() {
 
   const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, serial_number, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id')
+      .select('id, serial_number, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id, yarn_type, yarn_weight, multiply_by')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
@@ -24,10 +25,11 @@ export default async function PurchaseReturnsPage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
+  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const returns = rawReturns ?? []
   const supplierList = rawSuppliers ?? []
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
-  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
@@ -36,7 +38,7 @@ export default async function PurchaseReturnsPage() {
     <RoleGate allowedRoles={['owner']}>
       <div className="flex items-center gap-1">
         <EditPurchaseReturnForm
-          ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null }}
+          ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null }}
           suppliers={supplierList}
           lots={lotList}
           locations={locationList}

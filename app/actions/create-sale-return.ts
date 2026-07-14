@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
+import { normalizeMultiplyBy } from '@/lib/yarn'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -20,6 +21,9 @@ const schema = z.object({
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   reason:       z.string().optional(),
   locationId:   z.string().uuid().optional(),
+  yarnType:     z.string().optional().nullable(),
+  yarnWeight:   z.coerce.number().min(0).optional().nullable(),
+  multiplyBy:   z.coerce.number().positive().optional().nullable(),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
@@ -44,10 +48,22 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { saleOrderId, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason, locationId } = parsed.data
-  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
+  const { saleOrderId, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight, multiplyBy: rawMultiplyBy } = parsed.data
 
   const admin = createAdminClient()
+
+  // Determine whether the item is yarn (Item Type "Yarn"); yarn lines carry a
+  // multiplier that scales the money amount (not the quantity).
+  const { data: itemLot } = await admin
+    .from('inventory_lots').select('item_type_id').eq('id', stockItemId).eq('tenant_id', tenantId).maybeSingle()
+  let isYarn = false
+  if (itemLot?.item_type_id) {
+    const { data: itemType } = await admin
+      .from('item_types').select('name').eq('id', itemLot.item_type_id).eq('tenant_id', tenantId).maybeSingle()
+    isYarn = (itemType?.name ?? '').trim().toLowerCase() === 'yarn'
+  }
+  const multiplyBy = isYarn ? normalizeMultiplyBy(rawMultiplyBy) : 1
+  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
 
   /* Validate quantity does not exceed original sale if saleOrderId is provided */
   if (saleOrderId) {
@@ -104,6 +120,9 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
       date,
       reason:        reason ?? null,
       location_id:   locationId ?? null,
+      yarn_type:     isYarn ? (yarnType?.trim() || null) : null,
+      yarn_weight:   isYarn ? (yarnWeight ?? null) : null,
+      multiply_by:   multiplyBy,
     })
     .select('id')
     .single()

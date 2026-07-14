@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useCallback, useMemo, useEffect } from 'react'
+import React, { useState, useTransition, useRef, useCallback, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -24,9 +24,10 @@ import { FileUploader, type FileUploaderHandle } from '@/components/file-uploade
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
+import { YarnLineFields } from '@/components/yarn-line-fields'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service' }
+type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service'; isYarn?: boolean }
 type PricingRule = { customerId: string; stockItemId: string; rate: number }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
@@ -43,6 +44,9 @@ const lineSchema = z.object({
   quantity:    z.number().positive('Enter quantity'),
   rate:        z.number().positive('Enter rate'),
   discountPct: z.number().min(0).max(100).default(0),
+  yarnType:    z.string().optional().default(''),
+  yarnWeight:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  multiplyBy:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
 })
 
 const baseSchema = z.object({
@@ -107,6 +111,13 @@ export function SaleInvoiceForm({
     () => new Set(stockItems.filter((s) => s.itemNature === 'service').map((s) => s.id)),
     [stockItems],
   )
+  // Yarn items expose the per-line yarn fields; Multiply By scales the amount.
+  const yarnItemIds = useMemo(
+    () => new Set(stockItems.filter((s) => s.isYarn).map((s) => s.id)),
+    [stockItems],
+  )
+  const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
+    l.stockItemId && yarnItemIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
 
   // Local state so newly created items appear immediately
   const [customerList, setCustomerList] = useState<PickerItem[]>(
@@ -136,7 +147,7 @@ export function SaleInvoiceForm({
     defaultValues: initialValues ?? {
       customerId: '', date: today, paymentDueDate: '', dueDays: undefined, notes: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 }],
     },
   })
 
@@ -183,8 +194,8 @@ export function SaleInvoiceForm({
 
   // Computed inline (not memoised): react-hook-form's watch() mutates the lines
   // array in place, so a useMemo keyed on it would keep a stale total.
-  const subtotal      = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er, 0)
-  const discountTotal = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * ((l.discountPct || 0) / 100), 0)
+  const subtotal      = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l), 0)
+  const discountTotal = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l) * ((l.discountPct || 0) / 100), 0)
   const netTotal      = subtotal - discountTotal
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
@@ -244,7 +255,7 @@ export function SaleInvoiceForm({
       form.setValue(`lines.${emptyIdx}.stockItemId`, match.id)
       if (rate) form.setValue(`lines.${emptyIdx}.rate`, rate)
     } else {
-      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0 })
+      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockItems, pricingRules, append])
@@ -276,6 +287,9 @@ export function SaleInvoiceForm({
           quantity:    l.quantity,
           rate:        l.rate,
           discountPct: l.discountPct,
+          yarnType:    l.yarnType || undefined,
+          yarnWeight:  Number.isFinite(l.yarnWeight) ? l.yarnWeight : undefined,
+          multiplyBy:  Number.isFinite(l.multiplyBy) ? l.multiplyBy : undefined,
         })),
       }
 
@@ -519,9 +533,10 @@ export function SaleInvoiceForm({
                         <tbody className="divide-y">
                           {fields.map((field, index) => {
                             const line      = watchedLines[index] ?? {}
-                            const amount    = (line.quantity || 0) * (line.rate || 0) * er * (1 - (line.discountPct || 0) / 100)
+                            const amount    = (line.quantity || 0) * (line.rate || 0) * er * lineMult(line) * (1 - (line.discountPct || 0) / 100)
                             const item      = stockItems.find((s) => s.id === line.stockItemId)
                             const isServiceLine = item?.itemNature === 'service'
+                            const isYarnLine = !!item?.isYarn
                             const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
                             const ratePKR   = (line.rate || 0) * er
                             const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
@@ -530,7 +545,8 @@ export function SaleInvoiceForm({
                               : null
 
                             return (
-                              <tr key={field.id} className="align-top">
+                              <React.Fragment key={field.id}>
+                              <tr className="align-top">
                                 <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
                                 <td className="px-3 py-2 min-w-[180px]">
                                   <Controller
@@ -598,6 +614,15 @@ export function SaleInvoiceForm({
                                   </Button>
                                 </td>
                               </tr>
+                              {isYarnLine && (
+                                <tr>
+                                  <td />
+                                  <td colSpan={6} className="px-3 pb-3">
+                                    <YarnLineFields index={index} />
+                                  </td>
+                                </tr>
+                              )}
+                              </React.Fragment>
                             )
                           })}
                         </tbody>
@@ -606,7 +631,7 @@ export function SaleInvoiceForm({
                   </div>
                   <div className="mt-3">
                     <Button type="button" variant="outline" size="sm"
-                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0 })}
+                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })}
                       className="gap-1.5">
                       <Plus className="size-4" /> Add Line
                     </Button>

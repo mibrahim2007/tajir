@@ -21,7 +21,7 @@ export default async function SaleInvoiceReportPage({ params }: { params: Promis
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -123,7 +123,18 @@ export default async function SaleInvoiceReportPage({ params }: { params: Promis
             {lines.map((line, i) => (
               <tr key={line.id} className={`border-b border-gray-200 ${i % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : ''}`}>
                 <td className="px-3 py-2.5 text-gray-500 tabular-nums align-top">{i + 1}</td>
-                <td className="px-3 py-2.5 font-medium align-top">{stockMap.get(line.stock_item_id)?.name ?? '—'}</td>
+                <td className="px-3 py-2.5 font-medium align-top">
+                  {stockMap.get(line.stock_item_id)?.name ?? '—'}
+                  {(line.yarn_type || line.yarn_weight != null || (line.multiply_by != null && Number(line.multiply_by) !== 1)) && (
+                    <span className="block text-[10px] text-gray-500 font-normal">
+                      {[
+                        line.yarn_type,
+                        line.yarn_weight != null ? `Wt ${fmt(Number(line.yarn_weight))}` : null,
+                        line.multiply_by != null && Number(line.multiply_by) !== 1 ? `× ${fmt(Number(line.multiply_by))}` : null,
+                      ].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </td>
                 <td className="px-3 py-2.5 text-right tabular-nums align-top">
                   {line.quantity.toLocaleString(undefined, { maximumFractionDigits: 3 })}
                   {stockMap.get(line.stock_item_id)?.uom ? <span className="ml-1 text-gray-500 text-xs">{stockMap.get(line.stock_item_id)!.uom}</span> : null}

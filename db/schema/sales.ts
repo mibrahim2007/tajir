@@ -28,6 +28,9 @@ export const salesOrders = pgTable('sales_orders', {
   // Payment terms in days; when set, payment_due_date = date + due_days.
   dueDays:        integer('due_days'),
   notes:          text('notes'),
+  yarnType:       text('yarn_type'),
+  yarnWeight:     numeric('yarn_weight', { precision: 15, scale: 3 }),
+  multiplyBy:     numeric('multiply_by', { precision: 15, scale: 4 }).notNull().default('1'),
   confirmedAt:    timestamp('confirmed_at', { withTimezone: true }),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

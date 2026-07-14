@@ -20,6 +20,9 @@ export const purchaseReturns = pgTable('purchase_returns', {
   pkrEquivalent:   numeric('pkr_equivalent', { precision: 15, scale: 2 }).notNull(),
   date:            date('date').notNull(),
   reason:          text('reason'),
+  yarnType:        text('yarn_type'),
+  yarnWeight:      numeric('yarn_weight', { precision: 15, scale: 3 }),
+  multiplyBy:      numeric('multiply_by', { precision: 15, scale: 4 }).notNull().default('1'),
   createdAt:       timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
@@ -37,6 +40,9 @@ export const saleReturns = pgTable('sale_returns', {
   pkrEquivalent: numeric('pkr_equivalent', { precision: 15, scale: 2 }).notNull(),
   date:          date('date').notNull(),
   reason:        text('reason'),
+  yarnType:      text('yarn_type'),
+  yarnWeight:    numeric('yarn_weight', { precision: 15, scale: 3 }),
+  multiplyBy:    numeric('multiply_by', { precision: 15, scale: 4 }).notNull().default('1'),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

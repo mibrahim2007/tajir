@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useTransition, useMemo, useEffect } from 'react'
+import React, { useRef, useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -20,12 +20,16 @@ import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { createSaleReturnAction } from '@/app/actions/create-sale-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
+import { YarnLineFields } from '@/components/yarn-line-fields'
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
   quantity:    z.number().positive('Enter quantity'),
   rate:        z.number().positive('Enter rate'),
   discountPct: z.number().min(0).max(100).default(0),
+  yarnType:    z.string().optional().default(''),
+  yarnWeight:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  multiplyBy:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
 })
 
 const schema = z.object({
@@ -50,7 +54,7 @@ type Props = {
   today:              string
   customers:          { id: string; name: string }[]
   suppliers?:         { id: string; name: string }[]
-  lots:               { id: string; name: string; count: string; unitOfMeasure: string | null }[]
+  lots:               { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean }[]
   saleOrders:         SaleOrder[]
   locations:          { id: string; name: string }[]
   defaultSaleOrderId?: string
@@ -67,7 +71,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
     defaultValues: {
       saleOrderId: defaultSaleOrderId, customerId: '', date: today, reason: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 }],
     },
   })
 
@@ -86,11 +90,16 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
 
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
 
+  const yarnLotIds = useMemo(() => new Set(lots.filter((l) => l.isYarn).map((l) => l.id)), [lots])
+  const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
+    l.stockItemId && yarnLotIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
+
   const { subtotal, discountTotal, netTotal } = useMemo(() => {
-    const sub  = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er, 0)
-    const disc = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * ((l.discountPct || 0) / 100), 0)
+    const sub  = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l), 0)
+    const disc = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l) * ((l.discountPct || 0) / 100), 0)
     return { subtotal: sub, discountTotal: disc, netTotal: sub - disc }
-  }, [watchedLines, er])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedLines, er, yarnLotIds])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
@@ -159,6 +168,9 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
           saleOrderId:  i === 0 ? values.saleOrderId || undefined : undefined,
           reason:       values.reason || undefined,
           locationId:   values.locationId || undefined,
+          yarnType:     line.yarnType || undefined,
+          yarnWeight:   Number.isFinite(line.yarnWeight) ? line.yarnWeight : undefined,
+          multiplyBy:   Number.isFinite(line.multiplyBy) ? line.multiplyBy : undefined,
         })
         if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
         if (i === 0) firstEntryId = result.data.id
@@ -320,9 +332,11 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                       <tbody className="divide-y">
                         {fields.map((field, index) => {
                           const line   = watchedLines[index] ?? {}
-                          const amount = (line.quantity || 0) * (line.rate || 0) * er * (1 - (line.discountPct || 0) / 100)
+                          const isYarnLine = !!line.stockItemId && yarnLotIds.has(line.stockItemId)
+                          const amount = (line.quantity || 0) * (line.rate || 0) * er * lineMult(line) * (1 - (line.discountPct || 0) / 100)
                           return (
-                            <tr key={field.id} className="align-top">
+                            <React.Fragment key={field.id}>
+                            <tr className="align-top">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
                               <td className="px-3 py-2 min-w-[180px]">
                                 <Controller
@@ -372,6 +386,15 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                                 </Button>
                               </td>
                             </tr>
+                            {isYarnLine && (
+                              <tr>
+                                <td />
+                                <td colSpan={6} className="px-3 pb-3">
+                                  <YarnLineFields index={index} />
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
                           )
                         })}
                       </tbody>
@@ -380,7 +403,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                 </div>
                 <div className="mt-3">
                   <Button type="button" variant="outline" size="sm"
-                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0 })}
+                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })}
                     className="gap-1.5">
                     <Plus className="size-4" /> Add Line
                   </Button>

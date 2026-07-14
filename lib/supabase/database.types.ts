@@ -1969,6 +1969,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           location_id: string | null
+          multiply_by: number
           payment_due_date: string | null
           pkr_equivalent: number
           quantity: number
@@ -1977,6 +1978,8 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          yarn_type: string | null
+          yarn_weight: number | null
         }
         Insert: {
           advance_paid?: number
@@ -1988,6 +1991,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          multiply_by?: number
           payment_due_date?: string | null
           pkr_equivalent: number
           quantity: number
@@ -1996,6 +2000,8 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Update: {
           advance_paid?: number
@@ -2007,6 +2013,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          multiply_by?: number
           payment_due_date?: string | null
           pkr_equivalent?: number
           quantity?: number
@@ -2015,6 +2022,8 @@ export type Database = {
           stock_item_id?: string
           supplier_id?: string
           tenant_id?: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Relationships: [
           {
@@ -2069,6 +2078,7 @@ export type Database = {
           exchange_rate: number
           id: string
           location_id: string | null
+          multiply_by: number
           pkr_equivalent: number
           purchase_order_id: string | null
           quantity: number
@@ -2078,6 +2088,8 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          yarn_type: string | null
+          yarn_weight: number | null
         }
         Insert: {
           created_at?: string
@@ -2086,6 +2098,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           location_id?: string | null
+          multiply_by?: number
           pkr_equivalent: number
           purchase_order_id?: string | null
           quantity: number
@@ -2095,6 +2108,8 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Update: {
           created_at?: string
@@ -2103,6 +2118,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           location_id?: string | null
+          multiply_by?: number
           pkr_equivalent?: number
           purchase_order_id?: string | null
           quantity?: number
@@ -2112,6 +2128,8 @@ export type Database = {
           stock_item_id?: string
           supplier_id?: string
           tenant_id?: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Relationships: [
           {
@@ -2174,6 +2192,7 @@ export type Database = {
           exchange_rate: number
           id: string
           location_id: string | null
+          multiply_by: number
           pkr_equivalent: number
           quantity: number
           rate: number
@@ -2182,6 +2201,8 @@ export type Database = {
           serial_number: string | null
           stock_item_id: string
           tenant_id: string
+          yarn_type: string | null
+          yarn_weight: number | null
         }
         Insert: {
           created_at?: string
@@ -2191,6 +2212,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           location_id?: string | null
+          multiply_by?: number
           pkr_equivalent: number
           quantity: number
           rate: number
@@ -2199,6 +2221,8 @@ export type Database = {
           serial_number?: string | null
           stock_item_id: string
           tenant_id: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Update: {
           created_at?: string
@@ -2208,6 +2232,7 @@ export type Database = {
           exchange_rate?: number
           id?: string
           location_id?: string | null
+          multiply_by?: number
           pkr_equivalent?: number
           quantity?: number
           rate?: number
@@ -2216,6 +2241,8 @@ export type Database = {
           serial_number?: string | null
           stock_item_id?: string
           tenant_id?: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Relationships: [
           {
@@ -2281,6 +2308,7 @@ export type Database = {
           id: string
           invoice_id: string | null
           location_id: string | null
+          multiply_by: number
           notes: string | null
           payment_due_date: string | null
           pkr_equivalent: number
@@ -2289,6 +2317,8 @@ export type Database = {
           serial_number: string | null
           stock_item_id: string
           tenant_id: string
+          yarn_type: string | null
+          yarn_weight: number | null
         }
         Insert: {
           confirmed_at?: string | null
@@ -2301,6 +2331,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          multiply_by?: number
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent: number
@@ -2309,6 +2340,8 @@ export type Database = {
           serial_number?: string | null
           stock_item_id: string
           tenant_id: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Update: {
           confirmed_at?: string | null
@@ -2321,6 +2354,7 @@ export type Database = {
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          multiply_by?: number
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent?: number
@@ -2329,6 +2363,8 @@ export type Database = {
           serial_number?: string | null
           stock_item_id?: string
           tenant_id?: string
+          yarn_type?: string | null
+          yarn_weight?: number | null
         }
         Relationships: [
           {

@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { CreateSaleForm } from './create-sale-form'
 
 export default async function NewSalePage() {
@@ -42,6 +43,7 @@ export default async function NewSalePage() {
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
+  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
@@ -51,6 +53,7 @@ export default async function NewSalePage() {
     barcode: l.code ?? null,
     unitOfMeasure: l.unit_of_measure ?? null,
     itemNature: (l.item_nature === 'service' ? 'service' : 'inventory') as 'inventory' | 'service',
+    isYarn: yarnLotIds.has(l.id),
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({
     customerId: r.customer_id,

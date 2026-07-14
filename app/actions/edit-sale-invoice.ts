@@ -7,6 +7,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { normalizeMultiplyBy } from '@/lib/yarn'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -14,6 +15,9 @@ const lineSchema = z.object({
   quantity:    z.number().positive('Quantity must be positive'),
   rate:        z.number().positive('Rate must be positive'),
   discountPct: z.number().min(0).max(100).default(0),
+  yarnType:    z.string().optional().nullable(),
+  yarnWeight:  z.coerce.number().min(0).optional().nullable(),
+  multiplyBy:  z.coerce.number().positive().optional().nullable(),
 })
 
 const schema = z.object({
@@ -106,12 +110,19 @@ export async function editSaleInvoiceAction(
   const stockIds = [...new Set([...oldQtyByItem.keys(), ...newQtyByItem.keys()])]
   const { data: lots } = await admin
     .from('inventory_lots')
-    .select('id, current_quantity, item_nature')
+    .select('id, current_quantity, item_nature, item_type_id')
     .eq('tenant_id', tenantId)
     .in('id', stockIds)
   const currentByItem = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
   // Service items are non-stockable: no stock check, adjustment, or COGS.
   const serviceIds = new Set((lots ?? []).filter((l) => l.item_nature === 'service').map((l) => l.id))
+  // Yarn items expose the per-line multiplier and yarn attributes.
+  const typeIds = [...new Set((lots ?? []).map((l) => l.item_type_id).filter(Boolean) as string[])]
+  const { data: itemTypes } = typeIds.length
+    ? await admin.from('item_types').select('id, name').eq('tenant_id', tenantId).in('id', typeIds)
+    : { data: [] as { id: string; name: string }[] }
+  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => t.name.trim().toLowerCase() === 'yarn').map((t) => t.id))
+  const yarnIds = new Set((lots ?? []).filter((l) => l.item_type_id && yarnTypeIds.has(l.item_type_id)).map((l) => l.id))
 
   const oversells: OversellInfo[] = []
   for (const [stockItemId, requested] of newQtyByItem) {
@@ -131,8 +142,10 @@ export async function editSaleInvoiceAction(
 
   for (const line of lines) {
     const isService = serviceIds.has(line.stockItemId)
+    const isYarn = yarnIds.has(line.stockItemId)
+    const multiplyBy = isYarn ? normalizeMultiplyBy(line.multiplyBy) : 1
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
-    const pkrEquivalent = line.quantity * effectiveRate * (currencyCode === 'USD' ? exchangeRate : 1)
+    const pkrEquivalent = line.quantity * effectiveRate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
 
     const { data: order, error } = await admin.from('sales_orders').insert({
       tenant_id:       tenantId,
@@ -148,6 +161,9 @@ export async function editSaleInvoiceAction(
       payment_due_date: paymentDueDate ?? null,
       due_days:        dueDays ?? null,
       notes:           notes?.trim() ? notes.trim() : null,
+      yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
+      yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
+      multiply_by:     multiplyBy,
       // Service lines are not bound to a dispatch location.
       location_id:     isService ? null : (locationId ?? null),
       invoice_id:      invoiceId,

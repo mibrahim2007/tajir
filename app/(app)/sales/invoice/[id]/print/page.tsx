@@ -19,7 +19,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -144,7 +144,18 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
               return (
                 <tr key={line.id} className={i % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : ''}>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-gray-500 tabular-nums">{i + 1}</td>
-                  <td className="px-3 py-2.5 border-r border-gray-200 font-medium">{stockMap.get(line.stock_item_id)?.name ?? '—'}</td>
+                  <td className="px-3 py-2.5 border-r border-gray-200 font-medium">
+                    {stockMap.get(line.stock_item_id)?.name ?? '—'}
+                    {(line.yarn_type || line.yarn_weight != null || (line.multiply_by != null && Number(line.multiply_by) !== 1)) && (
+                      <span className="block text-[10px] text-gray-500 font-normal">
+                        {[
+                          line.yarn_type,
+                          line.yarn_weight != null ? `Wt ${fmt(Number(line.yarn_weight))}` : null,
+                          line.multiply_by != null && Number(line.multiply_by) !== 1 ? `× ${fmt(Number(line.multiply_by))}` : null,
+                        ].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockMap.get(line.stock_item_id)?.uom ? <span className="ml-1 text-gray-500 text-xs">{stockMap.get(line.stock_item_id)!.uom}</span> : null}</td>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
                     {first.currency_code} {fmt(rate)}

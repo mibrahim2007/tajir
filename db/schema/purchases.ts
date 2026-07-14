@@ -25,6 +25,9 @@ export const purchaseOrders = pgTable('purchase_orders', {
   pkrEquivalent: numeric('pkr_equivalent', { precision: 15, scale: 2 }).notNull(),
   advancePaid:   numeric('advance_paid', { precision: 15, scale: 2 }).notNull().default('0'),
   date:          date('date').notNull(),
+  yarnType:      text('yarn_type'),
+  yarnWeight:    numeric('yarn_weight', { precision: 15, scale: 3 }),
+  multiplyBy:    numeric('multiply_by', { precision: 15, scale: 4 }).notNull().default('1'),
   confirmedAt:   timestamp('confirmed_at', { withTimezone: true }),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })

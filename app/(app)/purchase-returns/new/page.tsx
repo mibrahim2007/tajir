@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { CreatePurchaseReturnForm } from './create-purchase-return-form'
 
 export default async function NewPurchaseReturnPage() {
@@ -19,9 +20,10 @@ export default async function NewPurchaseReturnPage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
+  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
   const purchaseOrderList = (rawOrders ?? []).map((o) => ({
     id: o.id,
     date: o.date,

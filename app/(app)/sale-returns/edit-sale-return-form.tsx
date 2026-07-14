@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleReturnAction } from '@/app/actions/edit-sale-return'
+import { YARN_TYPES } from '@/lib/yarn'
 
 const schema = z.object({
   customerId:   z.string().uuid('Select a customer'),
@@ -24,6 +25,9 @@ const schema = z.object({
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   reason:       z.string().optional(),
   locationId:   z.string().optional(),
+  yarnType:     z.string().optional().default(''),
+  yarnWeight:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  multiplyBy:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -39,12 +43,15 @@ type SaleReturn = {
   date: string
   reason: string | null
   locationId: string | null
+  yarnType: string | null
+  yarnWeight: number | null
+  multiplyBy: number | null
 }
 
 type Props = {
   ret: SaleReturn
   customers: { id: string; name: string }[]
-  lots: { id: string; name: string; unitOfMeasure: string | null }[]
+  lots: { id: string; name: string; unitOfMeasure: string | null; isYarn?: boolean }[]
   locations: { id: string; name: string }[]
 }
 
@@ -68,8 +75,13 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
       date:         ret.date,
       reason:       ret.reason ?? '',
       locationId:   ret.locationId ?? '',
+      yarnType:     ret.yarnType ?? '',
+      yarnWeight:   ret.yarnWeight ?? NaN,
+      multiplyBy:   ret.multiplyBy ?? 1,
     },
   })
+
+  const isYarn = !!lots.find((l) => l.id === form.watch('stockItemId'))?.isYarn
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -137,6 +149,29 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
               label="Rate per Unit"
               required
             />
+
+            {isYarn && (
+              <div className="rounded-md border border-amber-200/70 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20 p-3 space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Yarn</p>
+                <FormItem>
+                  <FormLabel>Yarn Type</FormLabel>
+                  <select {...form.register('yarnType')} className={SELECT_CLS}>
+                    <option value="">Type…</option>
+                    {YARN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </FormItem>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormItem>
+                    <FormLabel>Yarn Weight</FormLabel>
+                    <Input type="number" step="0.001" min="0" {...form.register('yarnWeight', { valueAsNumber: true })} />
+                  </FormItem>
+                  <FormItem>
+                    <FormLabel>Multiply By</FormLabel>
+                    <Input type="number" step="0.0001" min="0" {...form.register('multiplyBy', { valueAsNumber: true })} />
+                  </FormItem>
+                </div>
+              </div>
+            )}
 
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem>
