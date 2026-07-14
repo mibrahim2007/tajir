@@ -19,6 +19,7 @@ import { formatPKTDate } from '@/lib/utils/dates'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 type Bank = { id: string; name: string; account_number: string | null }
+type EmployeeOption = { id: string; name: string }
 
 const lineSchema = z.object({
   transactionType: z.enum(['cash', 'pdc', 'online']),
@@ -31,6 +32,7 @@ const lineSchema = z.object({
 })
 
 const schema = z.object({
+  employeeId:       z.string().optional().default(''),
   currencyCode:     z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:     z.number().positive().default(1),
   disbursementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
@@ -50,10 +52,13 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
 const freshDefaults = (today: string): FormValues => ({
-  currencyCode: 'PKR', exchangeRate: 1, disbursementDate: today, installmentCount: 0, firstDueDate: '', notes: '', lines: [{ ...emptyLine }],
+  employeeId: '', currencyCode: 'PKR', exchangeRate: 1, disbursementDate: today, installmentCount: 0, firstDueDate: '', notes: '', lines: [{ ...emptyLine }],
 })
 
-export function DisburseLoanForm({ employeeId, today, nextSerial, banks = [] }: { employeeId: string; today: string; nextSerial?: string | null; banks?: Bank[] }) {
+// Two modes: fixed employee (from an employee ledger) or an employee picker
+// (from the Loans page — pass `employees`, omit `employeeId`).
+export function DisburseLoanForm({ employeeId, employees, today, nextSerial, banks = [] }: { employeeId?: string; employees?: EmployeeOption[]; today: string; nextSerial?: string | null; banks?: Bank[] }) {
+  const showPicker = !employeeId && !!employees
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -76,10 +81,12 @@ export function DisburseLoanForm({ employeeId, today, nextSerial, banks = [] }: 
     : []
 
   const onSubmit = (values: FormValues) => {
+    const empId = employeeId ?? values.employeeId
+    if (!empId) { setServerError('Select an employee'); return }
     startTransition(async () => {
       setServerError(null)
       const result = await createEmployeeLoanAction({
-        employeeId,
+        employeeId: empId,
         currencyCode: values.currencyCode,
         exchangeRate: values.exchangeRate,
         disbursementDate: values.disbursementDate,
@@ -108,10 +115,27 @@ export function DisburseLoanForm({ employeeId, today, nextSerial, banks = [] }: 
       <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>Disburse Loan / Advance</SheetTitle>
-          <SheetDescription>Pay a loan or advance to this employee. Interest-free.</SheetDescription>
+          <SheetDescription>Pay a loan or advance{showPicker ? ' to an employee' : ' to this employee'}. Interest-free.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+            {showPicker && (
+              <FormField control={form.control} name="employeeId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employee <span className="text-destructive">*</span></FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select an employee…" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      {employees!.map((e) => (
+                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            )}
+
             {nextSerial && (
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">Serial No.</label>
