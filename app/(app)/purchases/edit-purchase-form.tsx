@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -87,6 +87,17 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
   const watchedWt  = form.watch('weightPerCarton')
   const qtyLbs = computeQtyLbs(watchedNos, watchedWt)
 
+  // For a polyester item, Quantity is derived = Nos Carton × Weight.
+  useEffect(() => {
+    if (!selectedIsPolyester) return
+    const q = (Number(watchedNos) || 0) * (Number(watchedWt) || 0)
+    const cur = Number(form.getValues('quantity'))
+    const next = q > 0 ? q : NaN
+    const same = q > 0 ? cur === q : Number.isNaN(cur)
+    if (!same) form.setValue('quantity', next, { shouldDirty: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIsPolyester, watchedNos, watchedWt])
+
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
@@ -159,8 +170,8 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
                 <FormItem>
-                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
-                  <FormControl><Input type="number" step="0.001" min="0" value={value} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
+                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}{selectedIsPolyester && <span className="ml-1 text-muted-foreground font-normal">(auto = Nos Carton × Weight)</span>}</FormLabel>
+                  <FormControl><Input type="number" step="0.001" min="0" value={value} readOnly={selectedIsPolyester} tabIndex={selectedIsPolyester ? -1 : undefined} className={selectedIsPolyester ? 'bg-muted/40 text-muted-foreground cursor-default' : undefined} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )

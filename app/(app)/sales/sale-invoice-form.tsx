@@ -228,6 +228,21 @@ export function SaleInvoiceForm({
   // at least one polyester line, so ordinary invoices stay unchanged.
   const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterItemIds.has(l.stockItemId))
 
+  // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
+  // field in sync so it drives stock and validation. The equality guard prevents
+  // an update loop (setValue re-renders → effect re-runs).
+  useEffect(() => {
+    watchedLines.forEach((l, i) => {
+      if (!l.stockItemId || !polyesterItemIds.has(l.stockItemId)) return
+      const q = (Number(l.nosCarton) || 0) * (Number(l.weightPerCarton) || 0)
+      const cur = Number(l.quantity)
+      const next = q > 0 ? q : NaN
+      const same = q > 0 ? cur === q : Number.isNaN(cur)
+      if (!same) form.setValue(`lines.${i}.quantity`, next, { shouldDirty: true })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedLines, polyesterItemIds])
+
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
   const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
 
@@ -634,10 +649,18 @@ export function SaleInvoiceForm({
                                   <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                                 </>)}
                                 <td className="px-3 py-2">
-                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
-                                    {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
-                                  {form.formState.errors.lines?.[index]?.quantity && (
-                                    <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
+                                  {isPolyesterLine ? (
+                                    <NumericInput readOnly tabIndex={-1} title="Auto = Nos Carton × Weight"
+                                      className="text-right bg-muted/40 text-muted-foreground cursor-default"
+                                      {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                  ) : (
+                                    <>
+                                      <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                        {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                      {form.formState.errors.lines?.[index]?.quantity && (
+                                        <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
+                                      )}
+                                    </>
                                   )}
                                   {item?.unitOfMeasure && <p className="text-xs text-muted-foreground mt-0.5 text-right">{item.unitOfMeasure}</p>}
                                 </td>

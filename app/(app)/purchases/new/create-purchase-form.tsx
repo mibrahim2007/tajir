@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useRef, useState, useTransition, useMemo } from 'react'
+import React, { useRef, useState, useTransition, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ExitButton } from '@/components/exit-button'
 import { useForm, useFieldArray, type Resolver, Controller } from 'react-hook-form'
@@ -142,6 +142,21 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
   // at least one polyester line, so ordinary invoices stay unchanged.
   const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterLotIds.has(l.stockItemId))
+
+  // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
+  // field in sync so it drives stock and validation. The equality guard prevents
+  // an update loop (setValue re-renders → effect re-runs).
+  useEffect(() => {
+    watchedLines.forEach((l, i) => {
+      if (!l.stockItemId || !polyesterLotIds.has(l.stockItemId)) return
+      const q = (Number(l.nosCarton) || 0) * (Number(l.weightPerCarton) || 0)
+      const cur = Number(l.quantity)
+      const next = q > 0 ? q : NaN
+      const same = q > 0 ? cur === q : Number.isNaN(cur)
+      if (!same) form.setValue(`lines.${i}.quantity`, next, { shouldDirty: true })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedLines, polyesterLotIds])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
   const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
@@ -362,10 +377,18 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>
                               </>)}
                               <td className="px-3 py-3">
-                                <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
-                                  {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
-                                {form.formState.errors.lines?.[index]?.quantity && (
-                                  <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
+                                {isPolyesterLine ? (
+                                  <NumericInput readOnly tabIndex={-1} title="Auto = Nos Carton × Weight"
+                                    className={`${LINE_INPUT_CLS} bg-muted/40 text-muted-foreground cursor-default`}
+                                    {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                ) : (
+                                  <>
+                                    <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
+                                      {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                    {form.formState.errors.lines?.[index]?.quantity && (
+                                      <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
+                                    )}
+                                  </>
                                 )}
                                 {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
