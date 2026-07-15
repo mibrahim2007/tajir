@@ -556,12 +556,14 @@ export function SaleInvoiceForm({
                           <tr>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Qty</th>
                             {hasPolyester && <>
                               <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Nos Carton</th>
-                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Wt/Carton</th>
-                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty Lbs</th>
+                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Weight</th>
                             </>}
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">{hasPolyester ? 'Quantity' : 'Qty'}</th>
+                            {hasPolyester && (
+                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">LBS Qty</th>
+                            )}
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
@@ -618,14 +620,6 @@ export function SaleInvoiceForm({
                                     )}
                                   />
                                 </td>
-                                <td className="px-3 py-2">
-                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
-                                    {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
-                                  {form.formState.errors.lines?.[index]?.quantity && (
-                                    <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
-                                  )}
-                                  {item?.unitOfMeasure && <p className="text-xs text-muted-foreground mt-0.5 text-right">{item.unitOfMeasure}</p>}
-                                </td>
                                 {hasPolyester && (isPolyesterLine ? <>
                                   <td className="px-3 py-2">
                                     <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
@@ -635,14 +629,21 @@ export function SaleInvoiceForm({
                                     <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
                                       {...form.register(`lines.${index}.weightPerCarton`, { valueAsNumber: true })} />
                                   </td>
-                                  <td className="px-3 py-2 text-right tabular-nums pt-3 text-muted-foreground">
-                                    {qtyLbs > 0 ? fmt4(qtyLbs) : '—'}
-                                  </td>
                                 </> : <>
                                   <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                                   <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                                  <td className="px-3 py-2 text-right text-muted-foreground">—</td>
                                 </>)}
+                                <td className="px-3 py-2">
+                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                    {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                  {form.formState.errors.lines?.[index]?.quantity && (
+                                    <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
+                                  )}
+                                  {item?.unitOfMeasure && <p className="text-xs text-muted-foreground mt-0.5 text-right">{item.unitOfMeasure}</p>}
+                                </td>
+                                {hasPolyester && (isPolyesterLine
+                                  ? <td className="px-3 py-2 text-right tabular-nums pt-3 text-muted-foreground">{qtyLbs > 0 ? fmt4(qtyLbs) : '—'}</td>
+                                  : <td className="px-3 py-2 text-right text-muted-foreground">—</td>)}
                                 <td className="px-3 py-2">
                                   <NumericInput min={0} step="0.0001" placeholder="" className={`text-right ${belowCost ? 'border-amber-400 focus-visible:ring-amber-400' : ''}`}
                                     {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />

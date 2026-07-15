@@ -136,6 +136,25 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
               </FormItem>
             )} />
 
+            {selectedIsPolyester && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormItem>
+                  <FormLabel>Nos Carton</FormLabel>
+                  <FormControl>
+                    <NumericInput step="0.0001" min="0" className="text-right"
+                      {...form.register('nosCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Weight</FormLabel>
+                  <FormControl>
+                    <NumericInput step="0.0001" min="0" className="text-right"
+                      {...form.register('weightPerCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+              </div>
+            )}
+
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
@@ -148,28 +167,12 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             }} />
 
             {selectedIsPolyester && (
-              <div className="grid grid-cols-3 gap-3 rounded-md border border-muted p-3">
-                <FormItem>
-                  <FormLabel>Nos Carton</FormLabel>
-                  <FormControl>
-                    <NumericInput step="0.0001" min="0" className="text-right"
-                      {...form.register('nosCarton', { valueAsNumber: true })} />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>Wt/Carton</FormLabel>
-                  <FormControl>
-                    <NumericInput step="0.0001" min="0" className="text-right"
-                      {...form.register('weightPerCarton', { valueAsNumber: true })} />
-                  </FormControl>
-                </FormItem>
-                <FormItem>
-                  <FormLabel>Qty Lbs</FormLabel>
-                  <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
-                    {qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
-                  </div>
-                </FormItem>
-              </div>
+              <FormItem>
+                <FormLabel>LBS Qty</FormLabel>
+                <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                  {qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
+                </div>
+              </FormItem>
             )}
 
             <CurrencyInput
