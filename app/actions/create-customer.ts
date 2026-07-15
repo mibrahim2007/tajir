@@ -9,6 +9,7 @@ import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  status: z.enum(['active', 'inactive', 'low_transaction']).default('active'),
   openingBalance: z.coerce.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -28,7 +29,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
+  const { name, status, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
   const pkrEquivalent = openingBalanceCurrency === 'USD' ? openingBalance * exchangeRate : openingBalance
 
   const admin = createAdminClient()
@@ -37,6 +38,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     .insert({
       tenant_id: tenantId,
       name,
+      status,
       opening_balance: openingBalance,
       opening_balance_currency: openingBalanceCurrency,
       opening_balance_pkr_equivalent: pkrEquivalent,
@@ -48,7 +50,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Failed to create customer', code: 'INTERNAL_ERROR' }
   }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'tajir_customers', entityId: customer.id, after: { name, openingBalance, openingBalanceCurrency } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'tajir_customers', entityId: customer.id, after: { name, status, openingBalance, openingBalanceCurrency } })
 
   return { success: true, data: customer }
 }

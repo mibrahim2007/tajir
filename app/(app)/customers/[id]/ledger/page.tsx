@@ -10,6 +10,7 @@ import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { toCustomerStatus, CUSTOMER_STATUS_LABELS, CUSTOMER_STATUS_BADGE } from '@/lib/customer-status'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -22,12 +23,14 @@ export default async function CustomerLedgerPage({ params }: Props) {
 
   const { data: customerRow } = await admin
     .from('tajir_customers')
-    .select('id, name, opening_balance_pkr_equivalent, created_at')
+    .select('id, name, status, opening_balance_pkr_equivalent, created_at')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!customerRow) notFound()
+
+  const customerStatus = toCustomerStatus(customerRow.status)
 
   const [nextReceiptSerial, nextRefundSerial] = await Promise.all([
     peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today),
@@ -158,7 +161,12 @@ export default async function CustomerLedgerPage({ params }: Props) {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <h1 className="text-2xl font-extrabold tracking-tight">{customerRow.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-extrabold tracking-tight">{customerRow.name}</h1>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CUSTOMER_STATUS_BADGE[customerStatus]}`}>
+              {CUSTOMER_STATUS_LABELS[customerStatus]}
+            </span>
+          </div>
           <p className="text-sm text-muted-foreground mt-1">Customer Ledger</p>
         </div>
         <div className="flex gap-2 flex-wrap justify-end">

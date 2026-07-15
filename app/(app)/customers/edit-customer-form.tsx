@@ -8,20 +8,24 @@ import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { editCustomerAction } from '@/app/actions/edit-customer'
+import { CUSTOMER_STATUSES, CUSTOMER_STATUS_LABELS, toCustomerStatus, type CustomerStatus } from '@/lib/customer-status'
 
-export function EditCustomerForm({ id, currentName }: { id: string; currentName: string }) {
+type FormValues = { name: string; status: CustomerStatus }
+
+export function EditCustomerForm({ id, currentName, currentStatus }: { id: string; currentName: string; currentStatus?: string }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
-  const form = useForm({ defaultValues: { name: currentName } })
+  const form = useForm<FormValues>({ defaultValues: { name: currentName, status: toCustomerStatus(currentStatus) } })
 
-  const onSubmit = (values: { name: string }) => {
+  const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
-      const result = await editCustomerAction({ id, name: values.name })
+      const result = await editCustomerAction({ id, name: values.name, status: values.status })
       if (!result.success) { setError(result.error); return }
       setOpen(false)
       router.refresh()
@@ -29,7 +33,7 @@ export function EditCustomerForm({ id, currentName }: { id: string; currentName:
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (o) form.reset({ name: currentName, status: toCustomerStatus(currentStatus) }) }}>
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
       </SheetTrigger>
@@ -41,6 +45,22 @@ export function EditCustomerForm({ id, currentName }: { id: string; currentName:
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="status" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Status</FormLabel>
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <FormControl>
+                    <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {CUSTOMER_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>{CUSTOMER_STATUS_LABELS[s]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )} />

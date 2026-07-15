@@ -2800,6 +2800,7 @@ export type Database = {
           opening_balance: number
           opening_balance_currency: string
           opening_balance_pkr_equivalent: number
+          status: string
           tenant_id: string
         }
         Insert: {
@@ -2809,6 +2810,7 @@ export type Database = {
           opening_balance?: number
           opening_balance_currency?: string
           opening_balance_pkr_equivalent?: number
+          status?: string
           tenant_id: string
         }
         Update: {
@@ -2818,6 +2820,7 @@ export type Database = {
           opening_balance?: number
           opening_balance_currency?: string
           opening_balance_pkr_equivalent?: number
+          status?: string
           tenant_id?: string
         }
         Relationships: [
