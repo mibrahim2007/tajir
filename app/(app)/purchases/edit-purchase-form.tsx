@@ -12,7 +12,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CurrencyInput } from '@/components/currency-input'
+import { NumericInput } from '@/components/numeric-input'
+import { computeQtyLbs } from '@/lib/polyester'
 import { editPurchaseAction } from '@/app/actions/edit-purchase'
+
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+  z.coerce.number().min(0).optional(),
+)
 
 const schema = z.object({
   supplierId:   z.string().min(1, 'Supplier is required'),
@@ -24,6 +31,8 @@ const schema = z.object({
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   advancePaid:  z.number().min(0).default(0),
   locationId:   z.string().optional(),
+  nosCarton:        optionalNumber,
+  weightPerCarton:  optionalNumber,
 })
 
 type FormValues = z.infer<typeof schema>
@@ -39,12 +48,14 @@ type Purchase = {
   advancePaid: number
   date: string
   locationId: string | null
+  nosCarton?: number | null
+  weightPerCarton?: number | null
 }
 
 type Props = {
   purchase: Purchase
   suppliers: { id: string; name: string }[]
-  lots: { id: string; name: string; count: string; unitOfMeasure: string | null }[]
+  lots: { id: string; name: string; count: string; unitOfMeasure: string | null; isPolyester?: boolean }[]
   locations: { id: string; name: string }[]
 }
 
@@ -66,8 +77,15 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
       date:         purchase.date,
       advancePaid:  purchase.advancePaid,
       locationId:   purchase.locationId ?? '',
+      nosCarton:        purchase.nosCarton ?? undefined,
+      weightPerCarton:  purchase.weightPerCarton ?? undefined,
     },
   })
+
+  const selectedIsPolyester = !!lots.find((l) => l.id === form.watch('stockItemId'))?.isPolyester
+  const watchedNos = form.watch('nosCarton')
+  const watchedWt  = form.watch('weightPerCarton')
+  const qtyLbs = computeQtyLbs(watchedNos, watchedWt)
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -129,11 +147,36 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
               )
             }} />
 
+            {selectedIsPolyester && (
+              <div className="grid grid-cols-3 gap-3 rounded-md border border-muted p-3">
+                <FormItem>
+                  <FormLabel>Nos Carton</FormLabel>
+                  <FormControl>
+                    <NumericInput step="0.0001" min="0" className="text-right"
+                      {...form.register('nosCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Wt/Carton</FormLabel>
+                  <FormControl>
+                    <NumericInput step="0.0001" min="0" className="text-right"
+                      {...form.register('weightPerCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+                <FormItem>
+                  <FormLabel>Qty Lbs</FormLabel>
+                  <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                    {qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
+                  </div>
+                </FormItem>
+              </div>
+            )}
+
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
               exchangeRateName="exchangeRate"
-              label="Rate per Unit"
+              label={selectedIsPolyester ? 'Rate per Lb' : 'Rate per Unit'}
               required
             />
 

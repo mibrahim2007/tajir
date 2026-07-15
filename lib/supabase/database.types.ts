@@ -1970,14 +1970,17 @@ export type Database = {
           invoice_id: string | null
           location_id: string | null
           multiply_by: number
+          nos_carton: number | null
           payment_due_date: string | null
           pkr_equivalent: number
+          qty_lbs: number | null
           quantity: number
           rate: number
           serial_number: string | null
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          weight_per_carton: number | null
           yarn_type: string | null
           yarn_weight: number | null
         }
@@ -1992,14 +1995,17 @@ export type Database = {
           invoice_id?: string | null
           location_id?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           payment_due_date?: string | null
           pkr_equivalent: number
+          qty_lbs?: number | null
           quantity: number
           rate: number
           serial_number?: string | null
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -2014,14 +2020,17 @@ export type Database = {
           invoice_id?: string | null
           location_id?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           payment_due_date?: string | null
           pkr_equivalent?: number
+          qty_lbs?: number | null
           quantity?: number
           rate?: number
           serial_number?: string | null
           stock_item_id?: string
           supplier_id?: string
           tenant_id?: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -2309,14 +2318,17 @@ export type Database = {
           invoice_id: string | null
           location_id: string | null
           multiply_by: number
+          nos_carton: number | null
           notes: string | null
           payment_due_date: string | null
           pkr_equivalent: number
+          qty_lbs: number | null
           quantity: number
           rate: number
           serial_number: string | null
           stock_item_id: string
           tenant_id: string
+          weight_per_carton: number | null
           yarn_type: string | null
           yarn_weight: number | null
         }
@@ -2332,14 +2344,17 @@ export type Database = {
           invoice_id?: string | null
           location_id?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent: number
+          qty_lbs?: number | null
           quantity: number
           rate: number
           serial_number?: string | null
           stock_item_id: string
           tenant_id: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -2355,14 +2370,17 @@ export type Database = {
           invoice_id?: string | null
           location_id?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent?: number
+          qty_lbs?: number | null
           quantity?: number
           rate?: number
           serial_number?: string | null
           stock_item_id?: string
           tenant_id?: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }

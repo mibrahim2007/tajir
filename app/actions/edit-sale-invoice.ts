@@ -7,7 +7,8 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
-import { normalizeMultiplyBy } from '@/lib/yarn'
+import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
+import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -18,6 +19,8 @@ const lineSchema = z.object({
   yarnType:    z.string().optional().nullable(),
   yarnWeight:  z.coerce.number().min(0).optional().nullable(),
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
+  nosCarton:       z.coerce.number().min(0).optional().nullable(),
+  weightPerCarton: z.coerce.number().min(0).optional().nullable(),
 })
 
 const schema = z.object({
@@ -121,8 +124,10 @@ export async function editSaleInvoiceAction(
   const { data: itemTypes } = typeIds.length
     ? await admin.from('item_types').select('id, name').eq('tenant_id', tenantId).in('id', typeIds)
     : { data: [] as { id: string; name: string }[] }
-  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => t.name.trim().toLowerCase() === 'yarn').map((t) => t.id))
+  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => isYarnItemType(t.name)).map((t) => t.id))
   const yarnIds = new Set((lots ?? []).filter((l) => l.item_type_id && yarnTypeIds.has(l.item_type_id)).map((l) => l.id))
+  const polyesterTypeIds = new Set((itemTypes ?? []).filter((t) => isPolyesterItemType(t.name)).map((t) => t.id))
+  const polyesterIds = new Set((lots ?? []).filter((l) => l.item_type_id && polyesterTypeIds.has(l.item_type_id)).map((l) => l.id))
 
   const oversells: OversellInfo[] = []
   for (const [stockItemId, requested] of newQtyByItem) {
@@ -143,9 +148,14 @@ export async function editSaleInvoiceAction(
   for (const line of lines) {
     const isService = serviceIds.has(line.stockItemId)
     const isYarn = yarnIds.has(line.stockItemId)
+    const isPolyester = polyesterIds.has(line.stockItemId)
     const multiplyBy = isYarn ? normalizeMultiplyBy(line.multiplyBy) : 1
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
-    const pkrEquivalent = line.quantity * effectiveRate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
+    const er = currencyCode === 'USD' ? exchangeRate : 1
+    const qtyLbs = isPolyester ? computeQtyLbs(line.nosCarton, line.weightPerCarton) : null
+    const pkrEquivalent = isPolyester
+      ? (qtyLbs ?? 0) * effectiveRate * er
+      : line.quantity * effectiveRate * er * multiplyBy
 
     const { data: order, error } = await admin.from('sales_orders').insert({
       tenant_id:       tenantId,
@@ -164,6 +174,9 @@ export async function editSaleInvoiceAction(
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:     multiplyBy,
+      nos_carton:        isPolyester ? (line.nosCarton ?? null) : null,
+      weight_per_carton: isPolyester ? (line.weightPerCarton ?? null) : null,
+      qty_lbs:           isPolyester ? qtyLbs : null,
       // Service lines are not bound to a dispatch location.
       location_id:     isService ? null : (locationId ?? null),
       invoice_id:      invoiceId,

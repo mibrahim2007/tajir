@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -18,6 +19,8 @@ const schema = z.object({
   advancePaid:  z.coerce.number().min(0).default(0),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   locationId:   z.string().uuid().optional().or(z.literal('')),
+  nosCarton:       z.coerce.number().min(0).optional().nullable(),
+  weightPerCarton: z.coerce.number().min(0).optional().nullable(),
 })
 
 export async function editPurchaseAction(input: unknown): Promise<ActionResult<void>> {
@@ -30,10 +33,22 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, advancePaid, date, locationId } = parsed.data
-  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1)
+  const { id, supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, advancePaid, date, locationId, nosCarton, weightPerCarton } = parsed.data
+  const er = currencyCode === 'USD' ? exchangeRate : 1
 
   const admin = createAdminClient()
+
+  // Determine whether the edited item is a Polyester type — those bill on QTY LBS.
+  const { data: lotRow } = await admin
+    .from('inventory_lots').select('item_type_id').eq('id', stockItemId).eq('tenant_id', tenantId).single()
+  let isPolyester = false
+  if (lotRow?.item_type_id) {
+    const { data: typeRow } = await admin
+      .from('item_types').select('name').eq('id', lotRow.item_type_id).eq('tenant_id', tenantId).single()
+    isPolyester = isPolyesterItemType(typeRow?.name)
+  }
+  const qtyLbs = isPolyester ? computeQtyLbs(nosCarton, weightPerCarton) : null
+  const pkrEquivalent = isPolyester ? (qtyLbs ?? 0) * rate * er : quantity * rate * er
 
   const { data: existing } = await admin
     .from('purchase_orders')
@@ -78,6 +93,9 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
       advance_paid: advancePaid,
       date,
       location_id: locationId || null,
+      nos_carton:        isPolyester ? (nosCarton ?? null) : null,
+      weight_per_carton: isPolyester ? (weightPerCarton ?? null) : null,
+      qty_lbs:           isPolyester ? qtyLbs : null,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

@@ -10,6 +10,7 @@ import { deletePurchaseAction } from '@/app/actions/delete-purchase'
 import { deletePurchaseInvoiceAction } from '@/app/actions/delete-purchase-invoice'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
+import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
 import { PurchaseFilters } from './purchase-filters'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
@@ -26,7 +27,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const admin = createAdminClient()
 
   let query = admin.from('purchase_orders')
-    .select('id, serial_number, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id')
+    .select('id, serial_number, invoice_id, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, advance_paid, supplier_id, stock_item_id, location_id, nos_carton, weight_per_carton, qty_lbs')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -45,9 +46,10 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
+  const polyesterLotIds = await loadPolyesterLotIds(admin, tenantId)
   const orders      = rawOrders ?? []
   const supplierList = rawSuppliers ?? []
-  const lotList      = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null }))
+  const lotList      = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isPolyester: polyesterLotIds.has(l.id) }))
   const locationList = rawLocs ?? []
 
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
@@ -211,7 +213,7 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                         <RoleGate allowedRoles={['owner']}>
                           {item.singleOrder && (
                             <EditPurchaseForm
-                              purchase={{ id: item.singleOrder.id, supplierId: item.singleOrder.supplier_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, advancePaid: item.singleOrder.advance_paid, date: item.singleOrder.date, locationId: item.singleOrder.location_id }}
+                              purchase={{ id: item.singleOrder.id, supplierId: item.singleOrder.supplier_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, advancePaid: item.singleOrder.advance_paid, date: item.singleOrder.date, locationId: item.singleOrder.location_id, nosCarton: item.singleOrder.nos_carton, weightPerCarton: item.singleOrder.weight_per_carton }}
                               suppliers={supplierList}
                               lots={lotList}
                               locations={locationList}

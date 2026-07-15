@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
+import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
 import { CreatePurchaseForm } from './create-purchase-form'
 
 export default async function NewPurchasePage() {
@@ -15,10 +16,13 @@ export default async function NewPurchasePage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
+  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+    loadYarnLotIds(admin, tenantId),
+    loadPolyesterLotIds(admin, tenantId),
+  ])
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id), isPolyester: polyesterLotIds.has(l.id) }))
   const locationList = rawLocs ?? []
 
   return (

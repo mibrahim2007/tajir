@@ -25,9 +25,10 @@ import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 import { YarnLineFields } from '@/components/yarn-line-fields'
+import { computeQtyLbs } from '@/lib/polyester'
 
 type Customer    = { id: string; name: string }
-type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service'; isYarn?: boolean }
+type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service'; isYarn?: boolean; isPolyester?: boolean }
 type PricingRule = { customerId: string; stockItemId: string; rate: number }
 type LocationStock = { stockItemId: string; locationId: string; quantity: number }
 
@@ -39,6 +40,11 @@ function addDays(dateStr: string, days: number): string {
   return dt.toISOString().split('T')[0]
 }
 
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+  z.coerce.number().min(0).optional(),
+)
+
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
   quantity:    z.number().positive('Enter quantity'),
@@ -47,6 +53,9 @@ const lineSchema = z.object({
   yarnType:    z.string().optional().default(''),
   yarnWeight:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
   multiplyBy:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
+  // Polyester-only line fields; QTY LBS drives the amount, stock uses quantity.
+  nosCarton:       optionalNumber,
+  weightPerCarton: optionalNumber,
 })
 
 const baseSchema = z.object({
@@ -116,8 +125,25 @@ export function SaleInvoiceForm({
     () => new Set(stockItems.filter((s) => s.isYarn).map((s) => s.id)),
     [stockItems],
   )
+  // Polyester items bill on QTY LBS (nos_carton * weight / 2.2046).
+  const polyesterItemIds = useMemo(
+    () => new Set(stockItems.filter((s) => s.isPolyester).map((s) => s.id)),
+    [stockItems],
+  )
   const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
     l.stockItemId && yarnItemIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
+  // Pre-discount, exchange-applied amount for a line. Polyester lines bill on
+  // QTY LBS; every other line bills on quantity (with the yarn multiplier).
+  const lineGross = (l: {
+    stockItemId?: string; quantity?: number | null; rate?: number | null
+    multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
+  }, erFactor: number) => {
+    const rate = (l.rate || 0) * erFactor
+    if (l.stockItemId && polyesterItemIds.has(l.stockItemId)) {
+      return computeQtyLbs(l.nosCarton, l.weightPerCarton) * rate
+    }
+    return (l.quantity || 0) * rate * lineMult(l)
+  }
 
   // Local state so newly created items appear immediately
   const [customerList, setCustomerList] = useState<PickerItem[]>(
@@ -147,7 +173,7 @@ export function SaleInvoiceForm({
     defaultValues: initialValues ?? {
       customerId: '', date: today, paymentDueDate: '', dueDays: undefined, notes: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
   })
 
@@ -194,11 +220,16 @@ export function SaleInvoiceForm({
 
   // Computed inline (not memoised): react-hook-form's watch() mutates the lines
   // array in place, so a useMemo keyed on it would keep a stale total.
-  const subtotal      = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l), 0)
-  const discountTotal = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l) * ((l.discountPct || 0) / 100), 0)
+  const subtotal      = watchedLines.reduce((s, l) => s + lineGross(l, er), 0)
+  const discountTotal = watchedLines.reduce((s, l) => s + lineGross(l, er) * ((l.discountPct || 0) / 100), 0)
   const netTotal      = subtotal - discountTotal
 
+  // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
+  // at least one polyester line, so ordinary invoices stay unchanged.
+  const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterItemIds.has(l.stockItemId))
+
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
+  const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
 
   const locStockMap = useMemo<Record<string, number> | null>(() => {
     if (!watchedLocation) return null
@@ -255,7 +286,7 @@ export function SaleInvoiceForm({
       form.setValue(`lines.${emptyIdx}.stockItemId`, match.id)
       if (rate) form.setValue(`lines.${emptyIdx}.rate`, rate)
     } else {
-      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })
+      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockItems, pricingRules, append])
@@ -290,6 +321,8 @@ export function SaleInvoiceForm({
           yarnType:    l.yarnType || undefined,
           yarnWeight:  Number.isFinite(l.yarnWeight) ? l.yarnWeight : undefined,
           multiplyBy:  Number.isFinite(l.multiplyBy) ? l.multiplyBy : undefined,
+          nosCarton:       Number.isFinite(l.nosCarton) ? l.nosCarton : undefined,
+          weightPerCarton: Number.isFinite(l.weightPerCarton) ? l.weightPerCarton : undefined,
         })),
       }
 
@@ -524,6 +557,11 @@ export function SaleInvoiceForm({
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Qty</th>
+                            {hasPolyester && <>
+                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Nos Carton</th>
+                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Wt/Carton</th>
+                              <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty Lbs</th>
+                            </>}
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
@@ -533,10 +571,12 @@ export function SaleInvoiceForm({
                         <tbody className="divide-y">
                           {fields.map((field, index) => {
                             const line      = watchedLines[index] ?? {}
-                            const amount    = (line.quantity || 0) * (line.rate || 0) * er * lineMult(line) * (1 - (line.discountPct || 0) / 100)
+                            const amount    = lineGross(line, er) * (1 - (line.discountPct || 0) / 100)
                             const item      = stockItems.find((s) => s.id === line.stockItemId)
                             const isServiceLine = item?.itemNature === 'service'
                             const isYarnLine = !!item?.isYarn
+                            const isPolyesterLine = !!item?.isPolyester
+                            const qtyLbs    = computeQtyLbs(line.nosCarton, line.weightPerCarton)
                             const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
                             const ratePKR   = (line.rate || 0) * er
                             const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
@@ -586,6 +626,23 @@ export function SaleInvoiceForm({
                                   )}
                                   {item?.unitOfMeasure && <p className="text-xs text-muted-foreground mt-0.5 text-right">{item.unitOfMeasure}</p>}
                                 </td>
+                                {hasPolyester && (isPolyesterLine ? <>
+                                  <td className="px-3 py-2">
+                                    <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                      {...form.register(`lines.${index}.nosCarton`, { valueAsNumber: true })} />
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                      {...form.register(`lines.${index}.weightPerCarton`, { valueAsNumber: true })} />
+                                  </td>
+                                  <td className="px-3 py-2 text-right tabular-nums pt-3 text-muted-foreground">
+                                    {qtyLbs > 0 ? fmt4(qtyLbs) : '—'}
+                                  </td>
+                                </> : <>
+                                  <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                  <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                  <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                </>)}
                                 <td className="px-3 py-2">
                                   <NumericInput min={0} step="0.0001" placeholder="" className={`text-right ${belowCost ? 'border-amber-400 focus-visible:ring-amber-400' : ''}`}
                                     {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
@@ -617,7 +674,7 @@ export function SaleInvoiceForm({
                               {isYarnLine && (
                                 <tr>
                                   <td />
-                                  <td colSpan={6} className="px-3 pb-3">
+                                  <td colSpan={hasPolyester ? 9 : 6} className="px-3 pb-3">
                                     <YarnLineFields index={index} />
                                   </td>
                                 </tr>
@@ -631,7 +688,7 @@ export function SaleInvoiceForm({
                   </div>
                   <div className="mt-3">
                     <Button type="button" variant="outline" size="sm"
-                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })}
+                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN })}
                       className="gap-1.5">
                       <Plus className="size-4" /> Add Line
                     </Button>

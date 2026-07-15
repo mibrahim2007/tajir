@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
+import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
 import { EditSaleInvoiceForm } from './edit-sale-invoice-form'
 import type { SaleFormValues } from '../../../sale-invoice-form'
 
@@ -17,7 +18,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, notes, yarn_type, yarn_weight, multiply_by')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -54,13 +55,17 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
-  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
+  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+    loadYarnLotIds(admin, tenantId),
+    loadPolyesterLotIds(admin, tenantId),
+  ])
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
     id: l.id, name: l.name, currentQuantity: l.current_quantity, barcode: l.code ?? null, unitOfMeasure: l.unit_of_measure ?? null,
     itemNature: (l.item_nature === 'service' ? 'service' : 'inventory') as 'inventory' | 'service',
     isYarn: yarnLotIds.has(l.id),
+    isPolyester: polyesterLotIds.has(l.id),
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({ customerId: r.customer_id, stockItemId: r.stock_item_id, rate: r.rate }))
   const locations = rawLocs ?? []
@@ -88,6 +93,8 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
       yarnType:    l.yarn_type ?? '',
       yarnWeight:  l.yarn_weight ?? NaN,
       multiplyBy:  l.multiply_by ?? 1,
+      nosCarton:       l.nos_carton ?? NaN,
+      weightPerCarton: l.weight_per_carton ?? NaN,
     })),
   }
 

@@ -22,6 +22,12 @@ import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-f
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { YarnLineFields } from '@/components/yarn-line-fields'
+import { computeQtyLbs } from '@/lib/polyester'
+
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+  z.coerce.number().min(0).optional(),
+)
 
 const lineSchema = z.object({
   stockItemId:  z.string().uuid('Select a stock item'),
@@ -31,6 +37,10 @@ const lineSchema = z.object({
   yarnType:     z.string().optional().default(''),
   yarnWeight:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
   multiplyBy:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
+  // Polyester-only line fields (cartons + weight per carton in kg). QTY LBS is
+  // derived and drives the amount; stock still uses `quantity`.
+  nosCarton:        optionalNumber,
+  weightPerCarton:  optionalNumber,
 })
 
 const schema = z.object({
@@ -53,7 +63,7 @@ type Props = {
   today: string
   suppliers: { id: string; name: string }[]
   customers?: { id: string; name: string }[]
-  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean }[]
+  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean; isPolyester?: boolean }[]
   locations: { id: string; name: string }[]
 }
 
@@ -79,13 +89,14 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   )
   const lotPickerItems      = lotList
   const yarnLotIds = useMemo(() => new Set(lots.filter((l) => l.isYarn).map((l) => l.id)), [lots])
+  const polyesterLotIds = useMemo(() => new Set(lots.filter((l) => l.isPolyester).map((l) => l.id)), [lots])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       supplierId: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
   })
 
@@ -101,14 +112,33 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
     l.stockItemId && yarnLotIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
 
+  // Pre-discount amount for a line. Polyester lines bill on QTY LBS
+  // (nos_carton * weight / 2.2046) instead of the plain quantity; every other
+  // line keeps quantity * rate * yarn-multiplier.
+  const lineGross = (l: {
+    stockItemId?: string; quantity?: number | null; rate?: number | null
+    multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
+  }) => {
+    const rate = (l.rate || 0) * er
+    if (l.stockItemId && polyesterLotIds.has(l.stockItemId)) {
+      return computeQtyLbs(l.nosCarton, l.weightPerCarton) * rate
+    }
+    return (l.quantity || 0) * rate * lineMult(l)
+  }
+
   const { subtotal, discountTotal, netTotal } = useMemo(() => {
-    const sub  = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l), 0)
-    const disc = watchedLines.reduce((s, l) => s + (l.quantity || 0) * (l.rate || 0) * er * lineMult(l) * ((l.discountPct || 0) / 100), 0)
+    const sub  = watchedLines.reduce((s, l) => s + lineGross(l), 0)
+    const disc = watchedLines.reduce((s, l) => s + lineGross(l) * ((l.discountPct || 0) / 100), 0)
     return { subtotal: sub, discountTotal: disc, netTotal: sub - disc }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedLines, er, yarnLotIds])
+  }, [watchedLines, er, yarnLotIds, polyesterLotIds])
+
+  // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
+  // at least one polyester line, so ordinary invoices stay unchanged.
+  const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterLotIds.has(l.stockItemId))
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
+  const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -138,6 +168,8 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
           yarnType:    l.yarnType || undefined,
           yarnWeight:  Number.isFinite(l.yarnWeight) ? l.yarnWeight : undefined,
           multiplyBy:  Number.isFinite(l.multiplyBy) ? l.multiplyBy : undefined,
+          nosCarton:       Number.isFinite(l.nosCarton) ? l.nosCarton : undefined,
+          weightPerCarton: Number.isFinite(l.weightPerCarton) ? l.weightPerCarton : undefined,
         })),
       })
       if (!result.success) { setServerError(result.error); return }
@@ -262,6 +294,11 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Qty</th>
+                          {hasPolyester && <>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Nos Carton</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Wt/Carton</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty Lbs</th>
+                          </>}
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
@@ -272,7 +309,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                         {fields.map((field, index) => {
                           const line = watchedLines[index] ?? {}
                           const isYarnLine = !!line.stockItemId && yarnLotIds.has(line.stockItemId)
-                          const gross  = (line.quantity || 0) * (line.rate || 0) * er * lineMult(line)
+                          const isPolyesterLine = !!line.stockItemId && polyesterLotIds.has(line.stockItemId)
+                          const qtyLbs = computeQtyLbs(line.nosCarton, line.weightPerCarton)
+                          const gross  = lineGross(line)
                           const amount = gross * (1 - (line.discountPct || 0) / 100)
                           return (
                             <React.Fragment key={field.id}>
@@ -309,6 +348,23 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 )}
                                 {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
+                              {hasPolyester && (isPolyesterLine ? <>
+                                <td className="px-3 py-2">
+                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                    {...form.register(`lines.${index}.nosCarton`, { valueAsNumber: true })} />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                    {...form.register(`lines.${index}.weightPerCarton`, { valueAsNumber: true })} />
+                                </td>
+                                <td className="px-3 py-2 text-right tabular-nums pt-3 text-muted-foreground">
+                                  {qtyLbs > 0 ? fmt4(qtyLbs) : '—'}
+                                </td>
+                              </> : <>
+                                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                              </>)}
                               <td className="px-3 py-2">
                                 <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
                                   {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
@@ -334,7 +390,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                             {isYarnLine && (
                               <tr>
                                 <td />
-                                <td colSpan={6} className="px-3 pb-3">
+                                <td colSpan={hasPolyester ? 9 : 6} className="px-3 pb-3">
                                   <YarnLineFields index={index} />
                                 </td>
                               </tr>
@@ -349,7 +405,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
                 <div className="mt-3">
                   <Button type="button" variant="outline" size="sm"
-                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1 })}
+                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN })}
                     className="gap-1.5">
                     <Plus className="size-4" /> Add Line
                   </Button>
