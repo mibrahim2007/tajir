@@ -26,7 +26,9 @@ import { computeQtyLbs } from '@/lib/polyester'
 
 // Larger, comfortable line-item inputs: ~48px tall, 16px text (md:text-base
 // overrides the Input's md:text-sm so it stays 16px on desktop), right-aligned.
-const LINE_INPUT_CLS = 'h-12 text-base md:text-base text-right'
+// min-w keeps the column from shrinking/clipping its value under the table's
+// w-full auto layout (the table scrolls horizontally instead on narrow screens).
+const LINE_INPUT_CLS = 'h-12 min-w-[5.5rem] text-base md:text-base text-right'
 
 const optionalNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
