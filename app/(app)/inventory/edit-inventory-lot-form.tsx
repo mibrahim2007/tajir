@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
+import { ItemTypeSelectItems } from '@/components/item-type-select-items'
 
 const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
 
@@ -27,7 +28,7 @@ const schema = z.object({
 })
 
 type FormValues = z.infer<typeof schema>
-type ItemType = { id: string; name: string }
+type ItemType = { id: string; name: string; parentId?: string | null }
 
 type Lot = {
   id: string
@@ -147,9 +148,7 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="_none_">No type</SelectItem>
-                    {itemTypes.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                    ))}
+                    <ItemTypeSelectItems itemTypes={itemTypes} keepSelectableId={lot.itemTypeId} />
                   </SelectContent>
                 </Select>
                 {itemTypes.length === 0 && (

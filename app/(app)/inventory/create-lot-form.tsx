@@ -41,10 +41,11 @@ import { Input } from '@/components/ui/input'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { ItemTypeSelectItems } from '@/components/item-type-select-items'
 
 const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
 
-type ItemType = { id: string; name: string }
+type ItemType = { id: string; name: string; parentId?: string | null }
 
 export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
   const router = useRouter()
@@ -252,9 +253,7 @@ export function CreateLotForm({ itemTypes }: { itemTypes: ItemType[] }) {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="_none_">No type</SelectItem>
-                        {itemTypes.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                        ))}
+                        <ItemTypeSelectItems itemTypes={itemTypes} />
                       </SelectContent>
                     </Select>
                     {itemTypes.length === 0 && (

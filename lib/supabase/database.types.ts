@@ -1437,21 +1437,31 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          parent_id: string | null
           tenant_id: string
         }
         Insert: {
           created_at?: string
           id?: string
           name: string
+          parent_id?: string | null
           tenant_id: string
         }
         Update: {
           created_at?: string
           id?: string
           name?: string
+          parent_id?: string | null
           tenant_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "item_types_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "item_types"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "item_types_tenant_id_fkey"
             columns: ["tenant_id"]

@@ -47,13 +47,16 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const [{ data: lots }, { count: totalRaw }, { data: itemTypes }] = await Promise.all([
     dataQuery.order('created_at', { ascending: false }).range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1),
     countQuery,
-    admin.from('item_types').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('item_types').select('id, name, parent_id').eq('tenant_id', tenantId).order('name'),
   ])
 
   const totalCount = totalRaw ?? 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
-  const safeItemTypes = itemTypes ?? []
+  // All types (with parent link) for the grouped create/edit LOVs.
+  const safeItemTypes = (itemTypes ?? []).map((t) => ({ id: t.id, name: t.name, parentId: t.parent_id }))
+  // The "Create Items by Type" flow files a batch under one top-level category.
+  const topItemTypes = safeItemTypes.filter((t) => !t.parentId).map((t) => ({ id: t.id, name: t.name }))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -67,7 +70,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         </div>
         <div className="flex items-center gap-2">
           <InventoryGuide />
-          <CreateItemsByTypeWrapper itemTypes={safeItemTypes} />
+          <CreateItemsByTypeWrapper itemTypes={topItemTypes} />
           <CreateLotFormWrapper itemTypes={safeItemTypes} />
         </div>
       </div>

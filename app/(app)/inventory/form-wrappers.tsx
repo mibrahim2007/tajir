@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic'
 
-type ItemType = { id: string; name: string }
+type ItemType = { id: string; name: string; parentId?: string | null }
 
 type Lot = {
   id: string

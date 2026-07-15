@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PageHeader } from '@/components/page-header'
@@ -13,7 +14,7 @@ export default async function ItemTypesPage() {
   const [{ data: itemTypes }, { data: counts }] = await Promise.all([
     admin
       .from('item_types')
-      .select('id, name, created_at')
+      .select('id, name, parent_id, created_at')
       .eq('tenant_id', tenantId)
       .order('name', { ascending: true }),
     admin
@@ -27,6 +28,19 @@ export default async function ItemTypesPage() {
   for (const row of counts ?? []) {
     if (row.item_type_id) countMap[row.item_type_id] = (countMap[row.item_type_id] ?? 0) + 1
   }
+
+  // Group sub-types under their parent; only top-level types (parent_id null)
+  // render as primary rows, each followed by its sub-type rows.
+  const all = itemTypes ?? []
+  const childrenByParent = new Map<string, { id: string; name: string }[]>()
+  for (const t of all) {
+    if (t.parent_id) {
+      const list = childrenByParent.get(t.parent_id) ?? []
+      list.push({ id: t.id, name: t.name })
+      childrenByParent.set(t.parent_id, list)
+    }
+  }
+  const topTypes = all.filter((t) => !t.parent_id)
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -45,19 +59,33 @@ export default async function ItemTypesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {(itemTypes ?? []).length === 0 ? (
+            {topTypes.length === 0 ? (
               <tr>
                 <td colSpan={isOwner ? 3 : 2}>
                   <EmptyState message="No item types yet. Add one to start categorizing your stock." />
                 </td>
               </tr>
-            ) : (itemTypes ?? []).map((it) => (
-              <tr key={it.id} className="hover:bg-secondary/50 transition-colors">
-                <Td strong>{it.name}</Td>
-                <Td muted>{countMap[it.id] ?? 0}</Td>
-                {isOwner && <Td><ItemTypeActions id={it.id} name={it.name} /></Td>}
-              </tr>
-            ))}
+            ) : topTypes.map((it) => {
+              const subs = childrenByParent.get(it.id) ?? []
+              return (
+                <Fragment key={it.id}>
+                  <tr className="hover:bg-secondary/50 transition-colors">
+                    <Td strong>{it.name}</Td>
+                    <Td muted>{countMap[it.id] ?? 0}</Td>
+                    {isOwner && <Td><ItemTypeActions id={it.id} name={it.name} subTypes={subs} /></Td>}
+                  </tr>
+                  {subs.map((s) => (
+                    <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
+                      <Td>
+                        <span className="text-muted-foreground pl-4">└ {s.name}</span>
+                      </Td>
+                      <Td muted>{countMap[s.id] ?? 0}</Td>
+                      {isOwner && <Td />}
+                    </tr>
+                  ))}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </TableCard>
