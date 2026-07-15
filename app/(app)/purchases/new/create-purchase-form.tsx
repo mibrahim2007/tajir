@@ -144,19 +144,21 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterLotIds.has(l.stockItemId))
 
   // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
-  // field in sync so it drives stock and validation. The equality guard prevents
-  // an update loop (setValue re-renders → effect re-runs).
+  // field in sync so it drives stock and validation. watch() mutates the lines
+  // array in place, so key the effect on a value signature (not the array ref)
+  // so it re-runs when carton/weight change. The equality guard stops a loop.
+  const polyQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
       if (!l.stockItemId || !polyesterLotIds.has(l.stockItemId)) return
       const q = (Number(l.nosCarton) || 0) * (Number(l.weightPerCarton) || 0)
-      const cur = Number(l.quantity)
+      const cur = Number(form.getValues(`lines.${i}.quantity`))
       const next = q > 0 ? q : NaN
       const same = q > 0 ? cur === q : Number.isNaN(cur)
       if (!same) form.setValue(`lines.${i}.quantity`, next, { shouldDirty: true })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedLines, polyesterLotIds])
+  }, [polyQtySig, polyesterLotIds])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
   const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
@@ -334,6 +336,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                           const isYarnLine = !!line.stockItemId && yarnLotIds.has(line.stockItemId)
                           const isPolyesterLine = !!line.stockItemId && polyesterLotIds.has(line.stockItemId)
                           const qtyLbs = computeQtyLbs(line.nosCarton, line.weightPerCarton)
+                          const qtyKg  = (Number(line.nosCarton) || 0) * (Number(line.weightPerCarton) || 0)
                           const gross  = lineGross(line)
                           const amount = gross * (1 - (line.discountPct || 0) / 100)
                           return (
@@ -378,9 +381,10 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                               </>)}
                               <td className="px-3 py-3">
                                 {isPolyesterLine ? (
-                                  <NumericInput readOnly tabIndex={-1} title="Auto = Nos Carton × Weight"
-                                    className={`${LINE_INPUT_CLS} bg-muted/40 text-muted-foreground cursor-default`}
-                                    {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                  <div title="Auto = Nos Carton × Weight"
+                                    className="flex h-12 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-base tabular-nums text-muted-foreground">
+                                    {qtyKg > 0 ? fmt4(qtyKg) : '—'}
+                                  </div>
                                 ) : (
                                   <>
                                     <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}

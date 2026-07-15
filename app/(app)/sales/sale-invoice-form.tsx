@@ -229,19 +229,21 @@ export function SaleInvoiceForm({
   const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterItemIds.has(l.stockItemId))
 
   // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
-  // field in sync so it drives stock and validation. The equality guard prevents
-  // an update loop (setValue re-renders → effect re-runs).
+  // field in sync so it drives stock and validation. watch() mutates the lines
+  // array in place, so key the effect on a value signature (not the array ref)
+  // so it re-runs when carton/weight change. The equality guard stops a loop.
+  const polyQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
       if (!l.stockItemId || !polyesterItemIds.has(l.stockItemId)) return
       const q = (Number(l.nosCarton) || 0) * (Number(l.weightPerCarton) || 0)
-      const cur = Number(l.quantity)
+      const cur = Number(form.getValues(`lines.${i}.quantity`))
       const next = q > 0 ? q : NaN
       const same = q > 0 ? cur === q : Number.isNaN(cur)
       if (!same) form.setValue(`lines.${i}.quantity`, next, { shouldDirty: true })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedLines, polyesterItemIds])
+  }, [polyQtySig, polyesterItemIds])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
   const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
@@ -594,6 +596,7 @@ export function SaleInvoiceForm({
                             const isYarnLine = !!item?.isYarn
                             const isPolyesterLine = !!item?.isPolyester
                             const qtyLbs    = computeQtyLbs(line.nosCarton, line.weightPerCarton)
+                            const qtyKg     = (Number(line.nosCarton) || 0) * (Number(line.weightPerCarton) || 0)
                             const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
                             const ratePKR   = (line.rate || 0) * er
                             const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
@@ -650,9 +653,10 @@ export function SaleInvoiceForm({
                                 </>)}
                                 <td className="px-3 py-2">
                                   {isPolyesterLine ? (
-                                    <NumericInput readOnly tabIndex={-1} title="Auto = Nos Carton × Weight"
-                                      className="text-right bg-muted/40 text-muted-foreground cursor-default"
-                                      {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
+                                    <div title="Auto = Nos Carton × Weight"
+                                      className="flex h-9 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                                      {qtyKg > 0 ? fmt4(qtyKg) : '—'}
+                                    </div>
                                   ) : (
                                     <>
                                       <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
