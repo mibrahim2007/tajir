@@ -322,8 +322,8 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                         <tr>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Qty</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Rate</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Qty</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
                           <th className="w-10" />
@@ -357,7 +357,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                                 />
                               </td>
                               <td className="px-3 py-2">
-                                <NumericInput min={0} step="0.001" placeholder="" className="text-right"
+                                <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
                                   {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.quantity && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
@@ -365,7 +365,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                                 {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
                               <td className="px-3 py-2">
-                                <NumericInput min={0} step="0.01" placeholder="" className="text-right"
+                                <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
                                   {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.rate && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.rate?.message}</p>

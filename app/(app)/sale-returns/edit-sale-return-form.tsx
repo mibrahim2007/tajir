@@ -133,7 +133,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
                 <FormItem>
                   <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
                   <FormControl>
-                    <Input type="number" step="0.001" min="0" value={value}
+                    <Input type="number" step="0.0001" min="0" value={value}
                       onFocus={(e) => e.target.select()}
                       {...form.register('quantity', { valueAsNumber: true })} />
                   </FormControl>
@@ -147,6 +147,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
               currencyName="currencyCode"
               exchangeRateName="exchangeRate"
               label="Rate per Unit"
+              step="0.0001"
               required
             />
 

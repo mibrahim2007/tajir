@@ -21,6 +21,9 @@ type Props = {
   // Allow a negative amount (e.g. a customer/supplier opening balance that is a
   // credit / advance). Off by default so receipts, refunds, etc. stay positive.
   allowNegative?: boolean
+  // Decimal granularity of the amount input. Defaults to 2dp (money); pass a
+  // finer step (e.g. '0.0001') for a per-unit rate that needs 4 decimals.
+  step?: string
 }
 
 export function CurrencyInput({
@@ -30,6 +33,7 @@ export function CurrencyInput({
   label = 'Amount',
   required,
   allowNegative,
+  step = '0.01',
 }: Props) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { watch, setValue, register, formState: { errors } } = useFormContext<any>()
@@ -50,7 +54,7 @@ export function CurrencyInput({
             {label}
             {required && <span className="text-destructive"> *</span>}
           </Label>
-          <Input type="number" step="0.01" min={allowNegative ? undefined : '0'} placeholder="0.00" {...register(amountName, { valueAsNumber: true })} />
+          <Input type="number" step={step} min={allowNegative ? undefined : '0'} placeholder="0.00" {...register(amountName, { valueAsNumber: true })} />
           {amountError && <p className="text-xs text-destructive">{amountError}</p>}
         </div>
 
