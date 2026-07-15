@@ -24,6 +24,10 @@ import { FileUploader, type FileUploaderHandle } from '@/components/file-uploade
 import { YarnLineFields } from '@/components/yarn-line-fields'
 import { computeQtyLbs } from '@/lib/polyester'
 
+// Larger, comfortable line-item inputs: ~48px tall, 16px text (md:text-base
+// overrides the Input's md:text-sm so it stays 16px on desktop), right-aligned.
+const LINE_INPUT_CLS = 'h-12 text-base md:text-base text-right'
+
 const optionalNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
   z.coerce.number().min(0).optional(),
@@ -294,15 +298,15 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
                           {hasPolyester && <>
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Nos Carton</th>
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Weight</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Nos Carton</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Weight</th>
                           </>}
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">{hasPolyester ? 'Quantity' : 'Qty'}</th>
                           {hasPolyester && (
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">LBS Qty</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">LBS Qty</th>
                           )}
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Rate</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Disc %</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
                           <th className="w-10" />
                         </tr>
@@ -317,9 +321,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                           const amount = gross * (1 - (line.discountPct || 0) / 100)
                           return (
                             <React.Fragment key={field.id}>
-                            <tr className="align-top">
+                            <tr className="align-middle">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
-                              <td className="px-3 py-2 min-w-[180px]">
+                              <td className="px-3 py-3 min-w-[180px]">
                                 <Controller
                                   control={form.control}
                                   name={`lines.${index}.stockItemId`}
@@ -343,20 +347,20 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 />
                               </td>
                               {hasPolyester && (isPolyesterLine ? <>
-                                <td className="px-3 py-2">
-                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                <td className="px-3 py-3">
+                                  <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
                                     {...form.register(`lines.${index}.nosCarton`, { valueAsNumber: true })} />
                                 </td>
-                                <td className="px-3 py-2">
-                                  <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                <td className="px-3 py-3">
+                                  <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
                                     {...form.register(`lines.${index}.weightPerCarton`, { valueAsNumber: true })} />
                                 </td>
                               </> : <>
-                                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
-                                <td className="px-3 py-2 text-right text-muted-foreground">—</td>
+                                <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>
+                                <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>
                               </>)}
-                              <td className="px-3 py-2">
-                                <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                              <td className="px-3 py-3">
+                                <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
                                   {...form.register(`lines.${index}.quantity`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.quantity && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.quantity?.message}</p>
@@ -364,23 +368,23 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
                               {hasPolyester && (isPolyesterLine
-                                ? <td className="px-3 py-2 text-right tabular-nums pt-3 text-muted-foreground">{qtyLbs > 0 ? fmt4(qtyLbs) : '—'}</td>
-                                : <td className="px-3 py-2 text-right text-muted-foreground">—</td>)}
-                              <td className="px-3 py-2">
-                                <NumericInput min={0} step="0.0001" placeholder="" className="text-right"
+                                ? <td className="px-3 py-3 text-right tabular-nums text-base text-muted-foreground">{qtyLbs > 0 ? fmt4(qtyLbs) : '—'}</td>
+                                : <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>)}
+                              <td className="px-3 py-3">
+                                <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
                                   {...form.register(`lines.${index}.rate`, { valueAsNumber: true })} />
                                 {form.formState.errors.lines?.[index]?.rate && (
                                   <p className="text-xs text-destructive mt-1">{form.formState.errors.lines[index]?.rate?.message}</p>
                                 )}
                               </td>
-                              <td className="px-3 py-2">
-                                <NumericInput min={0} max={100} step="0.1" placeholder="0" className="text-right"
+                              <td className="px-3 py-3">
+                                <NumericInput min={0} max={100} step="0.1" placeholder="0" className={LINE_INPUT_CLS}
                                   {...form.register(`lines.${index}.discountPct`, { valueAsNumber: true })} />
                               </td>
-                              <td className="px-3 py-2 text-right tabular-nums pt-3 font-medium">
+                              <td className="px-3 py-3 text-right tabular-nums text-base font-medium">
                                 {amount > 0 ? `Rs ${fmt(amount)}` : '—'}
                               </td>
-                              <td className="px-1 py-2 pt-2">
+                              <td className="px-1 py-3">
                                 <Button type="button" variant="ghost" size="icon-sm"
                                   onClick={() => remove(index)} disabled={fields.length === 1}
                                   className="text-muted-foreground hover:text-destructive">
