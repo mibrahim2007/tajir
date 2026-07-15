@@ -189,9 +189,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+        <div className="space-y-5">
 
-          {/* ── LEFT COLUMN ── */}
+          {/* ── DETAILS + LINE ITEMS (full width) ── */}
           <div className="space-y-5">
 
             {/* Header card */}
@@ -437,74 +437,76 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
           </div>
 
-          {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6 space-y-4">
-            <Card>
-              <CardContent className="px-5 pt-5 pb-5">
-                <p className="font-extrabold text-[15px] tracking-tight mb-4">Purchase Summary</p>
+          {/* ── SUMMARY (below the line items, full width) ── */}
+          <Card>
+            <CardContent className="px-5 py-5">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
 
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Items ({fields.length})</span>
-                    <span className="tabular-nums font-medium">Rs {fmt(subtotal)}</span>
-                  </div>
-                  {discountTotal > 0 && (
+                {/* Totals */}
+                <div className="w-full max-w-sm">
+                  <p className="font-extrabold text-[15px] tracking-tight mb-3">Purchase Summary</p>
+                  <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Discount</span>
-                      <span className="tabular-nums font-medium text-rose-600">− Rs {fmt(discountTotal)}</span>
+                      <span className="text-muted-foreground">Items ({fields.length})</span>
+                      <span className="tabular-nums font-medium">Rs {fmt(subtotal)}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Net Amount</span>
-                    <span className="tabular-nums font-medium">Rs {fmt(netTotal)}</span>
+                    {discountTotal > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Discount</span>
+                        <span className="tabular-nums font-medium text-rose-600">− Rs {fmt(discountTotal)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Net Amount</span>
+                      <span className="tabular-nums font-medium">Rs {fmt(netTotal)}</span>
+                    </div>
+                  </div>
+                  <Separator className="my-3" />
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-sm">Total</span>
+                    <span className="text-xl font-extrabold tabular-nums tracking-tight">Rs {fmt(netTotal)}</span>
                   </div>
                 </div>
 
-                <Separator className="my-4" />
-
-                <div className="flex justify-between items-center mb-5">
-                  <span className="font-bold text-sm">Total</span>
-                  <span className="text-xl font-extrabold tabular-nums tracking-tight">Rs {fmt(netTotal)}</span>
+                {/* Advance paid + actions */}
+                <div className="w-full lg:w-72 space-y-3">
+                  <FormField control={form.control} name="advancePaid" render={() => (
+                    <FormItem>
+                      <FormLabel>Advance Paid (PKR)</FormLabel>
+                      <FormControl>
+                        <NumericInput step="0.01" min="0" placeholder="0"
+                          {...form.register('advancePaid', { valueAsNumber: true })} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <div className="space-y-2">
+                    <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
+                      disabled={!canSubmit}>
+                      {isPending ? 'Saving…' : `Confirm Purchase${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
+                    </Button>
+                    <ExitButton
+                      isDirty={form.formState.isDirty}
+                      onExit={() => router.back()}
+                      className="w-full min-h-[44px]"
+                    />
+                  </div>
                 </div>
 
-                {/* Advance Paid */}
-                <FormField control={form.control} name="advancePaid" render={() => (
-                  <FormItem className="mb-4">
-                    <FormLabel>Advance Paid (PKR)</FormLabel>
-                    <FormControl>
-                      <NumericInput step="0.01" min="0" placeholder="0"
-                        {...form.register('advancePaid', { valueAsNumber: true })} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+              </div>
 
-                <div className="space-y-2">
-                  <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
-                    disabled={!canSubmit}>
-                    {isPending ? 'Saving…' : `Confirm Purchase${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
-                  </Button>
-                  <ExitButton
-                    isDirty={form.formState.isDirty}
-                    onExit={() => router.back()}
-                    className="w-full min-h-[44px]"
-                  />
-                </div>
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+              {(supplierList.length === 0 || lotList.length === 0) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  {supplierList.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
+                </p>
+              )}
 
-                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-                {(supplierList.length === 0 || lotList.length === 0) && (
-                  <p className="text-xs text-muted-foreground text-center mt-2">
-                    {supplierList.length === 0 ? 'Add a supplier first.' : 'Add a stock item first.'}
-                  </p>
-                )}
-
-                <div className="mt-4 pt-4 border-t">
-                  <FileUploader ref={uploaderRef} />
-                </div>
-
-              </CardContent>
-            </Card>
-          </div>
+              <div className="mt-4 pt-4 border-t">
+                <FileUploader ref={uploaderRef} />
+              </div>
+            </CardContent>
+          </Card>
 
         </div>
       </form>
