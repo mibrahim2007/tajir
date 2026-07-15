@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, BarChart2, BookOpen,
-  ClipboardList, FileSearch, LayoutDashboard, Landmark, Layers,
-  MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
+  ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, BarChart2, BookOpen,
+  ClipboardList, FileMinus, FilePlus, FileSearch, HandCoins, LayoutDashboard,
+  Landmark, Layers, MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
   ShoppingBag, ShoppingCart, Tag, Truck, Undo2, Users, UsersRound,
   Wallet,
 } from 'lucide-react'
@@ -32,6 +32,8 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/purchase-returns/new',    label: 'New Purchase Return', group: 'Quick Create', icon: Plus },
   { href: '/sale-returns/new',        label: 'New Sale Return',     group: 'Quick Create', icon: Plus },
   { href: '/stock-transfers/new',     label: 'New Stock Transfer',  group: 'Quick Create', icon: Plus, ownerOnly: true },
+  { href: '/credit-notes/new',        label: 'New Credit Note',     group: 'Quick Create', icon: Plus, ownerOnly: true },
+  { href: '/debit-notes/new',         label: 'New Debit Note',      group: 'Quick Create', icon: Plus, ownerOnly: true },
   // Pages
   { href: '/dashboard',               label: 'Dashboard',           group: 'Pages', icon: LayoutDashboard },
   { href: '/inventory',               label: 'Inventory',           group: 'Pages', icon: Package },
@@ -44,10 +46,14 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/stock-transfers',         label: 'Stock Transfers',     group: 'Pages', icon: ArrowLeftRight, ownerOnly: true },
   { href: '/customers',               label: 'Customers',           group: 'Pages', icon: Users, ownerOnly: true },
   { href: '/receipts',                label: 'Receipts',            group: 'Pages', icon: ArrowDownLeft, ownerOnly: true },
+  { href: '/credit-notes',            label: 'Credit Notes',        group: 'Pages', icon: FileMinus, ownerOnly: true },
   { href: '/suppliers',               label: 'Suppliers',           group: 'Pages', icon: Truck, ownerOnly: true },
   { href: '/payments',                label: 'Payments',            group: 'Pages', icon: ArrowUpRight, ownerOnly: true },
+  { href: '/debit-notes',             label: 'Debit Notes',         group: 'Pages', icon: FilePlus, ownerOnly: true },
   { href: '/pricing',                 label: 'Pricing',             group: 'Pages', icon: Tag, ownerOnly: true },
   { href: '/expenses',                label: 'Expenses',            group: 'Pages', icon: Receipt, ownerOnly: true },
+  { href: '/employees',               label: 'Employees',           group: 'Pages', icon: HandCoins },
+  { href: '/loans',                   label: 'Loans',               group: 'Pages', icon: Banknote },
   { href: '/accounts',                label: 'Accounts',            group: 'Pages', icon: BookOpen, ownerOnly: true },
   { href: '/vouchers',                label: 'Vouchers',            group: 'Pages', icon: PenLine, ownerOnly: true },
   { href: '/reports',                 label: 'Reports',             group: 'Pages', icon: BarChart2, ownerOnly: true },
