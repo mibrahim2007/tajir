@@ -20,6 +20,7 @@ import { buildPartyItems, needsMirror } from '@/lib/party-picker'
 import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
+import { editPurchaseInvoiceAction } from '@/app/actions/edit-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { YarnLineFields } from '@/components/yarn-line-fields'
 import { computeQtyLbs } from '@/lib/polyester'
@@ -71,9 +72,14 @@ type Props = {
   customers?: { id: string; name: string }[]
   lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean; isPolyester?: boolean }[]
   locations: { id: string; name: string }[]
+  // Edit mode: pre-fill the form and save via editPurchaseInvoiceAction.
+  mode?:          'create' | 'edit'
+  invoiceId?:     string
+  initialValues?: FormValues
 }
 
-export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations }: Props) {
+export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations, mode = 'create', invoiceId, initialValues }: Props) {
+  const isEdit = mode === 'edit'
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -99,7 +105,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: {
+    defaultValues: initialValues ?? {
       supplierId: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
@@ -175,7 +181,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
         supplierId = res.data.id
       }
 
-      const result = await createPurchaseInvoiceAction({
+      const payload = {
         supplierId,
         date:         values.date,
         currencyCode: values.currencyCode,
@@ -194,7 +200,11 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
           nosCarton:       Number.isFinite(l.nosCarton) ? l.nosCarton : undefined,
           weightPerCarton: Number.isFinite(l.weightPerCarton) ? l.weightPerCarton : undefined,
         })),
-      })
+      }
+
+      const result = isEdit
+        ? await editPurchaseInvoiceAction({ invoiceId: invoiceId!, ...payload })
+        : await createPurchaseInvoiceAction(payload)
       if (!result.success) { setServerError(result.error); return }
       await uploaderRef.current?.uploadFiles(result.data.invoiceId, 'purchase_order')
       router.push('/purchases')
@@ -510,7 +520,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                   <div className="space-y-2">
                     <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
                       disabled={!canSubmit}>
-                      {isPending ? 'Saving…' : `Confirm Purchase${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
+                      {isPending ? 'Saving…' : isEdit ? 'Save Changes' : `Confirm Purchase${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
                     </Button>
                     <ExitButton
                       isDirty={form.formState.isDirty}

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
@@ -210,14 +211,23 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                         <Link href={item.type === 'invoice' ? `/purchases/invoice/${item.invoiceId}/print` : `/purchases/${item.soloOrder!.id}/print`}>
                           <Button variant="ghost" size="sm" className="min-h-[36px]">Print</Button>
                         </Link>
+                        {item.type === 'invoice' && (
+                          <Link href={`/purchases/invoice/${item.invoiceId}/report`}>
+                            <Button variant="ghost" size="sm" className="min-h-[36px]" title="A4 report">A4</Button>
+                          </Link>
+                        )}
                         <RoleGate allowedRoles={['owner']}>
-                          {item.singleOrder && (
+                          {item.singleOrder ? (
                             <EditPurchaseForm
                               purchase={{ id: item.singleOrder.id, supplierId: item.singleOrder.supplier_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, advancePaid: item.singleOrder.advance_paid, date: item.singleOrder.date, locationId: item.singleOrder.location_id, nosCarton: item.singleOrder.nos_carton, weightPerCarton: item.singleOrder.weight_per_carton }}
                               suppliers={supplierList}
                               lots={lotList}
                               locations={locationList}
                             />
+                          ) : item.type === 'invoice' && (
+                            <Link href={`/purchases/invoice/${item.invoiceId}/edit`}>
+                              <Button variant="ghost" size="sm" className="min-h-[36px] h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                            </Link>
                           )}
                           <DeleteButton
                             description={item.type === 'invoice'

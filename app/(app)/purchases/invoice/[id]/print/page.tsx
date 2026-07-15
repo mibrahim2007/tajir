@@ -68,6 +68,9 @@ export default async function PrintPurchaseInvoicePage({ params }: { params: Pro
           <Button variant="ghost" size="sm">← Back</Button>
         </Link>
         <span className="text-sm text-muted-foreground flex-1">Purchase Invoice · {voucherNo} · {lines.length} item{lines.length !== 1 ? 's' : ''}</span>
+        <Link href={`/purchases/invoice/${invoiceId}/report`} className="print:hidden">
+          <Button variant="ghost" size="sm">A4 Report</Button>
+        </Link>
         <PrintButton />
       </div>
 
