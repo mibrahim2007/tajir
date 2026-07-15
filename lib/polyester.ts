@@ -10,9 +10,11 @@
 export const LBS_PER_KG = 2.2046
 
 // True when an item's Item Type name marks it as polyester (case-insensitive,
-// substring — covers types like "150D Polyester", "150/144 Polyester").
+// substring — covers types like "150D Polyester", "150/144 Polyester"). Also
+// accepts the common "ployester" misspelling so either spelling works.
 export function isPolyesterItemType(itemTypeName?: string | null): boolean {
-  return (itemTypeName ?? '').trim().toLowerCase().includes('polyester')
+  const n = (itemTypeName ?? '').trim().toLowerCase()
+  return n.includes('polyester') || n.includes('ployester')
 }
 
 // QTY LBS = Nos_Carton * Weight-per-carton / 2.2046. Returns 0 for blanks.
