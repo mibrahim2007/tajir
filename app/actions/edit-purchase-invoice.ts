@@ -26,6 +26,7 @@ const lineSchema = z.object({
 const schema = z.object({
   invoiceId:    z.string().uuid('Invalid invoice'),
   supplierId:   z.string().uuid('Invalid supplier'),
+  supplierInvoiceNo: z.string().trim().max(50, 'Supplier invoice no. is too long').optional().nullable(),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -52,7 +53,7 @@ export async function editPurchaseInvoiceAction(
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { invoiceId, supplierId, date, currencyCode, exchangeRate, advancePaid, locationId, notes, lines } = parsed.data
+  const { invoiceId, supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, notes, lines } = parsed.data
   const admin = createAdminClient()
   const er = currencyCode === 'USD' ? exchangeRate : 1
 
@@ -132,6 +133,7 @@ export async function editPurchaseInvoiceAction(
     const { data: order, error } = await admin.from('purchase_orders').insert({
       tenant_id:      tenantId,
       serial_number:  serialNumber,
+      supplier_invoice_no: supplierInvoiceNo || null,
       supplier_id:    supplierId,
       stock_item_id:  line.stockItemId,
       quantity:       line.quantity,
@@ -204,7 +206,7 @@ export async function editPurchaseInvoiceAction(
     tenantId, userId: user.id, action: 'update',
     entity: 'purchase_orders', entityId: invoiceId,
     before: { lineCount: existingLines.length },
-    after: { supplierId, date, currencyCode, totalPKR, lineCount: lines.length, notes },
+    after: { supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length, notes },
   })
 
   revalidatePath('/purchases')

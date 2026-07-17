@@ -52,6 +52,9 @@ const lineSchema = z.object({
 
 const schema = z.object({
   supplierId:   z.string().min(1, 'Supplier is required'),
+  // The supplier's own bill number, as printed on their document. Optional —
+  // not every supplier numbers their invoices.
+  supplierInvoiceNo: z.string().max(50, 'Too long').optional(),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   notes:        z.string().optional(),
   advancePaid:  z.number().min(0).default(0),
@@ -106,7 +109,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: initialValues ?? {
-      supplierId: '', date: today, notes: '', advancePaid: 0,
+      supplierId: '', supplierInvoiceNo: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
@@ -183,6 +186,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
       const payload = {
         supplierId,
+        supplierInvoiceNo: values.supplierInvoiceNo?.trim() || undefined,
         date:         values.date,
         currencyCode: values.currencyCode,
         exchangeRate: values.exchangeRate,
@@ -243,6 +247,21 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                         quickCreate={(onSuccess, onCancel) => (
                           <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
                         )}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <FormField control={form.control} name="supplierInvoiceNo" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Supplier Invoice No.</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Bill no. printed on the supplier's invoice"
+                        className="min-h-[44px]"
+                        {...field}
+                        value={field.value ?? ''}
                       />
                     </FormControl>
                     <FormMessage />

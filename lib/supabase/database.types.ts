@@ -1989,6 +1989,7 @@ export type Database = {
           serial_number: string | null
           stock_item_id: string
           supplier_id: string
+          supplier_invoice_no: string | null
           tenant_id: string
           weight_per_carton: number | null
           yarn_type: string | null
@@ -2014,6 +2015,7 @@ export type Database = {
           serial_number?: string | null
           stock_item_id: string
           supplier_id: string
+          supplier_invoice_no?: string | null
           tenant_id: string
           weight_per_carton?: number | null
           yarn_type?: string | null
@@ -2039,6 +2041,7 @@ export type Database = {
           serial_number?: string | null
           stock_item_id?: string
           supplier_id?: string
+          supplier_invoice_no?: string | null
           tenant_id?: string
           weight_per_carton?: number | null
           yarn_type?: string | null

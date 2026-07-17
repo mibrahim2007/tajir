@@ -28,6 +28,8 @@ const lineSchema = z.object({
 
 const schema = z.object({
   supplierId:   z.string().uuid('Invalid supplier'),
+  // The supplier's own bill number. Optional; stored on every line of the invoice.
+  supplierInvoiceNo: z.string().trim().max(50, 'Supplier invoice no. is too long').optional().nullable(),
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -56,7 +58,7 @@ export async function createPurchaseInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, date, currencyCode, exchangeRate, advancePaid, locationId, lines } = parsed.data
+  const { supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, lines } = parsed.data
   const admin = createAdminClient()
 
   const { count: coaCount } = await admin
@@ -101,6 +103,7 @@ export async function createPurchaseInvoiceAction(
     const { data: order, error } = await admin.from('purchase_orders').insert({
       tenant_id:      tenantId,
       serial_number:  serialNumber,
+      supplier_invoice_no: supplierInvoiceNo || null,
       supplier_id:    supplierId,
       stock_item_id:  line.stockItemId,
       quantity:       line.quantity,
@@ -151,7 +154,7 @@ export async function createPurchaseInvoiceAction(
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',
     entity: 'purchase_orders', entityId: invoiceId,
-    after: { supplierId, date, currencyCode, totalPKR, lineCount: lines.length },
+    after: { supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length },
   })
 
   return { success: true, data: { invoiceId } }

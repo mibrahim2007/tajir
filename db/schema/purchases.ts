@@ -16,6 +16,9 @@ export const purchaseOrders = pgTable('purchase_orders', {
   id:            uuid('id').primaryKey().defaultRandom(),
   tenantId:      uuid('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
   serialNumber:  text('serial_number'),
+  // The supplier's own bill number, as printed on their invoice — unlike
+  // serialNumber, which is the voucher number we generate.
+  supplierInvoiceNo: text('supplier_invoice_no'),
   supplierId:    uuid('supplier_id').notNull().references(() => suppliers.id),
   stockItemId:   uuid('stock_item_id').notNull().references(() => inventoryLots.id),
   quantity:      numeric('quantity', { precision: 15, scale: 3 }).notNull(),

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins, Receipt } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { ReportsGuide } from './reports-guide'
 
@@ -8,6 +8,7 @@ const reports = [
   { href: '/reports/item-ledger', label: 'Item Ledger', description: 'All movements (purchases, sales, returns) for a selected stock item between dates, with running balance.', icon: BookMarked },
   { href: '/reports/item-profit-loss', label: 'Item Profit & Loss', description: 'Revenue, cost, and gross profit for a single stock item over a date range. Shows per-transaction breakdown with rates.', icon: PieChart },
   { href: '/reports/customer-profit-loss', label: 'Customer Profit & Loss', description: 'Gross profit per customer based on sales vs. purchase cost. Summary of all customers or drill into a single customer with full invoice detail.', icon: TrendingUp },
+  { href: '/reports/purchase-detail', label: 'Purchase Detail', description: 'Every purchase invoice in a date range with its voucher number, supplier invoice number, and amount. Filter by supplier or search a bill number.', icon: Receipt },
   { href: '/reports/purchases-sales', label: 'Purchase & Sales', description: 'Date-range report of all purchases and sales with totals and gross profit. Printable and exportable.', icon: ArrowLeftRight },
   { href: '/reports/stock-summary', label: 'Stock Summary', description: 'All stock items with current quantities. Filterable and exportable.', icon: Package },
   { href: '/reports/stock-valuation', label: 'Stock Valuation', description: 'Current stock with rate (from latest purchase or opening rate) and total value in PKR. Printable.', icon: DollarSign },

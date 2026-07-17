@@ -16,7 +16,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
     { data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs },
   ] = await Promise.all([
     admin.from('purchase_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, advance_paid, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -39,6 +39,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
   // Stored rate is already net of any discount, so discountPct starts at 0.
   const initialValues = {
     supplierId:   first.supplier_id,
+    supplierInvoiceNo: first.supplier_invoice_no ?? '',
     date:         first.date,
     notes:        '',
     advancePaid:  invoiceLines.reduce((s, l) => s + (l.advance_paid ?? 0), 0),
