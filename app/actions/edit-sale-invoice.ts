@@ -32,6 +32,8 @@ const schema = z.object({
   currencyCode:   z.enum(['PKR', 'USD']),
   exchangeRate:   z.coerce.number().positive().default(1),
   locationId:     z.string().uuid().optional(),
+  poNo:           z.string().trim().max(50, 'PO no. is too long').optional().nullable(),
+  dcNo:           z.string().trim().max(50, 'DC no. is too long').optional().nullable(),
   notes:          z.string().optional(),
   allowOversell:  z.boolean().optional(),
   lines:          z.array(lineSchema).min(1, 'Add at least one item'),
@@ -63,7 +65,7 @@ export async function editSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { invoiceId, customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, notes, lines } = parsed.data
+  const { invoiceId, customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines } = parsed.data
   const admin = createAdminClient()
 
   // Existing lines for this invoice — the basis for reversing inventory & GL.
@@ -170,6 +172,8 @@ export async function editSaleInvoiceAction(
       date,
       payment_due_date: paymentDueDate ?? null,
       due_days:        dueDays ?? null,
+      po_no:           poNo || null,
+      dc_no:           dcNo || null,
       notes:           notes?.trim() ? notes.trim() : null,
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,

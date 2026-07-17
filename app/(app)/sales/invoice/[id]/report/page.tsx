@@ -21,7 +21,7 @@ export default async function SaleInvoiceReportPage({ params }: { params: Promis
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -53,6 +53,8 @@ export default async function SaleInvoiceReportPage({ params }: { params: Promis
   const voucherNo  = journalEntry?.voucher_number ?? `SI-${invoiceId.slice(-6).toUpperCase()}`
   const customerName = customerMap.get(first.customer_id) ?? '—'
   const notes = lines.find((l) => l.notes && l.notes.trim())?.notes?.trim() ?? null
+  const poNo  = lines.find((l) => l.po_no && l.po_no.trim())?.po_no?.trim() ?? null
+  const dcNo  = lines.find((l) => l.dc_no && l.dc_no.trim())?.dc_no?.trim() ?? null
   const generatedAt = formatPKTDateTime(new Date())
 
   const metaRow = (label: string, value: string) => (
@@ -103,6 +105,8 @@ export default async function SaleInvoiceReportPage({ params }: { params: Promis
             {metaRow('Invoice / Voucher No.', voucherNo)}
             {first.serial_number && metaRow('Serial No.', first.serial_number)}
             {metaRow('Invoice Date', formatPKTDate(new Date(first.date)))}
+            {poNo && metaRow('PO No.', poNo)}
+            {dcNo && metaRow('DC No.', dcNo)}
             {first.payment_due_date && metaRow('Payment Due', formatPKTDate(new Date(first.payment_due_date)))}
             {isUSD && metaRow('Exchange Rate', `1 USD = Rs ${fmt(er)}`)}
           </div>

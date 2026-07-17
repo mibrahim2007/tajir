@@ -67,6 +67,10 @@ const baseSchema = z.object({
                      (v) => (v === '' || v === null || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
                      z.coerce.number().int().min(0).max(3650).optional(),
                    ),
+  // Customer's PO number and our delivery challan number, as printed on those
+  // documents. Manual free-text, optional.
+  poNo:            z.string().max(50, 'Too long').optional(),
+  dcNo:            z.string().max(50, 'Too long').optional(),
   notes:           z.string().optional(),
   currencyCode:    z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:    z.number().positive().default(1),
@@ -172,6 +176,7 @@ export function SaleInvoiceForm({
     resolver: zodResolver(formSchema) as Resolver<SaleFormValues>,
     defaultValues: initialValues ?? {
       customerId: '', date: today, paymentDueDate: '', dueDays: undefined, notes: '',
+      poNo: '', dcNo: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
@@ -328,6 +333,8 @@ export function SaleInvoiceForm({
         currencyCode:   values.currencyCode,
         exchangeRate:   values.exchangeRate,
         locationId:     values.locationId || undefined,
+        poNo:           values.poNo?.trim() || undefined,
+        dcNo:           values.dcNo?.trim() || undefined,
         notes:          values.notes,
         allowOversell,
         lines: values.lines.map((l) => ({
@@ -483,6 +490,36 @@ export function SaleInvoiceForm({
                     <FormItem>
                       <FormLabel>Payment Due</FormLabel>
                       <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="poNo" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>PO No.</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Customer's purchase order no."
+                          className="min-h-[44px]"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="dcNo" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>DC No.</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Delivery challan no."
+                          className="min-h-[44px]"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

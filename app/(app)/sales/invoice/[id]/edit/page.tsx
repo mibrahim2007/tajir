@@ -18,7 +18,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -80,6 +80,8 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     date:           first.date,
     paymentDueDate: first.payment_due_date ?? '',
     dueDays:        first.due_days ?? undefined,
+    poNo:           invoiceLines.find((l) => l.po_no && l.po_no.trim())?.po_no ?? '',
+    dcNo:           invoiceLines.find((l) => l.dc_no && l.dc_no.trim())?.dc_no ?? '',
     notes:          invoiceLines.find((l) => l.notes && l.notes.trim())?.notes ?? '',
     currencyCode:   (first.currency_code === 'USD' ? 'USD' : 'PKR'),
     exchangeRate:   first.exchange_rate,

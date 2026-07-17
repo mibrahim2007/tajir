@@ -2325,6 +2325,7 @@ export type Database = {
           currency_code: string
           customer_id: string
           date: string
+          dc_no: string | null
           due_days: number | null
           exchange_rate: number
           id: string
@@ -2335,6 +2336,7 @@ export type Database = {
           notes: string | null
           payment_due_date: string | null
           pkr_equivalent: number
+          po_no: string | null
           qty_lbs: number | null
           quantity: number
           rate: number
@@ -2351,6 +2353,7 @@ export type Database = {
           currency_code: string
           customer_id: string
           date: string
+          dc_no?: string | null
           due_days?: number | null
           exchange_rate?: number
           id?: string
@@ -2361,6 +2364,7 @@ export type Database = {
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent: number
+          po_no?: string | null
           qty_lbs?: number | null
           quantity: number
           rate: number
@@ -2377,6 +2381,7 @@ export type Database = {
           currency_code?: string
           customer_id?: string
           date?: string
+          dc_no?: string | null
           due_days?: number | null
           exchange_rate?: number
           id?: string
@@ -2387,6 +2392,7 @@ export type Database = {
           notes?: string | null
           payment_due_date?: string | null
           pkr_equivalent?: number
+          po_no?: string | null
           qty_lbs?: number | null
           quantity?: number
           rate?: number

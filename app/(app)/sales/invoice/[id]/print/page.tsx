@@ -19,7 +19,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -29,6 +29,8 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   if (!lines || lines.length === 0) notFound()
 
   const first = lines[0]
+  const poNo = lines.find((l) => l.po_no && l.po_no.trim())?.po_no?.trim() ?? null
+  const dcNo = lines.find((l) => l.dc_no && l.dc_no.trim())?.dc_no?.trim() ?? null
   const stockIds    = [...new Set(lines.map((l) => l.stock_item_id))]
   const customerIds = [...new Set(lines.map((l) => l.customer_id))]
 
@@ -108,6 +110,18 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
             <span className="text-gray-500 w-24 shrink-0">Entry Time</span>
             <span className="font-semibold">{entryTime}</span>
           </div>
+          {poNo && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 w-28 shrink-0">PO No.</span>
+              <span className="font-semibold">{poNo}</span>
+            </div>
+          )}
+          {dcNo && (
+            <div className="flex gap-2">
+              <span className="text-gray-500 w-28 shrink-0">DC No.</span>
+              <span className="font-semibold">{dcNo}</span>
+            </div>
+          )}
           {first.payment_due_date && (
             <div className="flex gap-2">
               <span className="text-gray-500 w-28 shrink-0">Payment Due</span>

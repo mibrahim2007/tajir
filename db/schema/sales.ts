@@ -27,6 +27,9 @@ export const salesOrders = pgTable('sales_orders', {
   paymentDueDate: date('payment_due_date'),
   // Payment terms in days; when set, payment_due_date = date + due_days.
   dueDays:        integer('due_days'),
+  // Customer's PO number and our delivery challan number, as printed on those documents.
+  poNo:           text('po_no'),
+  dcNo:           text('dc_no'),
   notes:          text('notes'),
   yarnType:       text('yarn_type'),
   yarnWeight:     numeric('yarn_weight', { precision: 15, scale: 3 }),
