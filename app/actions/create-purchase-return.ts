@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy } from '@/lib/yarn'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -114,7 +115,7 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
 
   // Auto-post GL: DR Accounts Payable, CR Stock in Trade
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId,
     date,
     description:  'Purchase Return',
@@ -127,6 +128,12 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
       { accountSystemKey: 'inventory',        debit: 0, credit: pkrEquivalent, stockItemId },
     ],
   })
+  // The return already removed stock; put it back on failure.
+  if (!posted.ok) {
+    await admin.from('purchase_returns').delete().eq('id', ret.id)
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',

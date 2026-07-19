@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -96,13 +97,19 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
     : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
 
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',
     lines: [
       { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId },
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: 0, credit: leg.pkr })),
     ],
   })
+  // Without its GL entry the payment would be invisible to the ledger, so roll
+  // the document back rather than report a success that the books don't show.
+  if (!posted.ok) {
+    await admin.from('ap_payments').delete().eq('id', payment.id)
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create', entity: 'ap_payments', entityId: payment.id,

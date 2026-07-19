@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -115,7 +116,7 @@ export async function createCustomerRefundAction(input: unknown): Promise<Action
     ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
     : [{ accountSystemKey: paymentMethod === 'bank_transfer' ? 'cash_at_bank' : 'cash_in_hand', pkr: pkrEquivalent }]
 
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId,
     date,
     description: 'Customer Refund',
@@ -128,6 +129,10 @@ export async function createCustomerRefundAction(input: unknown): Promise<Action
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: 0, credit: leg.pkr })),
     ],
   })
+  if (!posted.ok) {
+    await admin.from('customer_refunds').delete().eq('id', refund.id)
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',

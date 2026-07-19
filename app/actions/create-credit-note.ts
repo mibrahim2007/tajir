@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -70,7 +71,7 @@ export async function createCreditNoteAction(input: unknown): Promise<ActionResu
   }
 
   // GL: DR Sales Returns & Allowances, CR Accounts Receivable
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId,
     date,
     description: 'Credit Note',
@@ -83,6 +84,10 @@ export async function createCreditNoteAction(input: unknown): Promise<ActionResu
       { accountSystemKey: 'accounts_receivable',  debit: 0, credit: pkrEquivalent, customerId },
     ],
   })
+  if (!posted.ok) {
+    await admin.from('credit_notes').delete().eq('id', note.id)
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',

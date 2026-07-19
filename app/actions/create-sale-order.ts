@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -102,7 +103,7 @@ export async function createSaleOrderAction(input: unknown): Promise<
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
 
   // Auto-post GL: DR Accounts Receivable, CR Sales Revenue + DR COGS, CR Inventory
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Sale Invoice', reference: serialNumber, sourceType: 'sale_order', sourceId: order.id, prefix: 'SI',
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: pkrEquivalent, credit: 0, customerId },
@@ -111,6 +112,12 @@ export async function createSaleOrderAction(input: unknown): Promise<
       { accountSystemKey: 'inventory',           debit: 0, credit: pkrEquivalent, stockItemId },
     ],
   })
+  // The sale already removed stock; put it back on failure.
+  if (!posted.ok) {
+    await admin.from('sales_orders').delete().eq('id', order.id)
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'sales_orders', entityId: order.id, after: { customerId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date } })
 

@@ -9,6 +9,7 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -142,7 +143,7 @@ export async function createPurchaseInvoiceAction(
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
 
   // Single GL entry for the whole invoice
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Purchase Invoice', reference: serialNumber,
     sourceType: 'purchase_invoice', sourceId: invoiceId, prefix: 'PI',
     lines: [
@@ -150,6 +151,17 @@ export async function createPurchaseInvoiceAction(
       { accountSystemKey: 'accounts_payable', debit: 0, credit: totalPKR, supplierId },
     ],
   })
+  // Same compensation the mid-loop failure path uses: drop every line we
+  // inserted and undo the stock each one added.
+  if (!posted.ok) {
+    if (createdOrders.length > 0) {
+      await admin.from('purchase_orders').delete().in('id', createdOrders.map((o) => o.id))
+      for (const o of createdOrders) {
+        await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: -o.quantity })
+      }
+    }
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',

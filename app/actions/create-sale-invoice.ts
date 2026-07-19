@@ -10,6 +10,7 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -191,7 +192,7 @@ export async function createSaleInvoiceAction(
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
   // Single GL entry for the whole invoice
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Sale Invoice', reference: serialNumber,
     sourceType: 'sale_invoice', sourceId: invoiceId, prefix: 'SI',
     lines: [
@@ -211,6 +212,19 @@ export async function createSaleInvoiceAction(
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
     ],
   })
+  // Same compensation the mid-loop failure path uses: drop every line we
+  // inserted and return the stock each non-service line consumed.
+  if (!posted.ok) {
+    if (createdOrders.length > 0) {
+      await admin.from('sales_orders').delete().in('id', createdOrders.map((o) => o.id))
+      for (const o of createdOrders) {
+        if (!o.isService) {
+          await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: o.quantity })
+        }
+      }
+    }
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',

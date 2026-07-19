@@ -6,9 +6,10 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -179,28 +180,17 @@ export async function editPurchaseInvoiceAction(
   // Re-post the GL entry with the new totals, keeping the voucher stable.
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
 
-  const { data: oldEntry } = await admin
-    .from('tajir_journal_entries')
-    .select('id, voucher_number')
-    .eq('source_type', 'purchase_invoice')
-    .eq('source_id', invoiceId)
-    .eq('tenant_id', tenantId)
-    .maybeSingle()
-
-  if (oldEntry) {
-    await admin.from('tajir_journal_entry_lines').delete().eq('journal_entry_id', oldEntry.id)
-    await admin.from('tajir_journal_entries').delete().eq('id', oldEntry.id)
-  }
-
-  await postJournalEntry({
+  // The helper snapshots the previous entry first, so a failed post restores
+  // it instead of leaving this invoice with no ledger entry.
+  const posted = await repostJournalEntry({
     tenantId, date, description: 'Purchase Invoice', reference: serialNumber ?? undefined,
     sourceType: 'purchase_invoice', sourceId: invoiceId, prefix: 'PI',
-    voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       { accountSystemKey: 'accounts_payable', debit: 0, credit: totalPKR, supplierId },
     ],
   })
+  if (!posted.ok) return glEditFailed(posted.message)
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',

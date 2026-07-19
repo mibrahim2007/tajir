@@ -9,6 +9,7 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
 import { generateSchedule, installmentAmount } from '@/lib/loans/amortization'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -126,7 +127,7 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
     lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
     rate,
   )
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date: disbursementDate, description: 'Employee Loan Disbursed', reference: serialNumber,
     sourceType: 'employee_loan', sourceId: loan.id, prefix: 'LN',
     lines: [
@@ -134,6 +135,11 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: 0, credit: leg.pkr })),
     ],
   })
+  // Disbursement lines and the schedule cascade from the loan row.
+  if (!posted.ok) {
+    await admin.from('employee_loans').delete().eq('id', loan.id)
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create', entity: 'employee_loans', entityId: loan.id,

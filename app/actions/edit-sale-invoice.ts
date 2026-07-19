@@ -6,9 +6,10 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -224,23 +225,11 @@ export async function editSaleInvoiceAction(
   const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
-  const { data: oldEntry } = await admin
-    .from('tajir_journal_entries')
-    .select('id, voucher_number')
-    .eq('source_type', 'sale_invoice')
-    .eq('source_id', invoiceId)
-    .eq('tenant_id', tenantId)
-    .maybeSingle()
-
-  if (oldEntry) {
-    await admin.from('tajir_journal_entry_lines').delete().eq('journal_entry_id', oldEntry.id)
-    await admin.from('tajir_journal_entries').delete().eq('id', oldEntry.id)
-  }
-
-  await postJournalEntry({
+  // The helper snapshots the previous entry first, so a failed post restores
+  // it instead of leaving this invoice with no ledger entry.
+  const posted = await repostJournalEntry({
     tenantId, date, description: 'Sale Invoice', reference: serialNumber ?? undefined,
     sourceType: 'sale_invoice', sourceId: invoiceId, prefix: 'SI',
-    voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       { accountSystemKey: 'accounts_receivable', debit: totalPKR, credit: 0, customerId },
       ...(goodsRevenue   > 0 ? [{ accountSystemKey: 'sales_revenue',  debit: 0, credit: goodsRevenue,   customerId }] : []),
@@ -256,6 +245,7 @@ export async function editSaleInvoiceAction(
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
     ],
   })
+  if (!posted.ok) return glEditFailed(posted.message)
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',

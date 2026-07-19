@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -81,13 +82,20 @@ export async function createPurchaseAction(input: unknown): Promise<ActionResult
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
 
   // Auto-post GL: DR Inventory, CR Accounts Payable
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Purchase Invoice', reference: serialNumber, sourceType: 'purchase_order', sourceId: order.id, prefix: 'PI',
     lines: [
       { accountSystemKey: 'inventory',        debit: pkrEquivalent, credit: 0, stockItemId },
       { accountSystemKey: 'accounts_payable', debit: 0, credit: pkrEquivalent, supplierId },
     ],
   })
+  // Stock was already incremented, so undo that too — otherwise a failed post
+  // would leave inventory holding goods no document accounts for.
+  if (!posted.ok) {
+    await admin.from('purchase_orders').delete().eq('id', order.id)
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({
     tenantId,

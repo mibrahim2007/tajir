@@ -5,8 +5,9 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy } from '@/lib/yarn'
+import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -108,17 +109,9 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
     await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: qtyDelta })
   }
 
-  // Replace GL entry
-  const { data: glEntry } = await admin
-    .from('tajir_journal_entries')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .eq('source_type', 'sale_return')
-    .eq('source_id', id)
-    .single()
-  if (glEntry) await admin.from('tajir_journal_entries').delete().eq('id', glEntry.id)
-
-  await postJournalEntry({
+  // Replace GL entry. The helper snapshots the previous one so a failed post
+  // restores it, and it carries the original voucher number over.
+  const posted = await repostJournalEntry({
     tenantId, date,
     description: 'Sale Return',
     reference: existing.serial_number ?? undefined,
@@ -132,6 +125,7 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
       { accountSystemKey: 'cogs',                 debit: 0, credit: pkrEquivalent, stockItemId },
     ],
   })
+  if (!posted.ok) return glEditFailed(posted.message)
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',

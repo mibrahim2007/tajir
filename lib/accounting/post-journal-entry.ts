@@ -12,7 +12,7 @@ type JournalLine = {
   ownerId?: string
 }
 
-type PostJournalEntryParams = {
+export type PostJournalEntryParams = {
   tenantId: string
   date: string
   description: string

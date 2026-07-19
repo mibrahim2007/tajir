@@ -5,8 +5,9 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
+import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
+import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -67,26 +68,17 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   }))
   await admin.from('ar_receipt_lines').insert(lineRows)
 
-  // Re-post GL: reuse the original voucher number, remove the old entry, post fresh.
-  const { data: oldEntry } = await admin
-    .from('tajir_journal_entries')
-    .select('id, voucher_number')
-    .eq('tenant_id', tenantId)
-    .eq('source_type', 'ar_receipt')
-    .eq('source_id', id)
-    .maybeSingle()
-
-  if (oldEntry) await admin.from('tajir_journal_entries').delete().eq('id', oldEntry.id)
-
+  // Re-post GL. The helper snapshots the previous entry first, so a failed
+  // post restores it instead of leaving this document with no ledger entry.
   const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
-  await postJournalEntry({
+  const posted = await repostJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ar_receipt', sourceId: id, prefix: 'RC',
-    voucherNumber: oldEntry?.voucher_number ?? undefined,
     lines: [
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),
       { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId: existing.customer_id },
     ],
   })
+  if (!posted.ok) return glEditFailed(posted.message)
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ar_receipts', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date } })
 

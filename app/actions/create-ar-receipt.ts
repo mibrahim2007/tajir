@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -99,13 +100,17 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
     : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
 
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
     lines: [
       ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),
       { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId },
     ],
   })
+  if (!posted.ok) {
+    await admin.from("ar_receipts").delete().eq("id", receipt.id)
+    return glCreateFailed(posted.message)
+  }
 
   await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'ar_receipts', entityId: receipt.id, after: { customerId, amount, currencyCode, pkrEquivalent, date } })
 

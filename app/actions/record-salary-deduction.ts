@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { reconcileLoanStatuses } from '@/lib/loans/reconcile'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -74,7 +75,7 @@ export async function recordSalaryDeductionAction(input: unknown): Promise<Actio
   }
 
   // GL: DR Salaries & Wages, CR Employee Loans & Advances. No cash leg.
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Loan Recovery via Salary Deduction', reference: serialNumber,
     sourceType: 'loan_repayment', sourceId: repayment.id, prefix: 'LR',
     lines: [
@@ -82,6 +83,10 @@ export async function recordSalaryDeductionAction(input: unknown): Promise<Actio
       { accountSystemKey: 'employee_loans_receivable', debit: 0, credit: pkrEquivalent, employeeId },
     ],
   })
+  if (!posted.ok) {
+    await admin.from('loan_repayments').delete().eq('id', repayment.id)
+    return glCreateFailed(posted.message)
+  }
 
   await reconcileLoanStatuses(admin, tenantId, employeeId)
 

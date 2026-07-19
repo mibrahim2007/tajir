@@ -9,6 +9,7 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
 import { reconcileLoanStatuses } from '@/lib/loans/reconcile'
+import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -107,7 +108,7 @@ export async function recordLoanRepaymentAction(input: unknown): Promise<ActionR
     lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
     rate,
   )
-  await postJournalEntry({
+  const posted = await postJournalEntry({
     tenantId, date, description: 'Employee Loan Repayment', reference: serialNumber,
     sourceType: 'loan_repayment', sourceId: repayment.id, prefix: 'LR',
     lines: [
@@ -115,6 +116,12 @@ export async function recordLoanRepaymentAction(input: unknown): Promise<ActionR
       { accountSystemKey: 'employee_loans_receivable', debit: 0, credit: pkrEquivalent, employeeId },
     ],
   })
+  // Roll back BEFORE reconciling loan statuses, so a failed post can't close a
+  // loan on the strength of a repayment that was never recorded in the ledger.
+  if (!posted.ok) {
+    await admin.from('loan_repayments').delete().eq('id', repayment.id)
+    return glCreateFailed(posted.message)
+  }
 
   // Auto-close any loan now fully repaid (or re-open on later reversal).
   await reconcileLoanStatuses(admin, tenantId, employeeId)
