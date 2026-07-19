@@ -15,7 +15,7 @@ export default async function ProfitAllocationPage() {
 
   const [{ data: rawAllocs }, { data: rawOwners }] = await Promise.all([
     admin.from('profit_allocations')
-      .select('id, serial_number, period_start, period_end, net_profit, notes')
+      .select('id, serial_number, period_start, period_end, net_profit, notes, status, reversed_at')
       .eq('tenant_id', tenantId)
       .order('period_end', { ascending: false }),
     admin.from('owners')
@@ -45,6 +45,7 @@ export default async function ProfitAllocationPage() {
     periodLabel: `${formatPKTDate(a.period_start + 'T00:00:00')} – ${formatPKTDate(a.period_end + 'T00:00:00')}`,
     netProfit: Number(a.net_profit),
     notes: a.notes as string | null,
+    status: a.status as 'active' | 'reversed',
     lines: lines
       .filter((l) => l.allocation_id === a.id)
       .map((l) => ({
@@ -57,7 +58,10 @@ export default async function ProfitAllocationPage() {
       })),
   }))
 
-  const totalAllocated = allocationItems.reduce((s, a) => s + a.netProfit, 0)
+  // Reversed allocations no longer stand, so they must not count toward the total.
+  const totalAllocated = allocationItems
+    .filter((a) => a.status === 'active')
+    .reduce((s, a) => s + a.netProfit, 0)
   const totalShare = owners.reduce((s, o) => s + Number(o.profit_share_pct), 0)
 
   return (

@@ -45,11 +45,13 @@ export async function createProfitAllocationAction(input: unknown): Promise<Acti
   const admin = createAdminClient()
 
   // Reject an overlapping period — allocating the same profit twice would
-  // double-credit every partner's capital.
+  // double-credit every partner's capital. Reversed allocations no longer claim
+  // their period, so they are history and do not block a fresh allocation.
   const { data: overlapping } = await admin
     .from('profit_allocations')
     .select('id, serial_number, period_start, period_end')
     .eq('tenant_id', tenantId)
+    .eq('status', 'active')
     .lte('period_start', periodEnd)
     .gte('period_end', periodStart)
     .limit(1)
@@ -58,7 +60,7 @@ export async function createProfitAllocationAction(input: unknown): Promise<Acti
     const o = overlapping[0]
     return {
       success: false,
-      error: `Period overlaps an existing allocation (${o.serial_number ?? 'unnumbered'}: ${o.period_start} → ${o.period_end}). Delete it first to re-allocate.`,
+      error: `Period overlaps an existing allocation (${o.serial_number ?? 'unnumbered'}: ${o.period_start} → ${o.period_end}). Reopen that period first to re-allocate.`,
       code: 'PERIOD_OVERLAP',
     }
   }

@@ -2072,7 +2072,9 @@ export type Database = {
           notes: string | null
           period_end: string
           period_start: string
+          reversed_at: string | null
           serial_number: string | null
+          status: string
           tenant_id: string
         }
         Insert: {
@@ -2082,7 +2084,9 @@ export type Database = {
           notes?: string | null
           period_end: string
           period_start: string
+          reversed_at?: string | null
           serial_number?: string | null
+          status?: string
           tenant_id: string
         }
         Update: {
@@ -2092,7 +2096,9 @@ export type Database = {
           notes?: string | null
           period_end?: string
           period_start?: string
+          reversed_at?: string | null
           serial_number?: string | null
+          status?: string
           tenant_id?: string
         }
         Relationships: [

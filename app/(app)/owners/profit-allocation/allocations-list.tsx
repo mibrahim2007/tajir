@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatPKR } from '@/lib/utils/currency'
 import { deleteProfitAllocationAction } from '@/app/actions/delete-profit-allocation'
+import { reopenProfitAllocationAction } from '@/app/actions/reopen-profit-allocation'
 
 export type AllocationItem = {
   id: string
@@ -13,21 +14,28 @@ export type AllocationItem = {
   periodLabel: string
   netProfit: number
   notes: string | null
+  status: 'active' | 'reversed'
   lines: { ownerId: string; name: string; sharePct: number; amount: number }[]
 }
 
 export function AllocationsList({ allocations }: { allocations: AllocationItem[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
-  const [armedId, setArmedId] = useState<string | null>(null)
+  // Two-click confirm per action: first click arms, second commits.
+  const [armed, setArmed] = useState<{ id: string; action: 'delete' | 'reopen' } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const onDelete = (id: string) => {
-    if (armedId !== id) { setArmedId(id); setError(null); return }
+  const isArmed = (id: string, action: 'delete' | 'reopen') =>
+    armed?.id === id && armed.action === action
+
+  const run = (id: string, action: 'delete' | 'reopen') => {
+    if (!isArmed(id, action)) { setArmed({ id, action }); setError(null); return }
     startTransition(async () => {
       setError(null)
-      const result = await deleteProfitAllocationAction({ id })
-      setArmedId(null)
+      const result = action === 'reopen'
+        ? await reopenProfitAllocationAction({ id })
+        : await deleteProfitAllocationAction({ id })
+      setArmed(null)
       if (!result.success) { setError(result.error); return }
       router.refresh()
     })
@@ -39,11 +47,24 @@ export function AllocationsList({ allocations }: { allocations: AllocationItem[]
 
       {allocations.map((a) => {
         const isProfit = a.netProfit > 0
+        const reversed = a.status === 'reversed'
         return (
-          <div key={a.id} className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+          <div
+            key={a.id}
+            className={`bg-card rounded-2xl border shadow-sm overflow-hidden ${
+              reversed ? 'border-dashed opacity-70' : 'border-border'
+            }`}
+          >
             <div className="flex items-center justify-between gap-3 px-4 py-3 border-b bg-muted/30">
               <div>
-                <p className="font-medium">{a.periodLabel}</p>
+                <p className="font-medium flex items-center gap-2">
+                  {a.periodLabel}
+                  {reversed && (
+                    <span className="text-xs font-semibold px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      Reversed
+                    </span>
+                  )}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   <span className="font-mono">{a.serialNumber ?? '—'}</span>
                   {a.notes && ` · ${a.notes}`}
@@ -54,20 +75,40 @@ export function AllocationsList({ allocations }: { allocations: AllocationItem[]
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     {isProfit ? 'Net Profit' : 'Net Loss'}
                   </p>
-                  <p className={`tabular-nums font-semibold ${isProfit ? '' : 'text-destructive'}`}>
+                  <p className={`tabular-nums font-semibold ${
+                    reversed ? 'line-through text-muted-foreground' : isProfit ? '' : 'text-destructive'
+                  }`}>
                     {formatPKR(Math.abs(a.netProfit))}
                   </p>
                 </div>
+
+                {/* Reopening is the accounting-safe undo: it posts a reversing
+                    entry and frees the period. Delete erases the record entirely
+                    and is only for an allocation posted in error. */}
+                {!reversed && (
+                  <button
+                    type="button"
+                    onClick={() => run(a.id, 'reopen')}
+                    onBlur={() => isArmed(a.id, 'reopen') && setArmed(null)}
+                    disabled={isPending}
+                    className={`text-xs underline underline-offset-4 disabled:opacity-50 ${
+                      isArmed(a.id, 'reopen') ? 'text-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {isArmed(a.id, 'reopen') ? 'Confirm reopen?' : 'Reopen Period'}
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => onDelete(a.id)}
-                  onBlur={() => armedId === a.id && setArmedId(null)}
+                  onClick={() => run(a.id, 'delete')}
+                  onBlur={() => isArmed(a.id, 'delete') && setArmed(null)}
                   disabled={isPending}
                   className={`text-xs underline underline-offset-4 disabled:opacity-50 ${
-                    armedId === a.id ? 'text-destructive font-semibold' : 'text-muted-foreground hover:text-destructive'
+                    isArmed(a.id, 'delete') ? 'text-destructive font-semibold' : 'text-muted-foreground hover:text-destructive'
                   }`}
                 >
-                  {armedId === a.id ? 'Confirm?' : 'Delete'}
+                  {isArmed(a.id, 'delete') ? 'Confirm?' : 'Delete'}
                 </button>
               </div>
             </div>
@@ -79,7 +120,9 @@ export function AllocationsList({ allocations }: { allocations: AllocationItem[]
                     <td className="px-4 py-2 text-right tabular-nums text-muted-foreground w-24">
                       {l.sharePct.toFixed(2)}%
                     </td>
-                    <td className="px-4 py-2 text-right tabular-nums w-40">{formatPKR(l.amount)}</td>
+                    <td className={`px-4 py-2 text-right tabular-nums w-40 ${reversed ? 'line-through text-muted-foreground' : ''}`}>
+                      {formatPKR(l.amount)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -89,7 +132,9 @@ export function AllocationsList({ allocations }: { allocations: AllocationItem[]
       })}
 
       <p className="text-xs text-muted-foreground">
-        Deleting an allocation also reverses its journal entry and frees the period for re-allocation.
+        Reopening posts a reversing entry that cancels the allocation and frees the period to be
+        allocated again; both entries stay on the ledger. Deleting removes the record and its
+        entries entirely.
       </p>
     </div>
   )
