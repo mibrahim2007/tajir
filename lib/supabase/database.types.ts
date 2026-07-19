@@ -1847,6 +1847,264 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_transaction_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          tenant_id: string
+          transaction_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          tenant_id: string
+          transaction_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          tenant_id?: string
+          transaction_id?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_transaction_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_transaction_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_transaction_lines_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "owner_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          currency_code: string
+          date: string
+          exchange_rate: number
+          id: string
+          notes: string | null
+          owner_id: string
+          pkr_equivalent: number
+          serial_number: string | null
+          tenant_id: string
+          txn_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency_code?: string
+          date: string
+          exchange_rate?: number
+          id?: string
+          notes?: string | null
+          owner_id: string
+          pkr_equivalent: number
+          serial_number?: string | null
+          tenant_id: string
+          txn_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency_code?: string
+          date?: string
+          exchange_rate?: number
+          id?: string
+          notes?: string | null
+          owner_id?: string
+          pkr_equivalent?: number
+          serial_number?: string | null
+          tenant_id?: string
+          txn_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_transactions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_transactions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owners: {
+        Row: {
+          cnic: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          profit_share_pct: number
+          tenant_id: string
+        }
+        Insert: {
+          cnic?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          profit_share_pct?: number
+          tenant_id: string
+        }
+        Update: {
+          cnic?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          profit_share_pct?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owners_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profit_allocation_lines: {
+        Row: {
+          allocation_id: string
+          amount: number
+          created_at: string
+          id: string
+          owner_id: string
+          share_pct: number
+          tenant_id: string
+        }
+        Insert: {
+          allocation_id: string
+          amount: number
+          created_at?: string
+          id?: string
+          owner_id: string
+          share_pct: number
+          tenant_id: string
+        }
+        Update: {
+          allocation_id?: string
+          amount?: number
+          created_at?: string
+          id?: string
+          owner_id?: string
+          share_pct?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profit_allocation_lines_allocation_id_fkey"
+            columns: ["allocation_id"]
+            isOneToOne: false
+            referencedRelation: "profit_allocations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profit_allocation_lines_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profit_allocation_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profit_allocations: {
+        Row: {
+          created_at: string
+          id: string
+          net_profit: number
+          notes: string | null
+          period_end: string
+          period_start: string
+          serial_number: string | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          net_profit: number
+          notes?: string | null
+          period_end: string
+          period_start: string
+          serial_number?: string | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          net_profit?: number
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          serial_number?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profit_allocations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       party_links: {
         Row: {
           created_at: string
@@ -2907,6 +3165,7 @@ export type Database = {
           employee_id: string | null
           id: string
           journal_entry_id: string
+          owner_id: string | null
           stock_item_id: string | null
           supplier_id: string | null
           tenant_id: string
@@ -2921,6 +3180,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           journal_entry_id: string
+          owner_id?: string | null
           stock_item_id?: string | null
           supplier_id?: string | null
           tenant_id: string
@@ -2935,6 +3195,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           journal_entry_id?: string
+          owner_id?: string | null
           stock_item_id?: string | null
           supplier_id?: string | null
           tenant_id?: string

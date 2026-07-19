@@ -6,7 +6,7 @@ import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, BarChart2, BookOpen,
   ClipboardList, FileMinus, FilePlus, FileSearch, HandCoins, LayoutDashboard,
   Landmark, Layers, MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
-  ShoppingBag, ShoppingCart, Tag, Truck, Undo2, Users, UsersRound,
+  PieChart, ShoppingBag, ShoppingCart, Tag, Truck, Undo2, UserCog, Users, UsersRound,
   Wallet,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -54,6 +54,8 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/expenses',                label: 'Expenses',            group: 'Pages', icon: Receipt, ownerOnly: true },
   { href: '/employees',               label: 'Employees',           group: 'Pages', icon: HandCoins },
   { href: '/loans',                   label: 'Loans',               group: 'Pages', icon: Banknote },
+  { href: '/owners',                  label: 'Owners',              group: 'Pages', icon: UserCog, ownerOnly: true },
+  { href: '/owners/profit-allocation', label: 'Profit Allocation',  group: 'Pages', icon: PieChart, ownerOnly: true },
   { href: '/accounts',                label: 'Accounts',            group: 'Pages', icon: BookOpen, ownerOnly: true },
   { href: '/vouchers',                label: 'Vouchers',            group: 'Pages', icon: PenLine, ownerOnly: true },
   { href: '/reports',                 label: 'Reports',             group: 'Pages', icon: BarChart2, ownerOnly: true },

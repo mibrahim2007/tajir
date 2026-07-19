@@ -11,10 +11,13 @@ export type DocType =
   | 'supplier_refund'
   | 'employee_loan'
   | 'loan_repayment'
+  | 'owner_withdrawal'
+  | 'owner_contribution'
+  | 'profit_allocation'
 
 /**
  * Prefix per document type — MUST stay in sync with the `CASE` in the
- * `next_document_serial` Postgres function (migrations 0018 / 0019 / 0020 / 0026).
+ * `next_document_serial` Postgres function (migrations 0018 / 0019 / 0020 / 0026 / 0036).
  */
 const DOC_TYPE_PREFIX: Record<DocType, string> = {
   purchase_order:  'PO',
@@ -27,6 +30,9 @@ const DOC_TYPE_PREFIX: Record<DocType, string> = {
   supplier_refund: 'RCV',
   employee_loan:   'LN',
   loan_repayment:  'LR',
+  owner_withdrawal:   'OW',
+  owner_contribution: 'OC',
+  profit_allocation:  'PA',
 }
 
 function formatSerial(docType: DocType, year: number, n: number): string {

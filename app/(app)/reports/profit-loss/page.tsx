@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { computeProfitAndLoss } from '@/lib/reports/profit-loss'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { PrintButton } from '@/components/print-button'
@@ -67,79 +68,23 @@ export default async function ProfitLossPage({ searchParams }: { searchParams: S
 
   const admin = createAdminClient()
 
-  const [{ data: rawAccounts }, { data: rawEntries }] = await Promise.all([
-    admin.from('chart_of_accounts')
-      .select('id, code, name, account_type')
-      .eq('tenant_id', tenantId)
-      .eq('is_active', true)
-      .eq('is_header', false)
-      .order('code'),
-    admin.from('tajir_journal_entries')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .gte('date', from)
-      .lte('date', to),
-  ])
-
-  const accounts = rawAccounts ?? []
-  const entryIds = (rawEntries ?? []).map((e) => e.id)
-
-  const { data: rawLines } = entryIds.length > 0
-    ? await admin.from('tajir_journal_entry_lines')
-        .select('account_id, debit, credit')
-        .eq('tenant_id', tenantId)
-        .in('journal_entry_id', entryIds)
-    : { data: [] }
-
-  const lines = rawLines ?? []
-
-  // Aggregate net per account
-  const netByAccount = new Map<string, number>()
-  for (const line of lines) {
-    const prev = netByAccount.get(line.account_id) ?? 0
-    netByAccount.set(line.account_id, prev + line.debit - line.credit)
-  }
-
-  // Filter to P&L accounts only (revenue 4xxx, expense 5xxx/6xxx/7xxx)
-  const plAccounts = accounts.filter((a) =>
-    a.account_type === 'revenue' || a.account_type === 'expense'
-  )
-
-  type PLRow = { code: string; name: string; amount: number }
-
-  const revenue: PLRow[] = []
-  const costOfSales: PLRow[] = []
-  const opexRows: PLRow[] = []
-  const finCharges: PLRow[] = []
-
-  for (const acc of plAccounts) {
-    const raw = netByAccount.get(acc.id) ?? 0
-    // Revenue: normal credit balance → amount = credit - debit = -raw
-    // Expense: normal debit balance → amount = debit - credit = raw
-    const codePrefix = parseInt(acc.code.slice(0, 1), 10)
-
-    if (acc.account_type === 'revenue') {
-      // 4xxx revenue: positive means income
-      revenue.push({ code: acc.code, name: acc.name, amount: -raw })
-    } else if (codePrefix === 5) {
-      costOfSales.push({ code: acc.code, name: acc.name, amount: raw })
-    } else if (codePrefix === 6) {
-      opexRows.push({ code: acc.code, name: acc.name, amount: raw })
-    } else if (codePrefix === 7) {
-      finCharges.push({ code: acc.code, name: acc.name, amount: raw })
-    }
-  }
-
-  const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0)
-  const totalCOS = costOfSales.reduce((s, r) => s + r.amount, 0)
-  const grossProfit = totalRevenue - totalCOS
-  const totalOpex = opexRows.reduce((s, r) => s + r.amount, 0)
-  const operatingProfit = grossProfit - totalOpex
-  const totalFinCharges = finCharges.reduce((s, r) => s + r.amount, 0)
-  const netProfit = operatingProfit - totalFinCharges
+  // Shared with the profit-allocation action so the allocated figure can never
+  // disagree with the one shown here.
+  const {
+    revenue, costOfSales,
+    operatingExpenses: opexRows,
+    financialCharges: finCharges,
+    totalRevenue,
+    totalCostOfSales: totalCOS,
+    grossProfit,
+    totalOperatingExpenses: totalOpex,
+    operatingProfit,
+    totalFinancialCharges: totalFinCharges,
+    netProfit,
+    hasData,
+  } = await computeProfitAndLoss({ admin, tenantId, from, to })
 
   const dateLabel = `${formatPKTDate(from + 'T00:00:00')} – ${formatPKTDate(to + 'T00:00:00')}`
-  const hasData = plAccounts.some((a) => netByAccount.has(a.id))
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
