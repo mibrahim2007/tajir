@@ -2012,6 +2012,38 @@ export type Database = {
           },
         ]
       }
+      accounting_locks: {
+        Row: {
+          locked_through: string
+          note: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          locked_through: string
+          note?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          locked_through?: string
+          note?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_locks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profit_allocation_lines: {
         Row: {
           allocation_id: string

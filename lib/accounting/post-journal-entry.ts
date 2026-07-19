@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getLockedThrough, isLocked, formatLockDate } from './period-lock'
 
 type JournalLine = {
   accountSystemKey: string
@@ -49,6 +50,7 @@ export type PostFailureReason =
   | 'no_voucher_number'
   | 'header_insert_failed'
   | 'lines_insert_failed'
+  | 'period_locked'
 
 function fail(
   reason: PostFailureReason,
@@ -67,6 +69,18 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const { tenantId, date, description, reference, sourceType, sourceId, prefix, lines, voucherNumber: reuseVoucher, suppressPartyName } = params
   const admin = createAdminClient()
   const ctx = { tenantId, sourceType, sourceId }
+
+  // Closed period: refuse before writing anything. The database trigger would
+  // refuse too, but checking here yields a readable message and leaves no
+  // half-written document behind for the caller to roll back.
+  const lockedThrough = await getLockedThrough(admin, tenantId)
+  if (isLocked(date, lockedThrough)) {
+    return fail(
+      'period_locked',
+      `The books are locked through ${formatLockDate(lockedThrough!)}; nothing dated ${date} can be posted`,
+      ctx,
+    )
+  }
 
   // Warn on an unbalanced entry but still post it: refusing here would turn a
   // slightly-off entry into a MISSING one for the many callers that ignore this

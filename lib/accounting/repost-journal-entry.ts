@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { postJournalEntry, type PostJournalEntryParams, type PostJournalEntryResult } from './post-journal-entry'
+import { getLockedThrough, isLocked, formatLockDate } from './period-lock'
 
 /**
  * Replaces the journal entry for a document that has just been edited.
@@ -26,6 +27,7 @@ export async function repostJournalEntry(
   const { data: oldEntry } = await admin
     .from('tajir_journal_entries')
     .select('id, voucher_number, date, description, reference')
+    // `date` is also read to vet the lock below, not just to restore the entry.
     .eq('tenant_id', tenantId)
     .eq('source_type', sourceType)
     .eq('source_id', sourceId)
@@ -38,6 +40,23 @@ export async function repostJournalEntry(
         .select('account_id, description, debit, credit, customer_id, supplier_id, stock_item_id, employee_id, owner_id')
         .eq('journal_entry_id', oldEntry.id)
     : { data: null }
+
+  // Refuse BEFORE deleting anything if either end of the move touches a closed
+  // period: the entry's current date (removing it from closed books) or the new
+  // date (posting into them). Checking after the delete would leave the document
+  // with no entry at all when the re-post is then refused.
+  const lockedThrough = await getLockedThrough(admin, tenantId)
+  const blockedDate = isLocked(params.date, lockedThrough)
+    ? params.date
+    : oldEntry && isLocked(oldEntry.date as string, lockedThrough)
+      ? (oldEntry.date as string)
+      : null
+
+  if (blockedDate) {
+    const message = `The books are locked through ${formatLockDate(lockedThrough!)}; the entry dated ${blockedDate} cannot be changed`
+    console.error(`[repostJournalEntry] period_locked: ${message} (${sourceType}/${sourceId})`)
+    return { ok: false, reason: 'period_locked', message }
+  }
 
   if (oldEntry) {
     await admin.from('tajir_journal_entry_lines').delete().eq('journal_entry_id', oldEntry.id)

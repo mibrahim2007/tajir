@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { round2 } from '@/lib/loans/amortization'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -48,9 +49,15 @@ export async function reopenProfitAllocationAction(input: unknown): Promise<Acti
     .maybeSingle()
 
   if (!alloc) return { success: false, error: 'Allocation not found', code: 'NOT_FOUND' }
+
   if (alloc.status === 'reversed') {
     return { success: false, error: 'This period has already been reopened', code: 'ALREADY_REVERSED' }
   }
+
+  // Reversing writes a fresh entry dated at period end, so a closed period
+  // blocks the reopen — unlock first, then reopen.
+  const locked = await checkPeriodOpen(tenantId, alloc.period_end as string, 'This allocation')
+  if (locked) return locked
 
   const { data: allocLines } = await admin
     .from('profit_allocation_lines')

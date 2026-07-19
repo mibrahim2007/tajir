@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, BarChart2, BookOpen,
   ClipboardList, FileMinus, FilePlus, FileSearch, HandCoins, LayoutDashboard,
-  Landmark, Layers, MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
+  Landmark, Layers, Lock, MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
   PieChart, ShoppingBag, ShoppingCart, Tag, Truck, Undo2, UserCog, Users, UsersRound,
   Wallet,
 } from 'lucide-react'
@@ -63,6 +63,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/item-types',              label: 'Item Types',          group: 'Settings', icon: Layers, ownerOnly: true },
   { href: '/settings/team',           label: 'Team',                group: 'Settings', icon: UsersRound, ownerOnly: true },
   { href: '/settings/opening-balances', label: 'Opening Balances', group: 'Settings', icon: Wallet, ownerOnly: true },
+  { href: '/settings/period-lock',    label: 'Close the Books',    group: 'Settings', icon: Lock, ownerOnly: true },
   { href: '/banks',                   label: 'Banks',               group: 'Settings', icon: Landmark, ownerOnly: true },
   { href: '/audit',                   label: 'Audit Log',           group: 'Settings', icon: FileSearch, ownerOnly: true },
 ]

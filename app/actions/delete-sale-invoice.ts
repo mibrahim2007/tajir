@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from '@/lib/accounting/period-lock'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ invoiceId: z.string().uuid() })
@@ -23,11 +24,16 @@ export async function deleteSaleInvoiceAction(input: unknown): Promise<ActionRes
   const admin = createAdminClient()
 
   const { data: orders } = await admin.from('sales_orders')
-    .select('id, stock_item_id, quantity')
+    .select('id, stock_item_id, quantity, date')
     .eq('invoice_id', invoiceId)
     .eq('tenant_id', tenantId)
 
   if (!orders || orders.length === 0) return { success: false, error: 'Invoice not found', code: 'NOT_FOUND' }
+
+  // Stop before touching anything: the trigger would refuse to remove the
+  // journal entry, and the invoice rows would already be gone by then.
+  const locked = await checkPeriodOpen(tenantId, orders[0].date as string, 'This invoice')
+  if (locked) return locked
 
   // Service items are non-stockable, so their sale never deducted stock — skip
   // restoring it (otherwise their current_quantity would drift above 0).

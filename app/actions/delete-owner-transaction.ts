@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -34,6 +35,9 @@ export async function deleteOwnerTransactionAction(input: unknown): Promise<Acti
     .maybeSingle()
 
   if (!txn) return { success: false, error: 'Transaction not found', code: 'NOT_FOUND' }
+
+  const locked = await checkPeriodOpen(tenantId, txn.date as string, "This movement")
+  if (locked) return locked
 
   // Reverse the GL first so a failed delete can never leave a dangling entry.
   await admin.from('tajir_journal_entries').delete()

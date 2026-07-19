@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from '@/lib/accounting/period-lock'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -33,6 +34,10 @@ export async function deleteProfitAllocationAction(input: unknown): Promise<Acti
     .maybeSingle()
 
   if (!alloc) return { success: false, error: 'Allocation not found', code: 'NOT_FOUND' }
+
+  // The allocation's entries are dated at period end.
+  const locked = await checkPeriodOpen(tenantId, alloc.period_end as string, 'This allocation')
+  if (locked) return locked
 
   // Remove the reversing entry too when the period was reopened, otherwise it
   // would be left on the ledger cancelling an allocation that no longer exists.

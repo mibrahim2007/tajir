@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
 import { reconcileLoanStatuses } from '@/lib/loans/reconcile'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -30,12 +31,15 @@ export async function voidEmployeeLoanAction(input: unknown): Promise<ActionResu
 
   const { data: loan } = await admin
     .from('employee_loans')
-    .select('employee_id, principal, pkr_equivalent, currency_code, status')
+    .select('employee_id, principal, pkr_equivalent, currency_code, status, disbursement_date')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!loan) return { success: false, error: 'Loan not found', code: 'NOT_FOUND' }
+
+  const locked = await checkPeriodOpen(tenantId, loan.disbursement_date as string, "This loan")
+  if (locked) return locked
   if (loan.status === 'void') return { success: false, error: 'Loan is already void', code: 'ALREADY_VOID' }
 
   // Determine whether any repayment is allocated to this loan (targeted or via FIFO).

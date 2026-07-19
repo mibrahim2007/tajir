@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { reconcileLoanStatuses } from '@/lib/loans/reconcile'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -32,7 +33,10 @@ export async function deleteLoanRepaymentAction(input: unknown): Promise<ActionR
     .eq('tenant_id', tenantId)
     .single()
 
-  if (!repayment) return { success: false, error: 'Repayment not found', code: 'NOT_FOUND' }
+  if (!repayment) return { success: false, error: 'Repayment not found', code: 'NOT_FOUND' }
+
+  const locked = await checkPeriodOpen(tenantId, repayment.date as string, "This repayment")
+  if (locked) return locked
 
   // Remove the GL entry first (lines cascade), then the repayment (tender lines cascade).
   await admin.from('tajir_journal_entries').delete()

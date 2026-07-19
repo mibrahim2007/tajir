@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -31,6 +32,9 @@ export async function deleteCreditNoteAction(input: unknown): Promise<ActionResu
   if (!note) {
     return { success: false, error: 'Credit note not found', code: 'NOT_FOUND' }
   }
+
+  const locked = await checkPeriodOpen(tenantId, note.date as string, "This credit note")
+  if (locked) return locked
 
   // Reverse the GL entry
   const { data: glEntry } = await admin

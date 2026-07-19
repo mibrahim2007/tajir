@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -31,6 +32,9 @@ export async function deleteJournalEntryAction(input: unknown): Promise<ActionRe
   if (!entry) {
     return { success: false, error: 'Journal entry not found', code: 'NOT_FOUND' }
   }
+
+  const locked = await checkPeriodOpen(tenantId, entry.date as string, "This voucher")
+  if (locked) return locked
 
   // Prevent deleting auto-posted entries directly; they're managed by source document deletion
   if (entry.source_type !== 'manual') {

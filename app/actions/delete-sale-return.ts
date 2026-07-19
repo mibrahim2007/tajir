@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -31,6 +32,9 @@ export async function deleteSaleReturnAction(input: unknown): Promise<ActionResu
   if (!ret) {
     return { success: false, error: 'Sale return not found', code: 'NOT_FOUND' }
   }
+
+  const locked = await checkPeriodOpen(tenantId, ret.date as string, "This sale return")
+  if (locked) return locked
 
   /* Guard: deleting a sale return removes the returned goods from stock */
   const { data: lot } = await admin
