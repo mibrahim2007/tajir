@@ -1,5 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchLedgerTotals } from '@/lib/reports/ledger-totals'
+import { classifyProfitAndLoss } from '@/lib/reports/profit-loss'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { PrintButton } from '@/components/print-button'
@@ -55,37 +57,19 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
 
   const admin = createAdminClient()
 
-  const [{ data: rawAccounts }, { data: rawEntries }] = await Promise.all([
+  const [{ data: rawAccounts }, totals] = await Promise.all([
     admin.from('chart_of_accounts')
       .select('id, code, name, account_type')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .eq('is_header', false)
       .order('code'),
-    admin.from('tajir_journal_entries')
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .lte('date', asOf),
+    // No `from` — a balance sheet is cumulative to the as-of date.
+    fetchLedgerTotals({ admin, tenantId, to: asOf }),
   ])
 
   const accounts = rawAccounts ?? []
-  const entryIds = (rawEntries ?? []).map((e) => e.id)
-
-  const { data: rawLines } = entryIds.length > 0
-    ? await admin.from('tajir_journal_entry_lines')
-        .select('account_id, debit, credit')
-        .eq('tenant_id', tenantId)
-        .in('journal_entry_id', entryIds)
-    : { data: [] }
-
-  const lines = rawLines ?? []
-
-  // Aggregate net per account (debit - credit)
-  const netByAccount = new Map<string, number>()
-  for (const line of lines) {
-    const prev = netByAccount.get(line.account_id) ?? 0
-    netByAccount.set(line.account_id, prev + line.debit - line.credit)
-  }
+  const netByAccount = totals.byAccount
 
   type BSRow = { code: string; name: string; amount: number }
 
@@ -93,11 +77,8 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
   const liabilityRows: BSRow[] = []
   const equityRows: BSRow[] = []
 
-  // Net profit from P&L accounts (revenue - expenses) cumulative to asOf
-  let netProfitFromPL = 0
-
   for (const acc of accounts) {
-    const raw = netByAccount.get(acc.id) ?? 0
+    const raw = netByAccount.get(acc.id)?.net ?? 0
     if (raw === 0) continue
 
     if (acc.account_type === 'asset') {
@@ -108,14 +89,13 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
       liabilityRows.push({ code: acc.code, name: acc.name, amount: -raw })
     } else if (acc.account_type === 'equity') {
       equityRows.push({ code: acc.code, name: acc.name, amount: -raw })
-    } else if (acc.account_type === 'revenue') {
-      // Revenue has credit-normal balance; credit > debit means income
-      netProfitFromPL += -raw
-    } else if (acc.account_type === 'expense') {
-      // Expense has debit-normal balance; debit > credit = cost
-      netProfitFromPL -= raw
     }
+    // revenue/expense are rolled into the net-profit row below.
   }
+
+  // Net profit cumulative to asOf, from the SAME classifier the P&L report and
+  // profit allocation use — so the equity row can never disagree with them.
+  const netProfitFromPL = classifyProfitAndLoss(accounts, totals).netProfit
 
   const totalAssets = assetRows.reduce((s, r) => s + r.amount, 0)
   const totalLiabilities = liabilityRows.reduce((s, r) => s + r.amount, 0)
@@ -123,7 +103,7 @@ export default async function BalanceSheetPage({ searchParams }: { searchParams:
   const totalLiabEquity = totalLiabilities + totalEquity
   const isBalanced = Math.abs(totalAssets - totalLiabEquity) < 0.01
 
-  const hasData = accounts.some((a) => netByAccount.has(a.id))
+  const hasData = totals.hasAny
 
   return (
     <div className="p-6 max-w-3xl mx-auto">

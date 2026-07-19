@@ -1,5 +1,6 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchLedgerTotals } from '@/lib/reports/ledger-totals'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { PrintButton } from '@/components/print-button'
@@ -26,36 +27,19 @@ export default async function TrialBalancePage({ searchParams }: { searchParams:
 
   const admin = createAdminClient()
 
-  // Fetch all GL lines up to the asOf date (via journal entry date)
-  const [{ data: rawLines }, { data: rawAccounts }, { data: rawEntries }] = await Promise.all([
-    admin.from('tajir_journal_entry_lines')
-      .select('account_id, debit, credit, journal_entry_id')
-      .eq('tenant_id', tenantId),
+  const [{ data: rawAccounts }, ledger] = await Promise.all([
     admin.from('chart_of_accounts')
       .select('id, code, name, account_type, is_header')
       .eq('tenant_id', tenantId)
       .eq('is_active', true)
       .eq('is_header', false)
       .order('code'),
-    admin.from('tajir_journal_entries')
-      .select('id, date')
-      .eq('tenant_id', tenantId)
-      .lte('date', asOf),
+    // No `from` — a trial balance is cumulative to the as-of date.
+    fetchLedgerTotals({ admin, tenantId, to: asOf }),
   ])
 
-  const validEntryIds = new Set((rawEntries ?? []).map((e) => e.id))
-  const lines = (rawLines ?? []).filter((l) => validEntryIds.has(l.journal_entry_id))
   const accounts = rawAccounts ?? []
-
-  // Aggregate debits/credits per account
-  const totals = new Map<string, { debit: number; credit: number }>()
-  for (const line of lines) {
-    const prev = totals.get(line.account_id) ?? { debit: 0, credit: 0 }
-    totals.set(line.account_id, {
-      debit:  prev.debit  + line.debit,
-      credit: prev.credit + line.credit,
-    })
-  }
+  const totals = ledger.byAccount
 
   // Only accounts with activity
   const activeAccounts = accounts.filter((a) => totals.has(a.id))

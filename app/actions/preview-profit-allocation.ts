@@ -18,8 +18,6 @@ export type AllocationPreview = {
   totalSharePct: number
   sharesComplete: boolean
   rows: { ownerId: string; name: string; sharePct: number; amount: number }[]
-  /** Expense accounts outside codes 5/6/7, which net profit silently excludes. */
-  unclassified: { code: string; name: string; amount: number }[]
 }
 
 // Read-only companion to createProfitAllocationAction: computes the same net
@@ -65,7 +63,6 @@ export async function previewProfitAllocationAction(input: unknown): Promise<Act
       // Only meaningful when shares are complete; otherwise the split would be
       // misleading, so send an empty list and let the UI show the warning.
       rows: complete ? allocateProfit(netProfit, owners) : [],
-      unclassified: pl.unclassified,
     },
   }
 }

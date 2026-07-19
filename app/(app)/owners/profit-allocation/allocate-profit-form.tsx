@@ -102,16 +102,6 @@ export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: st
                 </p>
               )}
 
-              {preview.unclassified.length > 0 && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
-                  <p className="font-medium mb-1">Excluded from net profit</p>
-                  <p>
-                    These expense accounts fall outside codes 5/6/7 and are not counted by the P&amp;L:{' '}
-                    {preview.unclassified.map((u) => `${u.code} ${u.name}`).join(', ')}. Renumber them to be included.
-                  </p>
-                </div>
-              )}
-
               {preview.rows.length > 0 && (
                 <div className="bg-card rounded-lg border overflow-hidden">
                   <table className="w-full text-sm">

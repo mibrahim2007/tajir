@@ -80,6 +80,8 @@ export default async function ProfitLossPage({ searchParams }: { searchParams: S
     totalOperatingExpenses: totalOpex,
     operatingProfit,
     totalFinancialCharges: totalFinCharges,
+    otherExpenses,
+    totalOtherExpenses,
     netProfit,
     hasData,
   } = await computeProfitAndLoss({ admin, tenantId, from, to })
@@ -159,6 +161,17 @@ export default async function ProfitLossPage({ searchParams }: { searchParams: S
               rows={finCharges.filter((r) => r.amount !== 0)}
               netLabel="Total Financial Charges"
               net={totalFinCharges}
+            />
+          )}
+
+          {/* Expense accounts outside 5/6/7. Previously dropped from net profit
+              entirely, which made this report disagree with the balance sheet. */}
+          {otherExpenses.length > 0 && (
+            <SectionTable
+              title="Other Expenses"
+              rows={otherExpenses.filter((r) => r.amount !== 0)}
+              netLabel="Total Other Expenses"
+              net={totalOtherExpenses}
             />
           )}
 
