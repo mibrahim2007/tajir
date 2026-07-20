@@ -35,12 +35,15 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
   const lines = watch('lines') ?? []
   const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const linesError = formState.errors.lines as
-    | ({ message?: string; root?: { message?: string } } & Array<{ chequeNumber?: { message?: string } } | undefined>)
+    | ({ message?: string; root?: { message?: string } } & Array<
+        { chequeNumber?: { message?: string }; chequeDueDate?: { message?: string } } | undefined
+      >)
     | undefined
   const rootError = linesError?.message ?? linesError?.root?.message
   // Per-line errors were previously not rendered at all, so a per-field rule
   // (e.g. cheque required for a PDC) would have blocked submit invisibly.
   const chequeError = (i: number) => linesError?.[i]?.chequeNumber?.message
+  const dueDateError = (i: number) => linesError?.[i]?.chequeDueDate?.message
 
   return (
     <div className="space-y-2">
@@ -69,6 +72,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           // can't be reconciled against the bank later.
           const chequeRequired = type === 'pdc'
           const chequeErr = chequeError(i)
+          const dueErr = dueDateError(i)
           return (
             // Narrow: each field stacks full-width with its own label inside a
             // bordered card. Wide: aligns to the header grid above.
@@ -107,12 +111,17 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                 {/* Only a PDC has a maturity date — it drives the pending-cheque
                     list and the overdue flag on the register. */}
                 {chequeRequired && (
-                  <Input
-                    type="date"
-                    title="Cheque due date"
-                    className="min-h-[36px] text-xs min-w-0"
-                    {...register(`lines.${i}.chequeDueDate`)}
-                  />
+                  <>
+                    <Input
+                      type="date"
+                      title="Cheque due date (required)"
+                      aria-label="Cheque due date"
+                      aria-invalid={!!dueErr}
+                      className={`min-h-[36px] text-xs min-w-0 ${dueErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      {...register(`lines.${i}.chequeDueDate`)}
+                    />
+                    {dueErr && <p className="text-xs text-destructive">{dueErr}</p>}
+                  </>
                 )}
               </div>
 

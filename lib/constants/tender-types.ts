@@ -32,16 +32,29 @@ export const TENDER_LABEL: Record<TenderType, string> = {
 // twenty copies previously, which is twenty chances to forget it.
 
 export const PDC_CHEQUE_REQUIRED = 'Cheque no. is required for a PDC'
+export const PDC_DUE_DATE_REQUIRED = 'Due date is required for a PDC'
 
 function requireChequeForPdc(
-  line: { transactionType: string; chequeNumber?: string | null },
+  line: { transactionType: string; chequeNumber?: string | null; chequeDueDate?: string | null },
   ctx: z.RefinementCtx,
 ) {
-  if (line.transactionType === 'pdc' && !line.chequeNumber?.trim()) {
+  if (line.transactionType !== 'pdc') return
+
+  if (!line.chequeNumber?.trim()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ['chequeNumber'],
       message: PDC_CHEQUE_REQUIRED,
+    })
+  }
+
+  // Without a due date the cheque never becomes overdue and sorts last forever,
+  // so it silently drops out of the pending list it exists to appear on.
+  if (!line.chequeDueDate?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['chequeDueDate'],
+      message: PDC_DUE_DATE_REQUIRED,
     })
   }
 }
