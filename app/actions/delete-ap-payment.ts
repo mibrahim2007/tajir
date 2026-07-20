@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { releaseEndorsement, endorsementRefsFrom } from '@/lib/pdc/endorsement'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ id: z.string().uuid() })
@@ -31,6 +32,19 @@ export async function deleteApPaymentAction(input: unknown): Promise<ActionResul
     .single()
 
   if (!payment) return { success: false, error: 'Payment not found', code: 'NOT_FOUND' }
+
+  // Any cheque this payment handed on has to go back in hand before the lines
+  // cascade away — once they are gone the link is unrecoverable and the cheque
+  // would sit 'endorsed' forever, invisible and impossible to clear.
+  const { data: tenderLines } = await admin
+    .from('ap_payment_lines')
+    .select('endorsed_from_source, endorsed_from_line_id')
+    .eq('payment_id', id)
+    .eq('tenant_id', tenantId)
+
+  for (const ref of endorsementRefsFrom(tenderLines ?? [])) {
+    await releaseEndorsement(tenantId, ref)
+  }
 
   // Remove the GL journal entry first (its lines cascade); then the payment
   // (its tender lines cascade). Keeps the ledger from drifting on delete.

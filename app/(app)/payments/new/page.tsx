@@ -3,6 +3,7 @@ import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { CreatePaymentForm } from './create-payment-form'
 
 export default async function NewPaymentPage() {
@@ -36,6 +37,10 @@ export default async function NewPaymentPage() {
       .eq('tenant_id', tenantId),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
+
+  // Cheques received from customers that could be handed on to this supplier
+  // instead of writing a new one.
+  const endorsableCheques = await listEndorsableCheques(tenantId)
 
   const suppliers = rawSuppliers ?? []
   const purchases = rawPurchases ?? []
@@ -100,7 +105,7 @@ export default async function NewPaymentPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Payment</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
       </div>
-      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} historyBySupplier={historyBySupplier} />
+      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} historyBySupplier={historyBySupplier} endorsableCheques={endorsableCheques} />
     </div>
   )
 }

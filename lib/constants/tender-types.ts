@@ -59,6 +59,22 @@ function requireChequeForPdc(
   }
 }
 
+// A line that hands on a received cheque only makes sense as a PDC: the money
+// leaves through 1112, which is what the 'pdc' tender type posts. Cash or
+// online with an endorsement link would credit the wrong account entirely.
+function requirePdcForEndorsement(
+  line: { transactionType: string; endorsedFromLineId?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (line.endorsedFromLineId?.trim() && line.transactionType !== 'pdc') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['transactionType'],
+      message: 'A handed-on cheque must use the PDC tender type',
+    })
+  }
+}
+
 /** Server-side shape: amounts must already be positive. */
 export const tenderLineSchema = z
   .object({
@@ -67,8 +83,14 @@ export const tenderLineSchema = z
     chequeDueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal("")),
     bankId:          z.string().uuid().optional().nullable(),
     amount:          z.coerce.number().positive('Line amount must be positive'),
+    // Set when this line hands on a cheque received from a party rather than
+    // writing a new one. The server re-reads the cheque and copies its amount,
+    // so these are a reference, not trusted data.
+    endorsedFromSource: z.string().optional().nullable(),
+    endorsedFromLineId: z.string().uuid().optional().nullable(),
   })
   .superRefine(requireChequeForPdc)
+  .superRefine(requirePdcForEndorsement)
 
 /**
  * Client-side shape: blank/NaN amounts collapse to 0 so an untouched spare row
@@ -85,8 +107,13 @@ export const tenderLineFormSchema = z
       (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
       z.coerce.number().min(0),
     ),
+    // Optional rather than defaulted: a defaulted field infers as a required
+    // string, which every existing `emptyLine` in the ten forms would fail.
+    endorsedFromSource: z.string().optional(),
+    endorsedFromLineId: z.string().optional(),
   })
   .superRefine(requireChequeForPdc)
+  .superRefine(requirePdcForEndorsement)
 
 // Aggregate tender lines into GL money legs, summing PKR by target account so a
 // receipt/payment with several lines of the same type posts one clean GL line.

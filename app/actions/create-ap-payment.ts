@@ -9,6 +9,8 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import { verifyEndorsable, markEndorsed, releaseEndorsement, type EndorsementRef } from '@/lib/pdc/endorsement'
+import type { PdcSource } from '@/lib/pdc/sources'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -42,6 +44,25 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
   const rate = currencyCode === 'USD' ? exchangeRate : 1
 
   const hasLines = !!lines && lines.length > 0
+
+  // Resolve handed-on cheques before anything is written. The cheque's own
+  // amount and number are authoritative — the client only sends a reference —
+  // and a cheque already spent or cleared elsewhere must stop the payment here
+  // rather than after the money has been posted.
+  const endorsements: EndorsementRef[] = []
+  if (hasLines) {
+    for (const l of lines!) {
+      if (!l.endorsedFromLineId || !l.endorsedFromSource) continue
+      const ref = { source: l.endorsedFromSource as PdcSource, lineId: l.endorsedFromLineId }
+      const check = await verifyEndorsable(tenantId, ref)
+      if (!check.ok) return { success: false, error: check.message, code: 'VALIDATION_ERROR' }
+      l.amount        = Number(check.cheque.amount)
+      l.chequeNumber  = check.cheque.cheque_number ?? l.chequeNumber
+      l.chequeDueDate = check.cheque.cheque_due_date ?? l.chequeDueDate
+      endorsements.push(ref)
+    }
+  }
+
   const amount = hasLines ? lines!.reduce((s, l) => s + l.amount, 0) : (parsed.data.amount ?? 0)
   if (amount <= 0) return { success: false, error: 'Amount must be positive', code: 'VALIDATION_ERROR' }
   const pkrEquivalent = amount * rate
@@ -79,11 +100,27 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     cheque_due_date:  l.chequeDueDate || null,
       bank_id:          l.bankId ?? null,
       amount:           l.amount,
+      endorsed_from_source:  l.endorsedFromSource || null,
+      endorsed_from_line_id: l.endorsedFromLineId || null,
     }))
     const { error: linesError } = await admin.from('ap_payment_lines').insert(lineRows)
     if (linesError) {
       await admin.from('ap_payments').delete().eq('id', payment.id)
       return { success: false, error: 'Failed to save payment lines', code: 'INTERNAL_ERROR' }
+    }
+
+    // Consume the source cheques. Conditional on each still being pending, so
+    // if another payment took one in the meantime this one backs out whole
+    // rather than spending the same cheque twice.
+    for (const [taken, ref] of endorsements.entries()) {
+      if (await markEndorsed(tenantId, ref)) continue
+      for (const done of endorsements.slice(0, taken)) await releaseEndorsement(tenantId, done)
+      await admin.from('ap_payments').delete().eq('id', payment.id)
+      return {
+        success: false,
+        error: 'That cheque was just used elsewhere, so nothing was saved. Reload and pick another.',
+        code: 'CONFLICT',
+      }
     }
   }
 
@@ -103,6 +140,9 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
   // the document back rather than report a success that the books don't show.
   if (!posted.ok) {
     await admin.from('ap_payments').delete().eq('id', payment.id)
+    // The payment is gone, so any cheque it consumed must go back in hand —
+    // otherwise it would be stranded 'endorsed' with no document behind it.
+    for (const ref of endorsements) await releaseEndorsement(tenantId, ref)
     return glCreateFailed(posted.message)
   }
 

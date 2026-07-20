@@ -89,6 +89,8 @@ export type Database = {
           pdc_status: string
           settled_at: string | null
           settled_bank_id: string | null
+          endorsed_from_source: string | null
+          endorsed_from_line_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -104,6 +106,8 @@ export type Database = {
           pdc_status?: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          endorsed_from_source?: string | null
+          endorsed_from_line_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -119,6 +123,8 @@ export type Database = {
           pdc_status?: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          endorsed_from_source?: string | null
+          endorsed_from_line_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1557,6 +1563,8 @@ export type Database = {
           pdc_status: string
           settled_at: string | null
           settled_bank_id: string | null
+          endorsed_from_source: string | null
+          endorsed_from_line_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -1572,6 +1580,8 @@ export type Database = {
           pdc_status?: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          endorsed_from_source?: string | null
+          endorsed_from_line_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1587,6 +1597,8 @@ export type Database = {
           pdc_status?: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          endorsed_from_source?: string | null
+          endorsed_from_line_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null

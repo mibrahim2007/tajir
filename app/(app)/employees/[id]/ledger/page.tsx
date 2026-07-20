@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { DisburseLoanForm } from '@/app/(app)/employees/[id]/disburse-loan-form'
 import { RecordRepaymentForm } from '@/app/(app)/employees/[id]/record-repayment-form'
 import { SalaryDeductionForm } from '@/app/(app)/employees/[id]/salary-deduction-form'
@@ -53,6 +54,8 @@ export default async function EmployeeLedgerPage({ params }: Props) {
   ])
 
   const banks = rawBanks ?? []
+  // Received cheques that could be handed straight to the employee.
+  const endorsableCheques = await listEndorsableCheques(tenantId)
   const loanOptions = (rawLoans ?? []).map((l) => ({
     id: l.id,
     label: `${l.serial_number ? `${l.serial_number} · ` : ''}${l.currency_code} ${Number(l.principal).toLocaleString()} · ${formatPKTDate(new Date(l.disbursement_date))}`,
@@ -74,7 +77,7 @@ export default async function EmployeeLedgerPage({ params }: Props) {
           <RecordRepaymentForm employeeId={id} today={today} nextSerial={nextRepaymentSerial} banks={banks} loans={loanOptions} />
           <RoleGate allowedRoles={['owner']}>
             <SalaryDeductionForm employeeId={id} today={today} monthlySalary={Number(employeeRow.monthly_salary) || 0} loans={loanOptions} />
-            <DisburseLoanForm employeeId={id} today={today} nextSerial={nextLoanSerial} banks={banks} />
+            <DisburseLoanForm employeeId={id} today={today} nextSerial={nextLoanSerial} banks={banks} endorsableCheques={endorsableCheques} />
           </RoleGate>
         </div>
       </div>

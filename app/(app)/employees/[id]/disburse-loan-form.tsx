@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type TenderLine, type EndorsableCheque } from '@/components/tender-lines-field'
 import { createEmployeeLoanAction } from '@/app/actions/create-employee-loan'
 import { generateSchedule } from '@/lib/loans/amortization'
 import { formatPKR } from '@/lib/utils/currency'
@@ -49,7 +49,7 @@ const freshDefaults = (today: string): FormValues => ({
 
 // Two modes: fixed employee (from an employee ledger) or an employee picker
 // (from the Loans page — pass `employees`, omit `employeeId`).
-export function DisburseLoanForm({ employeeId, employees, today, nextSerial, banks = [] }: { employeeId?: string; employees?: EmployeeOption[]; today: string; nextSerial?: string | null; banks?: Bank[] }) {
+export function DisburseLoanForm({ employeeId, employees, today, nextSerial, banks = [], endorsableCheques = [] }: { employeeId?: string; employees?: EmployeeOption[]; today: string; nextSerial?: string | null; banks?: Bank[]; endorsableCheques?: EndorsableCheque[] }) {
   const showPicker = !employeeId && !!employees
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -91,6 +91,8 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
           chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
           amount: l.amount,
+          endorsedFromSource: l.endorsedFromSource || undefined,
+          endorsedFromLineId: l.endorsedFromLineId || undefined,
         })),
       })
       if (!result.success) { setServerError(result.error); return }
@@ -170,7 +172,7 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
 
             <Separator />
 
-            <TenderLinesField banks={banks} currency={watchedCurrency} />
+            <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} />
 
             <Separator />
 

@@ -20,7 +20,7 @@ export default async function EditPaymentPage({ params }: { params: Promise<{ id
       .select('id, supplier_id, amount, currency_code, pkr_equivalent, payment_method_note, date, cheque_number, bank_id')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('ap_payment_lines')
-      .select('transaction_type, cheque_number, cheque_due_date, bank_id, amount, line_no')
+      .select('transaction_type, cheque_number, cheque_due_date, bank_id, amount, line_no, endorsed_from_source, endorsed_from_line_id')
       .eq('payment_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
@@ -41,6 +41,10 @@ export default async function EditPaymentPage({ params }: { params: Promise<{ id
         chequeDueDate: l.cheque_due_date ?? '',
         bankId: l.bank_id ?? '',
         amount: Number(l.amount),
+        // Must round-trip: the edit action replaces all lines, so a dropped
+        // link would strand the cheque as 'endorsed' with nothing behind it.
+        endorsedFromSource: l.endorsed_from_source ?? '',
+        endorsedFromLineId: l.endorsed_from_line_id ?? '',
       }))
     : [{
         transactionType: payment.bank_id ? 'online' : 'cash',
@@ -48,6 +52,8 @@ export default async function EditPaymentPage({ params }: { params: Promise<{ id
         chequeDueDate: '',
         bankId: payment.bank_id ?? '',
         amount: Number(payment.amount),
+        endorsedFromSource: '',
+        endorsedFromLineId: '',
       }]
 
   return (

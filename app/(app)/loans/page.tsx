@@ -5,6 +5,7 @@ import { RoleGate } from '@/components/role-gate'
 import { DisburseLoanForm } from '@/app/(app)/employees/[id]/disburse-loan-form'
 import { LoansList, type LoanListItem } from './loans-list'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
 
 export default async function LoansPage() {
@@ -57,6 +58,9 @@ export default async function LoansPage() {
 
   const activeEmployees = employees.filter((e) => e.is_active).map((e) => ({ id: e.id, name: e.name }))
 
+  // Received cheques that could be handed straight to the employee.
+  const endorsableCheques = await listEndorsableCheques(tenantId)
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <PendingChequesPanel direction="out" className="mb-4" />
@@ -66,7 +70,7 @@ export default async function LoansPage() {
           <p className="text-sm text-muted-foreground mt-1">{loans.length} loan{loans.length !== 1 ? 's' : ''} · advances to employees</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
-          <DisburseLoanForm employees={activeEmployees} today={today} nextSerial={nextLoanSerial} banks={banks} />
+          <DisburseLoanForm employees={activeEmployees} today={today} nextSerial={nextLoanSerial} banks={banks} endorsableCheques={endorsableCheques} />
         </RoleGate>
       </div>
 

@@ -10,6 +10,8 @@ import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
 import { generateSchedule, installmentAmount } from '@/lib/loans/amortization'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import { verifyEndorsable, markEndorsed, releaseEndorsement, type EndorsementRef } from '@/lib/pdc/endorsement'
+import type { PdcSource } from '@/lib/pdc/sources'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -42,6 +44,21 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
 
   const { employeeId, currencyCode, exchangeRate, disbursementDate, installmentCount, firstDueDate, notes, lines } = parsed.data
   const rate = currencyCode === 'USD' ? exchangeRate : 1
+
+  // Resolve handed-on cheques before anything is written — the cheque's own
+  // amount is authoritative, and one already spent must stop the disbursement
+  // here rather than after the loan exists.
+  const endorsements: EndorsementRef[] = []
+  for (const l of lines) {
+    if (!l.endorsedFromLineId || !l.endorsedFromSource) continue
+    const ref = { source: l.endorsedFromSource as PdcSource, lineId: l.endorsedFromLineId }
+    const check = await verifyEndorsable(tenantId, ref)
+    if (!check.ok) return { success: false, error: check.message, code: 'VALIDATION_ERROR' }
+    l.amount        = Number(check.cheque.amount)
+    l.chequeNumber  = check.cheque.cheque_number ?? l.chequeNumber
+    l.chequeDueDate = check.cheque.cheque_due_date ?? l.chequeDueDate
+    endorsements.push(ref)
+  }
 
   const principal = lines.reduce((s, l) => s + l.amount, 0)
   if (principal <= 0) return { success: false, error: 'Amount must be positive', code: 'VALIDATION_ERROR' }
@@ -94,11 +111,26 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
     cheque_due_date:  l.chequeDueDate || null,
     bank_id:          l.bankId ?? null,
     amount:           l.amount,
+    endorsed_from_source:  l.endorsedFromSource || null,
+    endorsed_from_line_id: l.endorsedFromLineId || null,
   }))
   const { error: linesError } = await admin.from('loan_disbursement_lines').insert(lineRows)
   if (linesError) {
     await admin.from('employee_loans').delete().eq('id', loan.id)
     return { success: false, error: 'Failed to save disbursement lines', code: 'INTERNAL_ERROR' }
+  }
+
+  // Consume the source cheques, backing the whole loan out if another document
+  // took one first.
+  for (const [taken, ref] of endorsements.entries()) {
+    if (await markEndorsed(tenantId, ref)) continue
+    for (const done of endorsements.slice(0, taken)) await releaseEndorsement(tenantId, done)
+    await admin.from('employee_loans').delete().eq('id', loan.id)
+    return {
+      success: false,
+      error: 'That cheque was just used elsewhere, so nothing was saved. Reload and pick another.',
+      code: 'CONFLICT',
+    }
   }
 
   // Amortization schedule (in loan currency — the ledger runs in PKR-equivalent).
@@ -133,6 +165,8 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
   // Disbursement lines and the schedule cascade from the loan row.
   if (!posted.ok) {
     await admin.from('employee_loans').delete().eq('id', loan.id)
+    // The loan is gone, so any cheque it consumed goes back in hand.
+    for (const ref of endorsements) await releaseEndorsement(tenantId, ref)
     return glCreateFailed(posted.message)
   }
 

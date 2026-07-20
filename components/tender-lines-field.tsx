@@ -15,9 +15,26 @@ export type TenderLine = {
   chequeDueDate:   string
   bankId:          string
   amount:          number
+  /** Set when this line hands on a cheque received from a party. */
+  endorsedFromSource?: string
+  endorsedFromLineId?: string
 }
 
 type Bank = { id: string; name: string; account_number: string | null }
+
+/** A received cheque that can be handed on instead of writing a new one. */
+export type EndorsableCheque = {
+  source: string
+  lineId: string
+  chequeNumber: string | null
+  dueDate: string | null
+  amount: number
+  partyName: string | null
+  docSerial: string | null
+}
+
+const NEW_CHEQUE = '__new__'
+const chequeKey = (c: { source: string; lineId: string }) => `${c.source}:${c.lineId}`
 
 // Small per-field label shown only on narrow screens (where the column header
 // row is hidden and fields stack), so Bank/Amount can't be confused.
@@ -28,8 +45,17 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 // Editable split-tender table: one row per tender (Cash / PDC / Online), each
 // with an optional cheque number and bank plus an amount. Reads/writes the
 // `lines` field array on the surrounding react-hook-form.
-export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; currency?: string }) {
-  const { control, register, watch, formState } = useFormContext<{ lines: TenderLine[] }>()
+export function TenderLinesField({
+  banks,
+  currency = 'PKR',
+  endorsableCheques = [],
+}: {
+  banks: Bank[]
+  currency?: string
+  /** Received cheques in hand. Passing any turns PDC's Cheque No. into a picker. */
+  endorsableCheques?: EndorsableCheque[]
+}) {
+  const { control, register, watch, setValue, formState } = useFormContext<{ lines: TenderLine[] }>()
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
 
   const lines = watch('lines') ?? []
@@ -44,6 +70,34 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
   // (e.g. cheque required for a PDC) would have blocked submit invisibly.
   const chequeError = (i: number) => linesError?.[i]?.chequeNumber?.message
   const dueDateError = (i: number) => linesError?.[i]?.chequeDueDate?.message
+
+  // Handing on a received cheque only makes sense in the base currency: the
+  // cheque is written for a fixed number of rupees, so it can't settle a line
+  // denominated in something else.
+  const canEndorse = endorsableCheques.length > 0 && currency === 'PKR'
+
+  /**
+   * Copies the chosen cheque onto the line. The amount comes from the cheque
+   * and is locked afterwards — a physical cheque is for what it is for, and a
+   * mismatch would leave 1112 holding a balance for a cheque that is gone.
+   */
+  const pickCheque = (i: number, key: string) => {
+    if (key === NEW_CHEQUE) {
+      setValue(`lines.${i}.endorsedFromSource`, '')
+      setValue(`lines.${i}.endorsedFromLineId`, '')
+      setValue(`lines.${i}.chequeNumber`, '')
+      setValue(`lines.${i}.chequeDueDate`, '')
+      setValue(`lines.${i}.amount`, 0, { shouldValidate: true })
+      return
+    }
+    const cheque = endorsableCheques.find((c) => chequeKey(c) === key)
+    if (!cheque) return
+    setValue(`lines.${i}.endorsedFromSource`, cheque.source)
+    setValue(`lines.${i}.endorsedFromLineId`, cheque.lineId)
+    setValue(`lines.${i}.chequeNumber`, cheque.chequeNumber ?? '')
+    setValue(`lines.${i}.chequeDueDate`, cheque.dueDate ?? '')
+    setValue(`lines.${i}.amount`, cheque.amount, { shouldValidate: true })
+  }
 
   return (
     <div className="space-y-2">
@@ -73,6 +127,18 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           const chequeRequired = type === 'pdc'
           const chequeErr = chequeError(i)
           const dueErr = dueDateError(i)
+          const endorsedKey = lines[i]?.endorsedFromLineId
+            ? `${lines[i]?.endorsedFromSource}:${lines[i]?.endorsedFromLineId}`
+            : NEW_CHEQUE
+          const isEndorsed = endorsedKey !== NEW_CHEQUE
+          // A cheque already spent on another line of this same document must
+          // not be offered again — it is one piece of paper.
+          const takenElsewhere = new Set(
+            lines
+              .filter((l, j) => j !== i && l.endorsedFromLineId)
+              .map((l) => `${l.endorsedFromSource}:${l.endorsedFromLineId}`),
+          )
+          const options = endorsableCheques.filter((c) => !takenElsewhere.has(chequeKey(c)))
           return (
             // Narrow: each field stacks full-width with its own label inside a
             // bordered card. Wide: aligns to the header grid above.
@@ -100,11 +166,36 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
 
               <div className="min-w-0 space-y-1">
                 <FieldLabel>Cheque No.{chequeRequired && <span className="text-destructive"> *</span>}</FieldLabel>
+
+                {/* With cheques in hand, a PDC can either hand one of them on or
+                    write a new one — so the number becomes a picker with an
+                    explicit "write a new cheque" escape. */}
+                {chequeRequired && canEndorse && (
+                  <Select value={endorsedKey} onValueChange={(v) => pickCheque(i, v)}>
+                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate">
+                      <SelectValue placeholder="Select a cheque…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NEW_CHEQUE}>Write a new cheque</SelectItem>
+                      {options.map((c) => (
+                        <SelectItem key={chequeKey(c)} value={chequeKey(c)}>
+                          {c.chequeNumber ?? '—'}
+                          {c.partyName ? ` · ${c.partyName}` : ''}
+                          {` · ${formatPKR(c.amount)}`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* An endorsed line's number and date belong to the cheque, so
+                    they are shown read-only rather than edited here. */}
                 <Input
                   placeholder={chequeDisabled ? '—' : chequeRequired ? 'Cheque No. (required)' : 'Cheque No.'}
                   disabled={chequeDisabled}
+                  readOnly={isEndorsed}
                   aria-invalid={!!chequeErr}
-                  className={`min-h-[44px] sm:min-h-[40px] min-w-0 ${chequeErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                  className={`min-h-[44px] sm:min-h-[40px] min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${chequeErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                   {...register(`lines.${i}.chequeNumber`)}
                 />
                 {chequeErr && <p className="text-xs text-destructive">{chequeErr}</p>}
@@ -114,13 +205,17 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                   <>
                     <Input
                       type="date"
-                      title="Cheque due date (required)"
+                      title={isEndorsed ? "The cheque's own due date" : 'Cheque due date (required)'}
                       aria-label="Cheque due date"
                       aria-invalid={!!dueErr}
-                      className={`min-h-[36px] text-xs min-w-0 ${dueErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      readOnly={isEndorsed}
+                      className={`min-h-[36px] text-xs min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${dueErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                       {...register(`lines.${i}.chequeDueDate`)}
                     />
                     {dueErr && <p className="text-xs text-destructive">{dueErr}</p>}
+                    {isEndorsed && (
+                      <p className="text-[11px] text-muted-foreground">Handed on — amount fixed by the cheque</p>
+                    )}
                   </>
                 )}
               </div>
@@ -155,7 +250,9 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                   min="0"
                   inputMode="decimal"
                   placeholder="0.00"
-                  className="min-h-[44px] sm:min-h-[40px] text-right min-w-0"
+                  readOnly={isEndorsed}
+                  title={isEndorsed ? 'Set by the cheque being handed on' : undefined}
+                  className={`min-h-[44px] sm:min-h-[40px] text-right min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''}`}
                   {...register(`lines.${i}.amount`, { valueAsNumber: true })}
                 />
               </div>
@@ -185,7 +282,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           variant="outline"
           size="sm"
           className="min-h-[40px]"
-          onClick={() => append({ transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 })}
+          onClick={() => append({ transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, endorsedFromSource: '', endorsedFromLineId: '' })}
         >
           <Plus className="h-4 w-4 mr-1" /> Add Line
         </Button>

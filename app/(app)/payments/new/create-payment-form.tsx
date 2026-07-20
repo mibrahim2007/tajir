@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateSupplier } from '@/components/quick-create-forms'
-import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type TenderLine, type EndorsableCheque } from '@/components/tender-lines-field'
 import { PartyTransactionHistory, type TxnHistoryItem } from '@/components/party-transaction-history'
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
 import { editApPaymentAction } from '@/app/actions/edit-ap-payment'
@@ -34,6 +34,7 @@ type Props = {
   banks:               Bank[]
   nextSerial?:         string | null
   historyBySupplier?:  Record<string, TxnHistoryItem[]>
+  endorsableCheques?:  EndorsableCheque[]
   mode?:               'create' | 'edit'
   paymentId?:          string
   initial?: {
@@ -63,7 +64,7 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 }
 
-export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, nextSerial, historyBySupplier, mode = 'create', paymentId, initial }: Props) {
+export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, nextSerial, historyBySupplier, endorsableCheques = [], mode = 'create', paymentId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
@@ -111,6 +112,8 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
           chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
           amount: l.amount,
+          endorsedFromSource: l.endorsedFromSource || undefined,
+          endorsedFromLineId: l.endorsedFromLineId || undefined,
         })),
       }
       const result = isEdit && paymentId
@@ -238,7 +241,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
 
                 <Separator />
 
-                <TenderLinesField banks={banks} currency={watchedCurrency} />
+                <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} />
 
                 <div className="space-y-1">
                   <Label>Note</Label>

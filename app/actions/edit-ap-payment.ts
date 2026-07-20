@@ -8,6 +8,8 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
+import { verifyEndorsable, markEndorsed, releaseEndorsement, endorsementRefsFrom, type EndorsementRef } from '@/lib/pdc/endorsement'
+import type { PdcSource } from '@/lib/pdc/sources'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -32,8 +34,6 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
 
   const { id, currencyCode, exchangeRate, date, paymentMethodNote, lines } = parsed.data
   const rate = currencyCode === 'USD' ? exchangeRate : 1
-  const amount = lines.reduce((s, l) => s + l.amount, 0)
-  const pkrEquivalent = amount * rate
 
   const admin = createAdminClient()
 
@@ -45,6 +45,37 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
     .single()
 
   if (!existing) return { success: false, error: 'Payment not found', code: 'NOT_FOUND' }
+
+  // Reconcile handed-on cheques against what this payment held before. Lines
+  // are replaced wholesale below, so without this a cheque dropped from the
+  // payment would stay 'endorsed' with nothing behind it, and a newly added
+  // one would never be consumed at all.
+  const { data: oldLines } = await admin
+    .from('ap_payment_lines')
+    .select('endorsed_from_source, endorsed_from_line_id')
+    .eq('payment_id', id)
+    .eq('tenant_id', tenantId)
+
+  const refKey = (r: EndorsementRef) => `${r.source}:${r.lineId}`
+  const heldBefore = new Set(endorsementRefsFrom(oldLines ?? []).map(refKey))
+
+  const wanted: EndorsementRef[] = []
+  for (const l of lines) {
+    if (!l.endorsedFromLineId || !l.endorsedFromSource) continue
+    const ref = { source: l.endorsedFromSource as PdcSource, lineId: l.endorsedFromLineId }
+    const check = await verifyEndorsable(tenantId, ref, heldBefore.has(refKey(ref)))
+    if (!check.ok) return { success: false, error: check.message, code: 'VALIDATION_ERROR' }
+    l.amount        = Number(check.cheque.amount)
+    l.chequeNumber  = check.cheque.cheque_number ?? l.chequeNumber
+    l.chequeDueDate = check.cheque.cheque_due_date ?? l.chequeDueDate
+    wanted.push(ref)
+  }
+  const wantedKeys = new Set(wanted.map(refKey))
+
+  // Totalled only now: an endorsed line's amount comes from its cheque, not
+  // from whatever the form submitted.
+  const amount = lines.reduce((s, l) => s + l.amount, 0)
+  const pkrEquivalent = amount * rate
 
   const { error } = await admin
     .from('ap_payments')
@@ -58,9 +89,23 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
   await admin.from('ap_payment_lines').delete().eq('payment_id', id).eq('tenant_id', tenantId)
   const lineRows = lines.map((l, i) => ({
     tenant_id: tenantId, payment_id: id, line_no: i + 1,
-    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null, bank_id: l.bankId ?? null, amount: l.amount,
+    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null,
+    // Was omitted here while the create path set it, so every edit silently
+    // wiped the due date off its PDC lines.
+    cheque_due_date: l.chequeDueDate || null,
+    bank_id: l.bankId ?? null, amount: l.amount,
+    endorsed_from_source:  l.endorsedFromSource || null,
+    endorsed_from_line_id: l.endorsedFromLineId || null,
   }))
   await admin.from('ap_payment_lines').insert(lineRows)
+
+  // Consume cheques newly added to this payment, and hand back any it dropped.
+  for (const ref of wanted) {
+    if (!heldBefore.has(refKey(ref))) await markEndorsed(tenantId, ref)
+  }
+  for (const ref of endorsementRefsFrom(oldLines ?? [])) {
+    if (!wantedKeys.has(refKey(ref))) await releaseEndorsement(tenantId, ref)
+  }
 
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
