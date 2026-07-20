@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { CreateReceiptForm } from './create-receipt-form'
@@ -91,6 +92,7 @@ export default async function NewReceiptPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>

@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { EditSupplierRefundForm } from '@/app/(app)/suppliers/edit-supplier-refund-form'
@@ -46,6 +47,7 @@ export default async function EditSupplierRefundPage({ params }: { params: Promi
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">Edit Supplier Refund</h1>
         <p className="text-sm text-muted-foreground mt-1">Update the tender breakdown; the ledger re-posts automatically.</p>

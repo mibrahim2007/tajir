@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateCreditNoteForm } from './create-credit-note-form'
 
@@ -27,6 +28,7 @@ export default async function NewCreditNotePage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Credit Note</h1>
         <p className="text-sm text-muted-foreground mt-1">Issue a financial credit to a customer — reduces their outstanding balance.</p>

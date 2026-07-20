@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ReceiptForm } from '@/app/(app)/receipts/new/create-receipt-form'
@@ -50,6 +51,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">Edit Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Update the tender breakdown; the ledger re-posts automatically.</p>

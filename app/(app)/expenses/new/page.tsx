@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateExpenseForm } from './create-expense-form'
 
@@ -23,6 +24,7 @@ export default async function NewExpensePage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Expense</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a cash expense against an expense account.</p>

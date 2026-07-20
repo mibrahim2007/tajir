@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { CreatePurchaseReturnForm } from './create-purchase-return-form'
@@ -37,6 +38,7 @@ export default async function NewPurchaseReturnPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase Return</h1>
         <p className="text-sm text-muted-foreground mt-1">Return goods to a supplier. Stock will be decremented.</p>

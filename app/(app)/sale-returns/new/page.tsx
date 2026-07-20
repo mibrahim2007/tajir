@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
@@ -41,6 +42,7 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Sale Return</h1>
         <p className="text-sm text-muted-foreground mt-1">Record goods returned by a customer. Stock will be incremented.</p>

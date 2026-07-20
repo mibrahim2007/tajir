@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
@@ -76,6 +77,7 @@ export default async function NewSalePage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Sale</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a sale to a customer.</p>
