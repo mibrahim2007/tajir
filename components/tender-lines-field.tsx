@@ -12,6 +12,7 @@ import { formatPKR } from '@/lib/utils/currency'
 export type TenderLine = {
   transactionType: 'cash' | 'pdc' | 'online'
   chequeNumber:    string
+  chequeDueDate:   string
   bankId:          string
   amount:          number
 }
@@ -103,6 +104,16 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
                   {...register(`lines.${i}.chequeNumber`)}
                 />
                 {chequeErr && <p className="text-xs text-destructive">{chequeErr}</p>}
+                {/* Only a PDC has a maturity date — it drives the pending-cheque
+                    list and the overdue flag on the register. */}
+                {chequeRequired && (
+                  <Input
+                    type="date"
+                    title="Cheque due date"
+                    className="min-h-[36px] text-xs min-w-0"
+                    {...register(`lines.${i}.chequeDueDate`)}
+                  />
+                )}
               </div>
 
               <div className="min-w-0 space-y-1">
@@ -165,7 +176,7 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           variant="outline"
           size="sm"
           className="min-h-[40px]"
-          onClick={() => append({ transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 })}
+          onClick={() => append({ transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 })}
         >
           <Plus className="h-4 w-4 mr-1" /> Add Line
         </Button>

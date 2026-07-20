@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
@@ -48,6 +49,7 @@ export default async function OwnersPage() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
+      <PendingChequesPanel direction="out" className="mb-4" />
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Owners</h1>

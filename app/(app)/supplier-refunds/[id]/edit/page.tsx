@@ -19,7 +19,7 @@ export default async function EditSupplierRefundPage({ params }: { params: Promi
       .select('id, supplier_id, amount, currency_code, exchange_rate, pkr_equivalent, payment_method, notes, date')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('supplier_refund_lines')
-      .select('transaction_type, cheque_number, bank_id, amount, line_no')
+      .select('transaction_type, cheque_number, cheque_due_date, bank_id, amount, line_no')
       .eq('refund_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
@@ -40,10 +40,11 @@ export default async function EditSupplierRefundPage({ params }: { params: Promi
     ? rawLines.map((l) => ({
         transactionType: l.transaction_type as TenderLine['transactionType'],
         chequeNumber: l.cheque_number ?? '',
+        chequeDueDate: l.cheque_due_date ?? '',
         bankId: l.bank_id ?? '',
         amount: Number(l.amount),
       }))
-    : [{ transactionType: fallbackType, chequeNumber: '', bankId: '', amount: Number(refund.amount) }]
+    : [{ transactionType: fallbackType, chequeNumber: '', chequeDueDate: '', bankId: '', amount: Number(refund.amount) }]
 
   return (
     <div className="p-6 max-w-2xl mx-auto">

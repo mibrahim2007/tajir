@@ -1,4 +1,5 @@
 import { requireAuth } from '@/lib/auth/require-auth'
+import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { RoleGate } from '@/components/role-gate'
 import { DisburseLoanForm } from '@/app/(app)/employees/[id]/disburse-loan-form'
@@ -58,6 +59,7 @@ export default async function LoansPage() {
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <PendingChequesPanel direction="out" className="mb-4" />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight">Loans</h1>

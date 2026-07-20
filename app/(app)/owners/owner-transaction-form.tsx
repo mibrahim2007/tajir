@@ -36,7 +36,7 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', bankId: '', amount: 0 }
+const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 }
 const freshDefaults = (today: string, ownerId = ''): FormValues => ({
   ownerId, txnType: 'withdrawal', currencyCode: 'PKR', exchangeRate: 1, date: today, notes: '', lines: [{ ...emptyLine }],
 })
@@ -85,6 +85,7 @@ export function OwnerTransactionForm({
         lines: values.lines.filter((l) => (Number(l.amount) || 0) > 0).map((l) => ({
           transactionType: l.transactionType,
           chequeNumber: l.chequeNumber || undefined,
+          chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
           amount: l.amount,
         })),

@@ -85,6 +85,10 @@ export type Database = {
       }
       ap_payment_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -96,6 +100,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -107,6 +115,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -210,6 +222,10 @@ export type Database = {
       }
       ar_receipt_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -221,6 +237,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -232,6 +252,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -677,6 +701,10 @@ export type Database = {
       }
       customer_refund_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -688,6 +716,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -699,6 +731,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1517,6 +1553,10 @@ export type Database = {
       }
       loan_disbursement_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -1528,6 +1568,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1539,6 +1583,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1620,6 +1668,10 @@ export type Database = {
       }
       loan_repayment_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -1631,6 +1683,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1642,6 +1698,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1849,6 +1909,10 @@ export type Database = {
       }
       owner_transaction_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -1860,6 +1924,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -1871,6 +1939,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -2869,6 +2941,10 @@ export type Database = {
       }
       supplier_refund_lines: {
         Row: {
+          cheque_due_date: string | null
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           amount: number
           bank_id: string | null
           cheque_number: string | null
@@ -2880,6 +2956,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -2891,6 +2971,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          cheque_due_date?: string | null
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
           cheque_number?: string | null
@@ -3481,6 +3565,28 @@ export type Database = {
       }
     }
     Views: {
+      pdc_register: {
+        Row: {
+          amount: number | null
+          bank_id: string | null
+          cheque_due_date: string | null
+          cheque_number: string | null
+          counter_key: string | null
+          direction: string | null
+          doc_date: string | null
+          doc_serial: string | null
+          document_id: string | null
+          line_id: string | null
+          party_id: string | null
+          party_kind: string | null
+          party_name: string | null
+          pdc_status: string | null
+          settled_at: string | null
+          source: string | null
+          tenant_id: string | null
+        }
+        Relationships: []
+      }
       ap_aging: {
         Row: {
           aging_bucket: string | null

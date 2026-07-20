@@ -20,7 +20,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
       .select('id, customer_id, amount, currency_code, pkr_equivalent, payment_method_note, date, cheque_number, bank_id')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('ar_receipt_lines')
-      .select('transaction_type, cheque_number, bank_id, amount, line_no')
+      .select('transaction_type, cheque_number, cheque_due_date, bank_id, amount, line_no')
       .eq('receipt_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
@@ -39,12 +39,14 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
     ? rawLines.map((l) => ({
         transactionType: l.transaction_type as TenderLine['transactionType'],
         chequeNumber: l.cheque_number ?? '',
+        chequeDueDate: l.cheque_due_date ?? '',
         bankId: l.bank_id ?? '',
         amount: Number(l.amount),
       }))
     : [{
         transactionType: receipt.bank_id ? 'online' : 'cash',
         chequeNumber: receipt.cheque_number ?? '',
+        chequeDueDate: '',
         bankId: receipt.bank_id ?? '',
         amount: Number(receipt.amount),
       }]

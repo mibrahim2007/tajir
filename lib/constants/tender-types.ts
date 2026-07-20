@@ -51,6 +51,7 @@ export const tenderLineSchema = z
   .object({
     transactionType: z.enum(['cash', 'pdc', 'online']),
     chequeNumber:    z.string().trim().optional().nullable(),
+    chequeDueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal("")),
     bankId:          z.string().uuid().optional().nullable(),
     amount:          z.coerce.number().positive('Line amount must be positive'),
   })
@@ -65,6 +66,7 @@ export const tenderLineFormSchema = z
   .object({
     transactionType: z.enum(['cash', 'pdc', 'online']),
     chequeNumber:    z.string().optional().default(''),
+    chequeDueDate:   z.string().optional().default(''),
     bankId:          z.string().optional().default(''),
     amount:          z.preprocess(
       (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),

@@ -76,6 +76,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
       line_no:          i + 1,
       transaction_type: l.transactionType,
       cheque_number:    l.chequeNumber || null,
+    cheque_due_date:  l.chequeDueDate || null,
       bank_id:          l.bankId ?? null,
       amount:           l.amount,
     }))

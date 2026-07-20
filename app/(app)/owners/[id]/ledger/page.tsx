@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation'
+import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -61,6 +62,7 @@ export default async function OwnerLedgerPage({ params }: { params: Promise<{ id
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
+      <PendingChequesPanel direction="out" className="mb-4" />
       <div className="flex items-center justify-between mb-6 gap-3">
         <div>
           <Link href="/owners" className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4">

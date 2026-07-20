@@ -62,6 +62,7 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
         lines: values.lines.filter((l) => (Number(l.amount) || 0) > 0).map((l) => ({
           transactionType: l.transactionType,
           chequeNumber: l.chequeNumber || undefined,
+          chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
           amount: l.amount,
         })),

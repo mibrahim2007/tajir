@@ -59,6 +59,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/accounts',                label: 'Accounts',            group: 'Pages', icon: BookOpen, ownerOnly: true },
   { href: '/vouchers',                label: 'Vouchers',            group: 'Pages', icon: PenLine, ownerOnly: true },
   { href: '/reports',                 label: 'Reports',             group: 'Pages', icon: BarChart2, ownerOnly: true },
+  { href: '/reports/pdc-register', label: 'Cheque Register',  group: 'Pages', icon: Receipt, ownerOnly: true },
   // Settings
   { href: '/item-types',              label: 'Item Types',          group: 'Settings', icon: Layers, ownerOnly: true },
   { href: '/settings/team',           label: 'Team',                group: 'Settings', icon: UsersRound, ownerOnly: true },
