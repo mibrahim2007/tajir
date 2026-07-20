@@ -33,8 +33,13 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
 
   const lines = watch('lines') ?? []
   const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
-  const linesError = formState.errors.lines as { message?: string; root?: { message?: string } } | undefined
+  const linesError = formState.errors.lines as
+    | ({ message?: string; root?: { message?: string } } & Array<{ chequeNumber?: { message?: string } } | undefined>)
+    | undefined
   const rootError = linesError?.message ?? linesError?.root?.message
+  // Per-line errors were previously not rendered at all, so a per-field rule
+  // (e.g. cheque required for a PDC) would have blocked submit invisibly.
+  const chequeError = (i: number) => linesError?.[i]?.chequeNumber?.message
 
   return (
     <div className="space-y-2">
@@ -59,6 +64,10 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
           const type = lines[i]?.transactionType ?? 'cash'
           const chequeDisabled = type === 'cash'
           const bankDisabled   = type === 'cash'
+          // A PDC is a specific physical cheque — without its number the row
+          // can't be reconciled against the bank later.
+          const chequeRequired = type === 'pdc'
+          const chequeErr = chequeError(i)
           return (
             // Narrow: each field stacks full-width with its own label inside a
             // bordered card. Wide: aligns to the header grid above.
@@ -85,13 +94,15 @@ export function TenderLinesField({ banks, currency = 'PKR' }: { banks: Bank[]; c
               </div>
 
               <div className="min-w-0 space-y-1">
-                <FieldLabel>Cheque No.</FieldLabel>
+                <FieldLabel>Cheque No.{chequeRequired && <span className="text-destructive"> *</span>}</FieldLabel>
                 <Input
-                  placeholder={chequeDisabled ? '—' : 'Cheque No.'}
+                  placeholder={chequeDisabled ? '—' : chequeRequired ? 'Cheque No. (required)' : 'Cheque No.'}
                   disabled={chequeDisabled}
-                  className="min-h-[44px] sm:min-h-[40px] min-w-0"
+                  aria-invalid={!!chequeErr}
+                  className={`min-h-[44px] sm:min-h-[40px] min-w-0 ${chequeErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                   {...register(`lines.${i}.chequeNumber`)}
                 />
+                {chequeErr && <p className="text-xs text-destructive">{chequeErr}</p>}
               </div>
 
               <div className="min-w-0 space-y-1">

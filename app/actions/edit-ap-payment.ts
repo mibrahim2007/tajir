@@ -6,16 +6,10 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
-import { aggregateMoneyLegs, type TenderType } from '@/lib/constants/tender-types'
+import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
-const lineSchema = z.object({
-  transactionType: z.enum(['cash', 'pdc', 'online']),
-  chequeNumber:    z.string().trim().optional().nullable(),
-  bankId:          z.string().uuid().optional().nullable(),
-  amount:          z.coerce.number().positive('Line amount must be positive'),
-})
 
 const schema = z.object({
   id:                z.string().uuid(),
@@ -23,7 +17,7 @@ const schema = z.object({
   exchangeRate:      z.coerce.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentMethodNote: z.string().optional(),
-  lines:             z.array(lineSchema).min(1, 'Add at least one tender line'),
+  lines:             z.array(tenderLineSchema).min(1, 'Add at least one tender line'),
 })
 
 export async function editApPaymentAction(input: unknown): Promise<ActionResult<void>> {

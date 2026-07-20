@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -21,15 +22,6 @@ import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 type Bank = { id: string; name: string; account_number: string | null }
 type EmployeeOption = { id: string; name: string }
 
-const lineSchema = z.object({
-  transactionType: z.enum(['cash', 'pdc', 'online']),
-  chequeNumber:    z.string().optional().default(''),
-  bankId:          z.string().optional().default(''),
-  amount:          z.preprocess(
-    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
-    z.coerce.number().min(0),
-  ),
-})
 
 const schema = z.object({
   employeeId:       z.string().optional().default(''),
@@ -39,7 +31,7 @@ const schema = z.object({
   installmentCount: z.preprocess((v) => (v === '' || v === null || v === undefined ? 0 : v), z.coerce.number().int().min(0)).default(0),
   firstDueDate:     z.string().optional(),
   notes:            z.string().optional(),
-  lines:            z.array(lineSchema).min(1, 'Add at least one tender line'),
+  lines:            z.array(tenderLineFormSchema).min(1, 'Add at least one tender line'),
 }).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
   message: 'Enter a positive amount for at least one tender line',
   path: ['lines'],
