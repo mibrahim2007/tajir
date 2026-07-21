@@ -109,7 +109,7 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
 
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
-  const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'out')
+  const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount, endorsed: !!l.endorsedFromLineId })), rate, 'out')
   const posted = await repostJournalEntry({
     tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ap_payment', sourceId: id, prefix: 'PM',
     lines: [

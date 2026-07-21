@@ -150,9 +150,11 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
   }
 
   // Auto-post GL: DR Employee Loans & Advances, CR each money account.
-  // A disbursement is money going out, so a PDC leg is a liability we owe.
+  // A disbursement is money going out, so a new PDC leg is a liability we owe;
+  // an endorsed leg instead disposes a received cheque (asset) — handled inside
+  // aggregateMoneyLegs via the endorsed flag.
   const moneyLegs = aggregateMoneyLegs(
-    lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
+    lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount, endorsed: !!l.endorsedFromLineId })),
     rate,
     'out',
   )

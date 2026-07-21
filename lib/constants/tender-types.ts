@@ -140,14 +140,22 @@ export const tenderLineFormSchema = z
 // receipt/payment with several lines of the same type posts one clean GL line.
 // `direction` decides which PDC account a cheque leg lands in (asset vs
 // liability); it does not affect cash or online.
+//
+// An ENDORSED pdc line is the exception: it hands on a cheque RECEIVED from a
+// party, so its money leg disposes the received-cheque ASSET (1112) — it must
+// never touch the issued-cheque liability (2115), even though the document
+// itself pays money out. Getting this wrong leaves the received cheque sitting
+// in 1112 and conjures a phantom liability in 2115.
 export function aggregateMoneyLegs(
-  lines: { transactionType: TenderType; amount: number }[],
+  lines: { transactionType: TenderType; amount: number; endorsed?: boolean }[],
   rate: number,
   direction: MoneyDirection,
 ): { accountSystemKey: string; pkr: number }[] {
   const byAccount = new Map<string, number>()
   for (const l of lines) {
-    const key = tenderAccount(l.transactionType, direction)
+    const key = l.transactionType === 'pdc' && l.endorsed
+      ? PDC_ASSET_KEY
+      : tenderAccount(l.transactionType, direction)
     byAccount.set(key, (byAccount.get(key) ?? 0) + l.amount * rate)
   }
   return [...byAccount.entries()].map(([accountSystemKey, pkr]) => ({ accountSystemKey, pkr }))

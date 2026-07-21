@@ -128,7 +128,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
   // On the single-account path a PDC selection is a cheque we issue, so it must
   // land in the liability account, not the received-cheques asset.
   const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'out')
+    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount, endorsed: !!l.endorsedFromLineId })), rate, 'out')
     : [{ accountSystemKey: moneyAccount === PDC_ASSET_KEY ? pdcAccount('out') : moneyAccount, pkr: pkrEquivalent }]
 
   const posted = await postJournalEntry({
