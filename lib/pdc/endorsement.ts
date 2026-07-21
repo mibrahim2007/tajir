@@ -131,6 +131,81 @@ export async function releaseEndorsement(tenantId: string, ref: EndorsementRef):
     .eq('pdc_status', 'endorsed')
 }
 
+/**
+ * Where an endorsed cheque went — the document that received it.
+ *
+ * Needed when such a cheque bounces: the money never reached that party, so
+ * their balance has to come back, and only the destination knows which account
+ * and which party that is.
+ */
+export type EndorsementDestination = {
+  /** The account the destination document settled when it took the cheque. */
+  counterKey: string
+  /** Journal-line dimension for the party that must be re-owed. */
+  party: { supplierId?: string; employeeId?: string }
+  label: string
+  docSerial: string | null
+}
+
+export async function findEndorsementDestination(
+  tenantId: string,
+  ref: EndorsementRef,
+): Promise<EndorsementDestination | null> {
+  const admin = createAdminClient()
+
+  const { data: apLine } = await admin
+    .from('ap_payment_lines')
+    .select('payment_id')
+    .eq('tenant_id', tenantId)
+    .eq('endorsed_from_source', ref.source)
+    .eq('endorsed_from_line_id', ref.lineId)
+    .maybeSingle()
+
+  if (apLine?.payment_id) {
+    const { data: payment } = await admin
+      .from('ap_payments')
+      .select('serial_number, supplier_id')
+      .eq('id', apLine.payment_id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (payment) {
+      return {
+        counterKey: 'accounts_payable',
+        party: { supplierId: payment.supplier_id },
+        label: 'Supplier Payment',
+        docSerial: payment.serial_number,
+      }
+    }
+  }
+
+  const { data: loanLine } = await admin
+    .from('loan_disbursement_lines')
+    .select('loan_id')
+    .eq('tenant_id', tenantId)
+    .eq('endorsed_from_source', ref.source)
+    .eq('endorsed_from_line_id', ref.lineId)
+    .maybeSingle()
+
+  if (loanLine?.loan_id) {
+    const { data: loan } = await admin
+      .from('employee_loans')
+      .select('serial_number, employee_id')
+      .eq('id', loanLine.loan_id)
+      .eq('tenant_id', tenantId)
+      .maybeSingle()
+    if (loan) {
+      return {
+        counterKey: 'employee_loans_receivable',
+        party: { employeeId: loan.employee_id },
+        label: 'Loan Disbursement',
+        docSerial: loan.serial_number,
+      }
+    }
+  }
+
+  return null
+}
+
 /** Reads the endorsement links off a document's saved tender lines. */
 export function endorsementRefsFrom(
   lines: { endorsed_from_source?: string | null; endorsed_from_line_id?: string | null }[],

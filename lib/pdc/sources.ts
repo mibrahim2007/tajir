@@ -34,7 +34,8 @@ export type PdcRegisterRow = {
   /** 'in' = the cheque brings money in (1112 was debited when it was recorded). */
   direction: 'in' | 'out'
   counter_key: string
-  pdc_status: 'pending' | 'cleared' | 'bounced'
+  /** 'endorsed' = handed on to another party; gone from our hands but it can still bounce. */
+  pdc_status: 'pending' | 'cleared' | 'bounced' | 'endorsed'
   settled_at: string | null
 }
 

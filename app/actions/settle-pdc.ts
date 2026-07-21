@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { checkPeriodOpen } from '@/lib/accounting/period-lock'
 import { PDC_SOURCES, partyDimension, type PdcRegisterRow, type PdcSource } from '@/lib/pdc/sources'
+import { findEndorsementDestination } from '@/lib/pdc/endorsement'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -59,7 +60,18 @@ export async function settlePdcAction(input: unknown): Promise<ActionResult<void
 
   const cheque = row as PdcRegisterRow | null
   if (!cheque) return { success: false, error: 'Cheque not found', code: 'NOT_FOUND' }
-  if (cheque.pdc_status !== 'pending') {
+
+  // An endorsed cheque was handed on to someone else, so it can still bounce —
+  // but it can never clear into our bank, because it is not ours to bank.
+  const wasEndorsed = cheque.pdc_status === 'endorsed'
+  if (wasEndorsed && outcome === 'cleared') {
+    return {
+      success: false,
+      error: 'This cheque was handed on, so it cannot clear into your account. It can only bounce.',
+      code: 'VALIDATION_ERROR',
+    }
+  }
+  if (cheque.pdc_status !== 'pending' && !wasEndorsed) {
     return {
       success: false,
       error: `This cheque is already marked ${cheque.pdc_status}.`,
@@ -74,30 +86,58 @@ export async function settlePdcAction(input: unknown): Promise<ActionResult<void
   const isIn = cheque.direction === 'in'
   const party = partyDimension(cheque)
 
-  // Cleared swaps 1112 for real cash; bounced swaps it for the original
-  // counter-account. Either way the 1112 leg is the mirror of the original.
-  const otherKey = outcome === 'cleared' ? moneyAccount : cheque.counter_key
-  const pdcLeg = { accountSystemKey: 'post_dated_cheques', debit: isIn ? 0 : amount, credit: isIn ? amount : 0 }
-  const otherLeg = {
-    accountSystemKey: otherKey,
-    debit:  isIn ? amount : 0,
-    credit: isIn ? 0 : amount,
-    // Only the bounce touches a party subledger; a clearing is bank-to-1112.
-    ...(outcome === 'bounced' ? party : {}),
-  }
-
   const label = PDC_SOURCES[source].label
+
+  // An endorsed cheque bouncing is a different entry entirely. 1112 is already
+  // flat for it — the receipt debited it, the payment that handed it on
+  // credited it — so touching 1112 again would conjure a balance from nothing.
+  // What actually failed is that BOTH settlements were undone: the party we
+  // paid never got their money, and the party who gave us the cheque never
+  // really paid us. So both subledgers come back and nothing else moves:
+  //     DR Accounts Receivable (customer)  — they owe us again
+  //     CR Accounts Payable    (supplier)  — we owe them again
+  let lines: { accountSystemKey: string; debit: number; credit: number }[]
+  let destinationNote = ''
+
+  if (wasEndorsed) {
+    const destination = await findEndorsementDestination(tenantId, { source, lineId })
+    if (!destination) {
+      return {
+        success: false,
+        error: 'This cheque is marked as handed on, but the document that took it no longer exists. Reverse that document instead.',
+        code: 'NOT_FOUND',
+      }
+    }
+    destinationNote = ` → ${destination.label}${destination.docSerial ? ` ${destination.docSerial}` : ''}`
+    lines = [
+      { accountSystemKey: cheque.counter_key,     debit: amount, credit: 0, ...party },
+      { accountSystemKey: destination.counterKey, debit: 0, credit: amount, ...destination.party },
+    ]
+  } else {
+    // Cleared swaps 1112 for real cash; bounced swaps it for the original
+    // counter-account. Either way the 1112 leg is the mirror of the original.
+    const otherKey = outcome === 'cleared' ? moneyAccount : cheque.counter_key
+    const pdcLeg = { accountSystemKey: 'post_dated_cheques', debit: isIn ? 0 : amount, credit: isIn ? amount : 0 }
+    const otherLeg = {
+      accountSystemKey: otherKey,
+      debit:  isIn ? amount : 0,
+      credit: isIn ? 0 : amount,
+      // Only the bounce touches a party subledger; a clearing is bank-to-1112.
+      ...(outcome === 'bounced' ? party : {}),
+    }
+    lines = isIn ? [otherLeg, pdcLeg] : [pdcLeg, otherLeg]
+  }
   const posted = await postJournalEntry({
     tenantId,
     date,
     description: outcome === 'cleared'
       ? `PDC Cleared — ${label}`
-      : `PDC Bounced — ${label}`,
+      : `PDC Bounced — ${label}${destinationNote}`,
     reference:  cheque.cheque_number ?? cheque.doc_serial,
     sourceType: outcome === 'cleared' ? 'pdc_cleared' : 'pdc_bounced',
     sourceId:   lineId,
     prefix:     'PDC',
-    lines: isIn ? [otherLeg, pdcLeg] : [pdcLeg, otherLeg],
+    lines,
   })
 
   if (!posted.ok) {
@@ -115,6 +155,9 @@ export async function settlePdcAction(input: unknown): Promise<ActionResult<void
     })
     .eq('id', lineId)
     .eq('tenant_id', tenantId)
+    // Guarded on the status we read, so two settlements racing the same cheque
+    // cannot both post — the loser writes nothing.
+    .eq('pdc_status', cheque.pdc_status)
 
   if (error) {
     await admin.from('tajir_journal_entries').delete()
@@ -127,7 +170,7 @@ export async function settlePdcAction(input: unknown): Promise<ActionResult<void
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',
     entity: PDC_SOURCES[source].table, entityId: lineId,
-    before: { pdcStatus: 'pending' },
+    before: { pdcStatus: cheque.pdc_status },
     after: {
       pdcStatus: outcome, date, amount,
       chequeNumber: cheque.cheque_number, party: cheque.party_name,

@@ -15,6 +15,7 @@ const STATUS_STYLE: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
   cleared: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
   bounced: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+  endorsed: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400',
 }
 
 export function PdcRegisterTable({
@@ -37,7 +38,9 @@ export function PdcRegisterTable({
   type Row = (typeof rows)[number]
   const open = (r: Row) => {
     setOpenId(`${r.source}-${r.line_id}`)
-    setOutcome('cleared')
+    // A handed-on cheque can only bounce, so don't open on an outcome the
+    // server will refuse.
+    setOutcome(r.pdc_status === 'endorsed' ? 'bounced' : 'cleared')
     setDate(today)
     setMoneyAccount('cash_at_bank')
     setBankId(r.bank_id ?? '')
@@ -97,18 +100,26 @@ export function PdcRegisterTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right print:hidden">
-                    {r.pdc_status === 'pending' && canSettle && (
+                    {(r.pdc_status === 'pending' || r.pdc_status === 'endorsed') && canSettle && (
                       openId === key ? (
                         <div className="flex flex-col gap-2 items-end min-w-[220px]">
-                          <Select value={outcome} onValueChange={(v) => setOutcome(v as 'cleared' | 'bounced')}>
-                            <SelectTrigger className="min-h-[36px]"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="cleared">Cleared — funds moved</SelectItem>
-                              <SelectItem value="bounced">Bounced — cheque failed</SelectItem>
-                            </SelectContent>
-                          </Select>
+                          {/* A handed-on cheque is not ours to bank, so bouncing
+                              is the only outcome left for it. */}
+                          {r.pdc_status === 'endorsed' ? (
+                            <p className="text-xs text-muted-foreground text-right">
+                              Handed on — bouncing re-owes both parties
+                            </p>
+                          ) : (
+                            <Select value={outcome} onValueChange={(v) => setOutcome(v as 'cleared' | 'bounced')}>
+                              <SelectTrigger className="min-h-[36px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cleared">Cleared — funds moved</SelectItem>
+                                <SelectItem value="bounced">Bounced — cheque failed</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          )}
                           <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="min-h-[36px]" />
-                          {outcome === 'cleared' && (
+                          {outcome === 'cleared' && r.pdc_status !== 'endorsed' && (
                             <>
                               <Select value={moneyAccount} onValueChange={(v) => setMoneyAccount(v as 'cash_at_bank' | 'cash_in_hand')}>
                                 <SelectTrigger className="min-h-[36px]"><SelectValue /></SelectTrigger>
