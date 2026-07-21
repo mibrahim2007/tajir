@@ -58,6 +58,14 @@ const NONENTITY_KEYWORDS: Record<string, string[]> = {
   receivables:    ['receivable', 'who owes', 'owes me', 'outstanding customer', 'pending from customer', 'to collect', 'collection'],
   payables:       ['payable', 'who do i owe', 'whom do i owe', 'we owe', 'i owe', 'outstanding supplier', 'pending to supplier'],
   low_stock:      ['low stock', 'out of stock', 'reorder', 'running low', 'least stock', 'low quantity'],
+  cheques:        ['cheque', 'cheques', 'pdc', 'post dated', 'post-dated', 'dated cheque'],
+}
+
+// Higher-weight phrases so a specific cheque intent beats the generic list
+// (which also matches the bare word "cheque").
+const SPECIFIC_KEYWORDS: Record<string, string[]> = {
+  cheque_summary: ['cheque summary', 'cheques summary', 'pdc summary', 'cheque overview', 'how many cheque', 'cheque total', 'cheques total'],
+  cheque_lookup:  ['cheque no', 'cheque number', 'cheque #', 'cheque#', 'status of cheque', 'find cheque', 'trace cheque', 'which cheque'],
 }
 
 type Ctx = {
@@ -343,6 +351,126 @@ async function lowStock(ctx: Ctx): Promise<AskResponse> {
   }
 }
 
+// ── Cheques (post-dated cheque register) ────────────────────────────
+const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
+const dirLabel = (d: string) => (d === 'in' ? 'Received' : 'Issued')
+
+// Read the status / direction / overdue filters out of the wording.
+function chequeFilters(lowerQ: string): { status: string | null; direction: string | null; overdue: boolean } {
+  let status: string | null = null
+  if (lowerQ.includes('bounce')) status = 'bounced'
+  else if (lowerQ.includes('cleared') || lowerQ.includes('clear ')) status = 'cleared'
+  else if (lowerQ.includes('endorse')) status = 'endorsed'
+  else if (lowerQ.includes('pending') || lowerQ.includes('outstanding') || lowerQ.includes('in hand')) status = 'pending'
+
+  let overdue = false
+  if (lowerQ.includes('overdue') || lowerQ.includes('late') || lowerQ.includes('past due')) { overdue = true; status = 'pending' }
+
+  let direction: string | null = null
+  if (lowerQ.includes('received') || lowerQ.includes('incoming') || lowerQ.includes('from customer') || lowerQ.includes('customer cheque') || lowerQ.includes('in hand')) direction = 'in'
+  else if (lowerQ.includes('issued') || lowerQ.includes('outgoing') || lowerQ.includes('to supplier') || lowerQ.includes('supplier cheque') || lowerQ.includes('we gave') || lowerQ.includes('we issued')) direction = 'out'
+
+  return { status, direction, overdue }
+}
+
+function chequeRows(raw: Record<string, unknown>[]) {
+  return raw.map((r) => ({
+    cheque: (r.cheque_number as string) || '—',
+    party: (r.party_name as string) || '—',
+    type: dirLabel(r.direction as string),
+    due: (r.cheque_due_date as string) ?? null,
+    amount: num(r.amount),
+    status: cap(r.pdc_status as string),
+  }))
+}
+
+const CHEQUE_COLS: AskColumn[] = [
+  { key: 'cheque', label: 'Cheque #' },
+  { key: 'party', label: 'Party' },
+  { key: 'type', label: 'Type' },
+  { key: 'due', label: 'Due', kind: 'date' },
+  { key: 'amount', label: 'Amount', kind: 'money' },
+  { key: 'status', label: 'Status' },
+]
+
+async function chequesList(ctx: Ctx): Promise<AskResponse> {
+  const f = chequeFilters(ctx.lowerQ)
+  const raw = await callRpc(ctx.admin, 'ask_cheques', {
+    p_tenant_id: ctx.tenantId, p_status: f.status, p_direction: f.direction, p_overdue: f.overdue, p_limit: 40,
+  })
+  const rows = chequeRows(raw)
+  if (!rows.length) return text('No cheques match that. Try "pending cheques", "bounced cheques", or "cheque summary".', ['Cheque summary', 'Pending cheques'])
+
+  const parts = [
+    f.overdue ? 'overdue' : '',
+    f.status && !f.overdue ? f.status : '',
+    f.direction ? dirLabel(f.direction).toLowerCase() : '',
+  ].filter(Boolean)
+  const label = parts.length ? parts.join(' ') + ' cheques' : 'cheques'
+  const total = rows.reduce((s, r) => s + r.amount, 0)
+  return {
+    kind: 'table',
+    title: `Cheques — ${label}`,
+    subtitle: raw.length >= 40 ? 'Showing the first 40' : `${rows.length} cheque${rows.length !== 1 ? 's' : ''}`,
+    columns: CHEQUE_COLS,
+    rows,
+    summary: `${rows.length} ${label} worth ${formatPKR(total)} in total.`,
+    footer: `Total: ${formatPKR(total)}`,
+    suggestions: ['Cheque summary', 'Bounced cheques', 'Overdue cheques'],
+  }
+}
+
+async function chequeSummary(ctx: Ctx): Promise<AskResponse> {
+  const raw = await callRpc(ctx.admin, 'ask_cheque_summary', { p_tenant_id: ctx.tenantId })
+  if (!raw.length) return text('No cheques recorded yet.')
+  const rows = raw.map((r) => ({
+    type: dirLabel(r.direction as string),
+    status: cap(r.pdc_status as string),
+    count: num(r.n),
+    total: num(r.total),
+  }))
+  const pendIn = rows.filter((r) => r.type === 'Received' && r.status === 'Pending').reduce((s, r) => s + r.total, 0)
+  const pendOut = rows.filter((r) => r.type === 'Issued' && r.status === 'Pending').reduce((s, r) => s + r.total, 0)
+  return {
+    kind: 'table',
+    title: 'Cheque summary',
+    subtitle: 'Counts and value by type and status',
+    columns: [
+      { key: 'type', label: 'Type' },
+      { key: 'status', label: 'Status' },
+      { key: 'count', label: 'Count', kind: 'number' },
+      { key: 'total', label: 'Value', kind: 'money' },
+    ],
+    rows,
+    summary: `Pending in hand ${formatPKR(pendIn)} to collect · ${formatPKR(pendOut)} you have issued.`,
+    suggestions: ['Pending cheques', 'Bounced cheques', 'Overdue cheques'],
+  }
+}
+
+function chequeNumberFromQuestion(q: string): string | null {
+  const m = q.match(/([0-9][0-9a-zA-Z\-/]{2,})/)
+  return m ? m[1] : null
+}
+
+async function chequeLookup(ctx: Ctx): Promise<AskResponse> {
+  const numToken = chequeNumberFromQuestion(ctx.question)
+  if (!numToken) return chequesList(ctx)   // no number given → fall back to a list
+  const raw = await callRpc(ctx.admin, 'ask_cheque_by_number', { p_tenant_id: ctx.tenantId, p_number: numToken })
+  const rows = chequeRows(raw)
+  if (!rows.length) return text(`No cheque matching "${numToken}" was found.`, ['Pending cheques', 'Cheque summary'])
+  return {
+    kind: 'table',
+    title: `Cheque ${numToken}`,
+    subtitle: rows.length > 1 ? `${rows.length} matches` : undefined,
+    columns: CHEQUE_COLS,
+    rows,
+    summary: rows.length === 1
+      ? `Cheque ${rows[0].cheque} (${dirLabel(raw[0].direction as string).toLowerCase()}, ${rows[0].party}) is ${rows[0].status.toLowerCase()}.`
+      : `${rows.length} cheques match "${numToken}".`,
+    suggestions: ['Pending cheques', 'Cheque summary'],
+  }
+}
+
 const RUNNERS: Record<string, (ctx: Ctx) => Promise<AskResponse>> = {
   customer_summary: customerSummary,
   supplier_summary: supplierSummary,
@@ -355,6 +483,9 @@ const RUNNERS: Record<string, (ctx: Ctx) => Promise<AskResponse>> = {
   receivables: receivables,
   payables: payables,
   low_stock: lowStock,
+  cheques: chequesList,
+  cheque_summary: chequeSummary,
+  cheque_lookup: chequeLookup,
 }
 
 // ── Classifier ──────────────────────────────────────────────────────
@@ -379,6 +510,11 @@ export async function runAsk(question: string): Promise<AskResponse> {
   const add = (id: string, n: number) => score.set(id, (score.get(id) ?? 0) + n)
   for (const [id, kws] of Object.entries(NONENTITY_KEYWORDS)) {
     for (const kw of kws) if (lowerQ.includes(kw)) add(id, 2)
+  }
+  // Specific cheque intents outweigh the generic list, which also matches the
+  // bare word "cheque".
+  for (const [id, kws] of Object.entries(SPECIFIC_KEYWORDS)) {
+    for (const kw of kws) if (lowerQ.includes(kw)) add(id, 3)
   }
 
   const has = (...ws: string[]) => ws.some((w) => lowerQ.includes(w))
