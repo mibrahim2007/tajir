@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
@@ -11,7 +11,9 @@ import { OwnerLedgerRows } from './owner-ledger-rows'
 
 export default async function OwnerLedgerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const { tenantId } = await requireAuth()
+  const { tenantId, role } = await requireAuth()
+  // Owner equity — per-owner ledger — is owner-only.
+  if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 

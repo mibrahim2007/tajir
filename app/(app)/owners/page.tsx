@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -8,7 +9,9 @@ import { OwnerTransactionForm } from './owner-transaction-form'
 import { OwnersList } from './owners-list'
 
 export default async function OwnersPage() {
-  const { tenantId } = await requireAuth()
+  const { tenantId, role } = await requireAuth()
+  // Owner equity — capital and drawings — is owner-only.
+  if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 

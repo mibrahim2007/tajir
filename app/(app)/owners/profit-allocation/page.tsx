@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
@@ -7,7 +8,9 @@ import { AllocateProfitForm } from './allocate-profit-form'
 import { AllocationsList } from './allocations-list'
 
 export default async function ProfitAllocationPage() {
-  const { tenantId } = await requireAuth()
+  const { tenantId, role } = await requireAuth()
+  // Owner equity — profit allocation — is owner-only.
+  if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
 
   const today = new Date().toISOString().split('T')[0]
