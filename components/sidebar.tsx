@@ -17,6 +17,7 @@ import {
   Bell,
   Settings,
   Building2,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -55,6 +56,7 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
       title: "Admin",
       links: [
         { href: "/settings/business",         label: "Business",          icon: Building2 },
+        { href: "/owners",                    label: "Owners",            icon: UserCog },
         { href: "/item-types",                label: "Item Types",        icon: Layers },
         { href: "/settings/team",             label: "Team",              icon: UsersRound },
         { href: "/settings/modules",          label: "Modules",           icon: Settings },
