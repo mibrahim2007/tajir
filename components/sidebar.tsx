@@ -18,6 +18,7 @@ import {
   Settings,
   Building2,
   UserCog,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -40,7 +41,10 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
 
   groups.push({
     title: "Overview",
-    links: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    links: [
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/ask", label: "Ask", icon: Sparkles },
+    ],
   });
 
   const sections = ["Sales", "Procurement", "Inventory", "Accounts"] as const;
