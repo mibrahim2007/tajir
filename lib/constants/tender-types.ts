@@ -4,7 +4,9 @@ import { z } from 'zod'
 // accounts system_key its money leg posts to in the GL.
 //   Cash   → Cash in Hand (1110)
 //   Online → Cash at Bank (1120)
-//   PDC    → Post-Dated Cheques (1112)
+//   PDC    → Post-Dated Cheques Received (1112, asset) when the cheque comes
+//            IN, or Post-Dated Cheques Issued (2115, liability) when it goes
+//            OUT — resolved by document direction, see pdcAccount().
 export const TENDER_TYPES = [
   { value: 'cash',   label: 'Cash',   account: 'cash_in_hand' },
   { value: 'online', label: 'Online', account: 'cash_at_bank' },
@@ -12,6 +14,25 @@ export const TENDER_TYPES = [
 ] as const
 
 export type TenderType = (typeof TENDER_TYPES)[number]['value']
+
+/** Money flow of a document: 'in' = we receive, 'out' = we pay. */
+export type MoneyDirection = 'in' | 'out'
+
+export const PDC_ASSET_KEY = 'post_dated_cheques'
+export const PDC_LIABILITY_KEY = 'post_dated_cheques_payable'
+
+// A post-dated cheque is an asset while it is one we hold (money coming in) and
+// a liability while it is one we have written (money going out). Splitting them
+// keeps the Balance Sheet honest — a single account nets the two and can show a
+// liability as a negative asset.
+export function pdcAccount(direction: MoneyDirection): string {
+  return direction === 'in' ? PDC_ASSET_KEY : PDC_LIABILITY_KEY
+}
+
+/** The money-leg account for a tender line, given the document's direction. */
+export function tenderAccount(type: TenderType, direction: MoneyDirection): string {
+  return type === 'pdc' ? pdcAccount(direction) : TENDER_ACCOUNT[type]
+}
 
 export const TENDER_ACCOUNT: Record<TenderType, string> = {
   cash:   'cash_in_hand',
@@ -117,13 +138,16 @@ export const tenderLineFormSchema = z
 
 // Aggregate tender lines into GL money legs, summing PKR by target account so a
 // receipt/payment with several lines of the same type posts one clean GL line.
+// `direction` decides which PDC account a cheque leg lands in (asset vs
+// liability); it does not affect cash or online.
 export function aggregateMoneyLegs(
   lines: { transactionType: TenderType; amount: number }[],
   rate: number,
+  direction: MoneyDirection,
 ): { accountSystemKey: string; pkr: number }[] {
   const byAccount = new Map<string, number>()
   for (const l of lines) {
-    const key = TENDER_ACCOUNT[l.transactionType]
+    const key = tenderAccount(l.transactionType, direction)
     byAccount.set(key, (byAccount.get(key) ?? 0) + l.amount * rate)
   }
   return [...byAccount.entries()].map(([accountSystemKey, pkr]) => ({ accountSystemKey, pkr }))

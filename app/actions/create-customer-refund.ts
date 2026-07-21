@@ -108,7 +108,7 @@ export async function createCustomerRefundAction(input: unknown): Promise<Action
   // Auto-post GL: DR Accounts Receivable (reduces the customer's credit balance),
   // CR each money account (money paid out, per tender type).
   const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
+    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'out')
     : [{ accountSystemKey: paymentMethod === 'bank_transfer' ? 'cash_at_bank' : 'cash_in_hand', pkr: pkrEquivalent }]
 
   const posted = await postJournalEntry({

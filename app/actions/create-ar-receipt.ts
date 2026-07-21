@@ -92,7 +92,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
 
   // Auto-post GL: DR each money account (per tender type), CR Accounts Receivable.
   const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
+    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'in')
     : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
 
   const posted = await postJournalEntry({

@@ -95,7 +95,7 @@ export async function createSupplierRefundAction(input: unknown): Promise<Action
 
   // Auto-post GL: DR each money account (money received, per tender type), CR Accounts Payable.
   const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
+    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'in')
     : [{ accountSystemKey: paymentMethod === 'bank_transfer' ? 'cash_at_bank' : 'cash_in_hand', pkr: pkrEquivalent }]
 
   const posted = await postJournalEntry({

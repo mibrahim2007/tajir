@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
+import { aggregateMoneyLegs, pdcAccount, PDC_ASSET_KEY, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import { verifyEndorsable, markEndorsed, releaseEndorsement, type EndorsementRef } from '@/lib/pdc/endorsement'
 import type { PdcSource } from '@/lib/pdc/sources'
@@ -125,9 +125,11 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
   }
 
   // Auto-post GL: DR Accounts Payable, CR each money account (per tender type).
+  // On the single-account path a PDC selection is a cheque we issue, so it must
+  // land in the liability account, not the received-cheques asset.
   const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
-    : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
+    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'out')
+    : [{ accountSystemKey: moneyAccount === PDC_ASSET_KEY ? pdcAccount('out') : moneyAccount, pkr: pkrEquivalent }]
 
   const posted = await postJournalEntry({
     tenantId, date, description: `Supplier Payment — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ap_payment', sourceId: payment.id, prefix: 'PM',

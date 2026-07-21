@@ -150,9 +150,11 @@ export async function createEmployeeLoanAction(input: unknown): Promise<ActionRe
   }
 
   // Auto-post GL: DR Employee Loans & Advances, CR each money account.
+  // A disbursement is money going out, so a PDC leg is a liability we owe.
   const moneyLegs = aggregateMoneyLegs(
     lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
     rate,
+    'out',
   )
   const posted = await postJournalEntry({
     tenantId, date: disbursementDate, description: 'Employee Loan Disbursed', reference: serialNumber,

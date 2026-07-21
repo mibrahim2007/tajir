@@ -99,9 +99,11 @@ export async function recordLoanRepaymentAction(input: unknown): Promise<ActionR
   }
 
   // Auto-post GL: DR each money account, CR Employee Loans & Advances.
+  // A repayment is money coming in, so a PDC leg lands in the asset account.
   const moneyLegs = aggregateMoneyLegs(
     lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
     rate,
+    'in',
   )
   const posted = await postJournalEntry({
     tenantId, date, description: 'Employee Loan Repayment', reference: serialNumber,

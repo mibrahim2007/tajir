@@ -64,7 +64,7 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
-  const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate)
+  const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'in')
   const posted = await repostJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ar_receipt', sourceId: id, prefix: 'RC',
     lines: [

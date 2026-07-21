@@ -9,6 +9,7 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { checkPeriodOpen } from '@/lib/accounting/period-lock'
 import { PDC_SOURCES, partyDimension, type PdcRegisterRow, type PdcSource } from '@/lib/pdc/sources'
 import { findEndorsementDestination } from '@/lib/pdc/endorsement'
+import { pdcAccount } from '@/lib/constants/tender-types'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -117,7 +118,9 @@ export async function settlePdcAction(input: unknown): Promise<ActionResult<void
     // Cleared swaps 1112 for real cash; bounced swaps it for the original
     // counter-account. Either way the 1112 leg is the mirror of the original.
     const otherKey = outcome === 'cleared' ? moneyAccount : cheque.counter_key
-    const pdcLeg = { accountSystemKey: 'post_dated_cheques', debit: isIn ? 0 : amount, credit: isIn ? amount : 0 }
+    // A cheque we received clears out of the asset account; one we issued
+    // clears out of the liability. Its direction decides which.
+    const pdcLeg = { accountSystemKey: pdcAccount(cheque.direction), debit: isIn ? 0 : amount, credit: isIn ? amount : 0 }
     const otherLeg = {
       accountSystemKey: otherKey,
       debit:  isIn ? amount : 0,

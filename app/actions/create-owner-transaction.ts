@@ -100,9 +100,12 @@ export async function createOwnerTransactionAction(input: unknown): Promise<Acti
   // Auto-post GL. The equity leg carries the owner dimension; the money legs
   // are aggregated per target account so several lines of one tender type
   // collapse into a single clean GL line.
+  // A withdrawal takes money out (PDC = liability); a capital contribution
+  // brings it in (PDC = asset).
   const moneyLegs = aggregateMoneyLegs(
     lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })),
     rate,
+    isWithdrawal ? 'out' : 'in',
   )
   const equityLeg = isWithdrawal
     ? { accountSystemKey: 'owners_drawings', debit: pkrEquivalent, credit: 0, ownerId }
