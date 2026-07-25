@@ -50,6 +50,8 @@ export const ASK_EXAMPLES = [
   'Top customers',
   'Who owes me money',
   'Who do I owe',
+  'Stock summary',
+  'What is overdue',
   'Low stock items',
   'Pending cheques',
   'Overdue cheques',
