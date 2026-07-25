@@ -1818,6 +1818,74 @@ export type Database = {
           },
         ]
       }
+      demo_batches: {
+        Row: {
+          auto_remove: boolean
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          removed_at: string | null
+          summary: Json
+          tenant_id: string
+        }
+        Insert: {
+          auto_remove?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          removed_at?: string | null
+          summary?: Json
+          tenant_id: string
+        }
+        Update: {
+          auto_remove?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          removed_at?: string | null
+          summary?: Json
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      demo_batch_rows: {
+        Row: {
+          batch_id: string
+          created_at: string
+          entity: string
+          id: number
+          row_id: string
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          entity: string
+          id?: never
+          row_id: string
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          entity?: string
+          id?: never
+          row_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_batch_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "demo_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null

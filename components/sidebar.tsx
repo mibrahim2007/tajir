@@ -19,6 +19,7 @@ import {
   Building2,
   UserCog,
   Sparkles,
+  FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LogoutButton } from "./logout-button";
@@ -60,6 +61,7 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
       title: "Admin",
       links: [
         { href: "/settings/business",         label: "Business",          icon: Building2 },
+        { href: "/playground",                label: "Demo Playground",   icon: FlaskConical },
         { href: "/owners",                    label: "Owners",            icon: UserCog },
         { href: "/item-types",                label: "Item Types",        icon: Layers },
         { href: "/settings/team",             label: "Team",              icon: UsersRound },
