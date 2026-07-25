@@ -59,6 +59,8 @@ const NONENTITY_KEYWORDS: Record<string, string[]> = {
   payables:       ['payable', 'who do i owe', 'whom do i owe', 'we owe', 'i owe', 'outstanding supplier', 'pending to supplier'],
   low_stock:      ['low stock', 'out of stock', 'reorder', 'running low', 'least stock', 'low quantity'],
   cheques:        ['cheque', 'cheques', 'pdc', 'post dated', 'post-dated', 'dated cheque'],
+  stock_summary:  ['stock summary', 'inventory summary', 'stock value', 'inventory value', 'stock overview', 'inventory overview', 'total stock', 'stock worth', 'value of stock', 'stock on hand', 'inventory on hand', 'stock report', 'how much stock'],
+  overdue:        ['overdue', 'past due', 'past-due', 'overdue invoice', 'overdue receivable', 'overdue payable', 'overdue receipt', 'overdue payment', 'due invoices', 'late payment', 'late invoice', 'payments overdue', 'receipts overdue', 'what is overdue', 'whats overdue'],
 }
 
 // Higher-weight phrases so a specific cheque intent beats the generic list
@@ -99,7 +101,7 @@ async function callRpc(
 async function customerSummary(ctx: Ctx): Promise<AskResponse> {
   const c = ctx.customer!
   const r = (await callRpc(ctx.admin, 'ask_customer_summary', { p_tenant_id: ctx.tenantId, p_customer_id: c.id }))[0] as Record<string, unknown> | undefined
-  if (!r) return text(`No activity found for ${c.name} yet.`, followups(c.name))
+  if (!r) return text(`No activity found for ${c.name} yet.`, ASK_EXAMPLES)
   const bal = num(r.balance)
   return {
     kind: 'stats',
@@ -351,6 +353,68 @@ async function lowStock(ctx: Ctx): Promise<AskResponse> {
   }
 }
 
+async function stockSummary(ctx: Ctx): Promise<AskResponse> {
+  const r = (await callRpc(ctx.admin, 'ask_stock_summary', { p_tenant_id: ctx.tenantId }))[0] as Record<string, unknown> | undefined
+  if (!r || num(r.total_items) === 0) return text('No items in inventory yet.', ['Low stock items', 'Slow moving items'])
+  const value = num(r.total_value)
+  const units = num(r.total_units)
+  const inv = num(r.inventory_items)
+  const out = num(r.out_of_stock)
+  const low = num(r.low_stock)
+  const svc = num(r.service_items)
+  const fmtUnits = units.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  return {
+    kind: 'stats',
+    title: 'Stock summary',
+    subtitle: 'Inventory on hand and its approximate value',
+    stats: [
+      { label: 'Items', value: String(num(r.total_items)) },
+      { label: 'Stock value', value: formatPKR(value) },
+      { label: 'Units on hand', value: fmtUnits },
+      { label: 'Out of stock', value: String(out), tone: out > 0 ? 'negative' : 'default' },
+      { label: 'Low (≤5)', value: String(low), tone: low > 0 ? 'negative' : 'default' },
+      ...(svc > 0 ? [{ label: 'Service items', value: String(svc) }] : []),
+    ],
+    // Value uses each item's latest purchase rate (opening rate as fallback), so
+    // it's an estimate, not a booked figure.
+    summary: `${inv} stockable item${inv !== 1 ? 's' : ''} holding ${fmtUnits} units, worth about ${formatPKR(value)}.${out > 0 ? ` ${out} out of stock.` : ''}${low > 0 ? ` ${low} running low.` : ''}`,
+    suggestions: ['Low stock items', 'Slow moving items', 'What is overdue'],
+  }
+}
+
+async function overdue(ctx: Ctx): Promise<AskResponse> {
+  const raw = await callRpc(ctx.admin, 'ask_overdue', { p_tenant_id: ctx.tenantId, p_limit: 40 })
+  if (!raw.length) return text('Nothing is overdue — no invoices past their payment due date and no post-dated cheques past due.', ['Who owes me money', 'Cheque summary'])
+  const rows = raw.map((r) => ({
+    side: (r.side as string) === 'receivable' ? 'To collect' : 'To pay',
+    party: (r.party_name as string) || '—',
+    type: cap(r.kind as string),
+    detail: (r.reference as string) || '',
+    due: (r.due_date as string) ?? null,
+    amount: num(r.amount),
+  }))
+  const collect = rows.filter((x) => x.side === 'To collect').reduce((s, x) => s + x.amount, 0)
+  const pay = rows.filter((x) => x.side === 'To pay').reduce((s, x) => s + x.amount, 0)
+  const net = collect - pay
+  return {
+    kind: 'table',
+    title: 'Overdue — past due date',
+    subtitle: 'Invoices past their payment due date and post-dated cheques past due',
+    columns: [
+      { key: 'side', label: 'Direction' },
+      { key: 'party', label: 'Party' },
+      { key: 'type', label: 'Type' },
+      { key: 'detail', label: 'Detail' },
+      { key: 'due', label: 'Due', kind: 'date' },
+      { key: 'amount', label: 'Amount', kind: 'money' },
+    ],
+    rows,
+    summary: `${formatPKR(collect)} overdue to collect · ${formatPKR(pay)} overdue to pay.`,
+    footer: `Net overdue: ${formatPKR(Math.abs(net))} ${net >= 0 ? 'in your favour' : 'against you'}`,
+    suggestions: ['Overdue cheques', 'Who owes me money', 'Who do I owe'],
+  }
+}
+
 // ── Cheques (post-dated cheque register) ────────────────────────────
 const cap = (s: string) => (s ? s[0].toUpperCase() + s.slice(1) : s)
 const dirLabel = (d: string) => (d === 'in' ? 'Received' : 'Issued')
@@ -483,6 +547,8 @@ const RUNNERS: Record<string, (ctx: Ctx) => Promise<AskResponse>> = {
   receivables: receivables,
   payables: payables,
   low_stock: lowStock,
+  stock_summary: stockSummary,
+  overdue: overdue,
   cheques: chequesList,
   cheque_summary: chequeSummary,
   cheque_lookup: chequeLookup,
@@ -520,6 +586,10 @@ export async function runAsk(question: string): Promise<AskResponse> {
   const has = (...ws: string[]) => ws.some((w) => lowerQ.includes(w))
   const ledgerWord = has('ledger', 'statement', 'account', 'khata', 'movement', 'history')
   const bizWord = has('business', 'summary', 'overview', 'dealing', 'profile')
+
+  // "overdue cheques" is already served by the cheque intent (it supports an
+  // overdue filter); only use the combined overdue view when not cheque-specific.
+  if (has('cheque', 'cheques', 'pdc', 'post dated', 'post-dated')) score.delete('overdue')
 
   // Entity + intent-word routing. An entity of a given type strongly implies
   // its ledger/summary; a bare name defaults to the business overview.
@@ -598,6 +668,3 @@ function help(): AskResponse {
   }
 }
 
-function followups(_name: string): string[] {
-  return ASK_EXAMPLES
-}
