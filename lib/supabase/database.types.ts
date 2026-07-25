@@ -14,53 +14,34 @@ export type Database = {
   }
   public: {
     Tables: {
-      accounts: {
+      accounting_locks: {
         Row: {
-          code: string
-          created_at: string
-          id: string
-          is_active: boolean
-          name: string
-          org_id: string
-          parent_id: string | null
-          type: Database["public"]["Enums"]["account_type"]
+          locked_through: string
+          note: string | null
+          tenant_id: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
-          code: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name: string
-          org_id: string
-          parent_id?: string | null
-          type: Database["public"]["Enums"]["account_type"]
+          locked_through: string
+          note?: string | null
+          tenant_id: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
-          code?: string
-          created_at?: string
-          id?: string
-          is_active?: boolean
-          name?: string
-          org_id?: string
-          parent_id?: string | null
-          type?: Database["public"]["Enums"]["account_type"]
+          locked_through?: string
+          note?: string | null
+          tenant_id?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "accounts_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "accounts_parent_id_fkey"
-            columns: ["parent_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
+            foreignKeyName: "accounting_locks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -85,53 +66,53 @@ export type Database = {
       }
       ap_payment_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
-          endorsed_from_source: string | null
-          endorsed_from_line_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
+          endorsed_from_line_id: string | null
+          endorsed_from_source: string | null
           id: string
           line_no: number
           payment_id: string
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
-          endorsed_from_source?: string | null
-          endorsed_from_line_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          endorsed_from_line_id?: string | null
+          endorsed_from_source?: string | null
           id?: string
           line_no?: number
           payment_id: string
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
-          endorsed_from_source?: string | null
-          endorsed_from_line_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          endorsed_from_line_id?: string | null
+          endorsed_from_source?: string | null
           id?: string
           line_no?: number
           payment_id?: string
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -148,6 +129,13 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
           {
@@ -228,47 +216,47 @@ export type Database = {
       }
       ar_receipt_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
           id: string
           line_no: number
+          pdc_status: string
           receipt_id: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           receipt_id: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           receipt_id?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -285,6 +273,13 @@ export type Database = {
             columns: ["receipt_id"]
             isOneToOne: false
             referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
           {
@@ -363,51 +358,6 @@ export type Database = {
           },
         ]
       }
-      attachments: {
-        Row: {
-          created_at: string
-          entry_id: string
-          filename: string
-          id: string
-          org_id: string
-          size: number
-          storage_path: string
-        }
-        Insert: {
-          created_at?: string
-          entry_id: string
-          filename: string
-          id?: string
-          org_id: string
-          size: number
-          storage_path: string
-        }
-        Update: {
-          created_at?: string
-          entry_id?: string
-          filename?: string
-          id?: string
-          org_id?: string
-          size?: number
-          storage_path?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "attachments_entry_id_fkey"
-            columns: ["entry_id"]
-            isOneToOne: false
-            referencedRelation: "journal_entries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "attachments_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       audit_log: {
         Row: {
           action: string
@@ -443,47 +393,6 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
-      }
-      audit_logs: {
-        Row: {
-          action: string
-          created_at: string
-          id: string
-          org_id: string
-          payload: Json
-          record_id: string
-          table_name: string
-          user_id: string
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          id?: string
-          org_id: string
-          payload?: Json
-          record_id: string
-          table_name: string
-          user_id: string
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          id?: string
-          org_id?: string
-          payload?: Json
-          record_id?: string
-          table_name?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "audit_logs_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       banks: {
         Row: {
@@ -707,47 +616,47 @@ export type Database = {
       }
       customer_refund_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
           id: string
           line_no: number
+          pdc_status: string
           refund_id: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           refund_id: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           refund_id?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -757,6 +666,13 @@ export type Database = {
             columns: ["refund_id"]
             isOneToOne: false
             referencedRelation: "customer_refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_refund_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
         ]
@@ -821,53 +737,6 @@ export type Database = {
           },
         ]
       }
-      customers: {
-        Row: {
-          address: string | null
-          created_at: string
-          currency: string
-          email: string | null
-          id: string
-          is_active: boolean
-          name: string
-          org_id: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          currency?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          org_id: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          currency?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          org_id?: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "customers_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       debit_notes: {
         Row: {
           amount: number
@@ -928,6 +797,89 @@ export type Database = {
           },
           {
             foreignKeyName: "debit_notes_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demo_batch_rows: {
+        Row: {
+          batch_id: string
+          created_at: string
+          entity: string
+          id: number
+          row_id: string
+          tenant_id: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          entity: string
+          id?: never
+          row_id: string
+          tenant_id: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          entity?: string
+          id?: never
+          row_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_batch_rows_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "demo_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "demo_batch_rows_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      demo_batches: {
+        Row: {
+          auto_remove: boolean
+          config: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          removed_at: string | null
+          summary: Json
+          tenant_id: string
+        }
+        Insert: {
+          auto_remove?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          removed_at?: string | null
+          summary?: Json
+          tenant_id: string
+        }
+        Update: {
+          auto_remove?: boolean
+          config?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          removed_at?: string | null
+          summary?: Json
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "demo_batches_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
@@ -1079,48 +1031,6 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      entry_lines: {
-        Row: {
-          account_id: string
-          credit: number
-          debit: number
-          entry_id: string
-          id: string
-          memo: string | null
-        }
-        Insert: {
-          account_id: string
-          credit?: number
-          debit?: number
-          entry_id: string
-          id?: string
-          memo?: string | null
-        }
-        Update: {
-          account_id?: string
-          credit?: number
-          debit?: number
-          entry_id?: string
-          id?: string
-          memo?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "entry_lines_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "entry_lines_entry_id_fkey"
-            columns: ["entry_id"]
-            isOneToOne: false
-            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
         ]
@@ -1320,160 +1230,6 @@ export type Database = {
           },
         ]
       }
-      invoice_lines: {
-        Row: {
-          account_id: string | null
-          amount: number
-          description: string
-          id: string
-          invoice_id: string
-          quantity: number
-          unit_price: number
-        }
-        Insert: {
-          account_id?: string | null
-          amount?: number
-          description: string
-          id?: string
-          invoice_id: string
-          quantity?: number
-          unit_price?: number
-        }
-        Update: {
-          account_id?: string | null
-          amount?: number
-          description?: string
-          id?: string
-          invoice_id?: string
-          quantity?: number
-          unit_price?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_lines_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_lines_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "ap_aging"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_lines_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "ar_aging"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_lines_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      invoices: {
-        Row: {
-          amount_paid: number
-          created_at: string
-          created_by: string
-          customer_id: string | null
-          due_date: string
-          id: string
-          issue_date: string
-          journal_entry_id: string | null
-          notes: string | null
-          number: string
-          org_id: string
-          status: Database["public"]["Enums"]["invoice_status"]
-          subtotal: number
-          tax_amount: number
-          tax_rate: number
-          total: number
-          type: Database["public"]["Enums"]["invoice_type"]
-          updated_at: string
-          vendor_id: string | null
-        }
-        Insert: {
-          amount_paid?: number
-          created_at?: string
-          created_by: string
-          customer_id?: string | null
-          due_date: string
-          id?: string
-          issue_date: string
-          journal_entry_id?: string | null
-          notes?: string | null
-          number: string
-          org_id: string
-          status?: Database["public"]["Enums"]["invoice_status"]
-          subtotal?: number
-          tax_amount?: number
-          tax_rate?: number
-          total?: number
-          type: Database["public"]["Enums"]["invoice_type"]
-          updated_at?: string
-          vendor_id?: string | null
-        }
-        Update: {
-          amount_paid?: number
-          created_at?: string
-          created_by?: string
-          customer_id?: string | null
-          due_date?: string
-          id?: string
-          issue_date?: string
-          journal_entry_id?: string | null
-          notes?: string | null
-          number?: string
-          org_id?: string
-          status?: Database["public"]["Enums"]["invoice_status"]
-          subtotal?: number
-          tax_amount?: number
-          tax_rate?: number
-          total?: number
-          type?: Database["public"]["Enums"]["invoice_type"]
-          updated_at?: string
-          vendor_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "journal_entries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoices_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       item_types: {
         Row: {
           created_at: string
@@ -1513,99 +1269,55 @@ export type Database = {
           },
         ]
       }
-      journal_entries: {
-        Row: {
-          created_at: string
-          created_by: string
-          date: string
-          description: string
-          id: string
-          org_id: string
-          reference: string | null
-          status: Database["public"]["Enums"]["entry_status"]
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by: string
-          date: string
-          description: string
-          id?: string
-          org_id: string
-          reference?: string | null
-          status?: Database["public"]["Enums"]["entry_status"]
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string
-          date?: string
-          description?: string
-          id?: string
-          org_id?: string
-          reference?: string | null
-          status?: Database["public"]["Enums"]["entry_status"]
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "journal_entries_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       loan_disbursement_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
-          endorsed_from_source: string | null
-          endorsed_from_line_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
+          endorsed_from_line_id: string | null
+          endorsed_from_source: string | null
           id: string
           line_no: number
           loan_id: string
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
-          endorsed_from_source?: string | null
-          endorsed_from_line_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          endorsed_from_line_id?: string | null
+          endorsed_from_source?: string | null
           id?: string
           line_no?: number
           loan_id: string
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
-          endorsed_from_source?: string | null
-          endorsed_from_line_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          endorsed_from_line_id?: string | null
+          endorsed_from_source?: string | null
           id?: string
           line_no?: number
           loan_id?: string
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -1622,6 +1334,13 @@ export type Database = {
             columns: ["loan_id"]
             isOneToOne: false
             referencedRelation: "employee_loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_disbursement_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
           {
@@ -1680,47 +1399,47 @@ export type Database = {
       }
       loan_repayment_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
           id: string
           line_no: number
+          pdc_status: string
           repayment_id: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           repayment_id: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           repayment_id?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -1737,6 +1456,13 @@ export type Database = {
             columns: ["repayment_id"]
             isOneToOne: false
             referencedRelation: "loan_repayments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_repayment_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
           {
@@ -1818,74 +1544,6 @@ export type Database = {
           },
         ]
       }
-      demo_batches: {
-        Row: {
-          auto_remove: boolean
-          config: Json
-          created_at: string
-          created_by: string | null
-          id: string
-          removed_at: string | null
-          summary: Json
-          tenant_id: string
-        }
-        Insert: {
-          auto_remove?: boolean
-          config?: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          removed_at?: string | null
-          summary?: Json
-          tenant_id: string
-        }
-        Update: {
-          auto_remove?: boolean
-          config?: Json
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          removed_at?: string | null
-          summary?: Json
-          tenant_id?: string
-        }
-        Relationships: []
-      }
-      demo_batch_rows: {
-        Row: {
-          batch_id: string
-          created_at: string
-          entity: string
-          id: number
-          row_id: string
-          tenant_id: string
-        }
-        Insert: {
-          batch_id: string
-          created_at?: string
-          entity: string
-          id?: never
-          row_id: string
-          tenant_id: string
-        }
-        Update: {
-          batch_id?: string
-          created_at?: string
-          entity?: string
-          id?: never
-          row_id?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "demo_batch_rows_batch_id_fkey"
-            columns: ["batch_id"]
-            isOneToOne: false
-            referencedRelation: "demo_batches"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       locations: {
         Row: {
           address: string | null
@@ -1910,125 +1568,48 @@ export type Database = {
         }
         Relationships: []
       }
-      org_members: {
-        Row: {
-          accepted_at: string | null
-          id: string
-          invited_at: string
-          org_id: string
-          role: Database["public"]["Enums"]["user_role"]
-          user_id: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          id?: string
-          invited_at?: string
-          org_id: string
-          role?: Database["public"]["Enums"]["user_role"]
-          user_id: string
-        }
-        Update: {
-          accepted_at?: string | null
-          id?: string
-          invited_at?: string
-          org_id?: string
-          role?: Database["public"]["Enums"]["user_role"]
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "org_members_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      organizations: {
-        Row: {
-          created_at: string
-          currency: string
-          fiscal_year_start: number
-          id: string
-          industry: string | null
-          logo_url: string | null
-          name: string
-          owner_id: string
-          plan: Database["public"]["Enums"]["plan_tier"]
-          timezone: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          currency?: string
-          fiscal_year_start?: number
-          id?: string
-          industry?: string | null
-          logo_url?: string | null
-          name: string
-          owner_id: string
-          plan?: Database["public"]["Enums"]["plan_tier"]
-          timezone?: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          currency?: string
-          fiscal_year_start?: number
-          id?: string
-          industry?: string | null
-          logo_url?: string | null
-          name?: string
-          owner_id?: string
-          plan?: Database["public"]["Enums"]["plan_tier"]
-          timezone?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       owner_transaction_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
           id: string
           line_no: number
+          pdc_status: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_id?: string
           transaction_type?: string
@@ -2037,6 +1618,13 @@ export type Database = {
           {
             foreignKeyName: "owner_transaction_lines_bank_id_fkey"
             columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_transaction_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
             isOneToOne: false
             referencedRelation: "banks"
             referencedColumns: ["id"]
@@ -2164,33 +1752,47 @@ export type Database = {
           },
         ]
       }
-      accounting_locks: {
+      party_links: {
         Row: {
-          locked_through: string
-          note: string | null
+          created_at: string
+          customer_id: string
+          id: string
+          supplier_id: string
           tenant_id: string
-          updated_at: string
-          updated_by: string | null
         }
         Insert: {
-          locked_through: string
-          note?: string | null
+          created_at?: string
+          customer_id: string
+          id?: string
+          supplier_id: string
           tenant_id: string
-          updated_at?: string
-          updated_by?: string | null
         }
         Update: {
-          locked_through?: string
-          note?: string | null
+          created_at?: string
+          customer_id?: string
+          id?: string
+          supplier_id?: string
           tenant_id?: string
-          updated_at?: string
-          updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "accounting_locks_tenant_id_fkey"
+            foreignKeyName: "party_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "tajir_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_links_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "party_links_tenant_id_fkey"
             columns: ["tenant_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
@@ -2291,127 +1893,6 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      party_links: {
-        Row: {
-          created_at: string
-          customer_id: string
-          id: string
-          supplier_id: string
-          tenant_id: string
-        }
-        Insert: {
-          created_at?: string
-          customer_id: string
-          id?: string
-          supplier_id: string
-          tenant_id: string
-        }
-        Update: {
-          created_at?: string
-          customer_id?: string
-          id?: string
-          supplier_id?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "party_links_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "tajir_customers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "party_links_supplier_id_fkey"
-            columns: ["supplier_id"]
-            isOneToOne: false
-            referencedRelation: "suppliers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "party_links_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payments: {
-        Row: {
-          amount: number
-          created_at: string
-          id: string
-          invoice_id: string
-          journal_entry_id: string | null
-          notes: string | null
-          org_id: string
-          payment_date: string
-          payment_method: Database["public"]["Enums"]["payment_method"]
-          reference: string | null
-        }
-        Insert: {
-          amount: number
-          created_at?: string
-          id?: string
-          invoice_id: string
-          journal_entry_id?: string | null
-          notes?: string | null
-          org_id: string
-          payment_date: string
-          payment_method?: Database["public"]["Enums"]["payment_method"]
-          reference?: string | null
-        }
-        Update: {
-          amount?: number
-          created_at?: string
-          id?: string
-          invoice_id?: string
-          journal_entry_id?: string | null
-          notes?: string | null
-          org_id?: string
-          payment_date?: string
-          payment_method?: Database["public"]["Enums"]["payment_method"]
-          reference?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "ap_aging"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "ar_aging"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "invoices"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_journal_entry_id_fkey"
-            columns: ["journal_entry_id"]
-            isOneToOne: false
-            referencedRelation: "journal_entries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payments_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -2975,93 +2456,49 @@ export type Database = {
           },
         ]
       }
-      subscriptions: {
-        Row: {
-          created_at: string
-          current_period_end: string | null
-          id: string
-          org_id: string
-          plan: Database["public"]["Enums"]["plan_tier"]
-          status: Database["public"]["Enums"]["subscription_status"]
-          stripe_customer_id: string | null
-          stripe_sub_id: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          current_period_end?: string | null
-          id?: string
-          org_id: string
-          plan?: Database["public"]["Enums"]["plan_tier"]
-          status?: Database["public"]["Enums"]["subscription_status"]
-          stripe_customer_id?: string | null
-          stripe_sub_id?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          current_period_end?: string | null
-          id?: string
-          org_id?: string
-          plan?: Database["public"]["Enums"]["plan_tier"]
-          status?: Database["public"]["Enums"]["subscription_status"]
-          stripe_customer_id?: string | null
-          stripe_sub_id?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscriptions_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: true
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       supplier_refund_lines: {
         Row: {
-          cheque_due_date: string | null
-          pdc_status: string
-          settled_at: string | null
-          settled_bank_id: string | null
           amount: number
           bank_id: string | null
+          cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
           id: string
           line_no: number
+          pdc_status: string
           refund_id: string
+          settled_at: string | null
+          settled_bank_id: string | null
           tenant_id: string
           transaction_type: string
         }
         Insert: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           refund_id: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id: string
           transaction_type: string
         }
         Update: {
-          cheque_due_date?: string | null
-          pdc_status?: string
-          settled_at?: string | null
-          settled_bank_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
           id?: string
           line_no?: number
+          pdc_status?: string
           refund_id?: string
+          settled_at?: string | null
+          settled_bank_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -3071,6 +2508,13 @@ export type Database = {
             columns: ["refund_id"]
             isOneToOne: false
             referencedRelation: "supplier_refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_refund_lines_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
             referencedColumns: ["id"]
           },
         ]
@@ -3432,6 +2876,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tajir_journal_entry_lines_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "owners"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tajir_journal_entry_lines_stock_item_id_fkey"
             columns: ["stock_item_id"]
             isOneToOne: false
@@ -3596,55 +3047,28 @@ export type Database = {
           },
         ]
       }
-      vendors: {
+    }
+    Views: {
+      location_stock_summary: {
         Row: {
-          address: string | null
-          created_at: string
-          currency: string
-          email: string | null
-          id: string
-          is_active: boolean
-          name: string
-          org_id: string
-          phone: string | null
-          updated_at: string
-        }
-        Insert: {
-          address?: string | null
-          created_at?: string
-          currency?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          org_id: string
-          phone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          address?: string | null
-          created_at?: string
-          currency?: string
-          email?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          org_id?: string
-          phone?: string | null
-          updated_at?: string
+          location_id: string | null
+          location_name: string | null
+          quantity: number | null
+          stock_item_id: string | null
+          stock_item_name: string | null
+          tenant_id: string | null
+          yarn_count: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "vendors_org_id_fkey"
-            columns: ["org_id"]
+            foreignKeyName: "inventory_lots_tenant_id_fkey"
+            columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "organizations"
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
       }
-    }
-    Views: {
       pdc_register: {
         Row: {
           amount: number | null
@@ -3667,103 +3091,161 @@ export type Database = {
         }
         Relationships: []
       }
-      ap_aging: {
-        Row: {
-          aging_bucket: string | null
-          amount_paid: number | null
-          balance_due: number | null
-          days_overdue: number | null
-          due_date: string | null
-          id: string | null
-          issue_date: string | null
-          number: string | null
-          org_id: string | null
-          total: number | null
-          vendor_name: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ar_aging: {
-        Row: {
-          aging_bucket: string | null
-          amount_paid: number | null
-          balance_due: number | null
-          customer_name: string | null
-          days_overdue: number | null
-          due_date: string | null
-          id: string | null
-          issue_date: string | null
-          number: string | null
-          org_id: string | null
-          total: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoices_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      location_stock_summary: {
-        Row: {
-          location_id: string | null
-          location_name: string | null
-          quantity: number | null
-          stock_item_id: string | null
-          stock_item_name: string | null
-          tenant_id: string | null
-          yarn_count: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "inventory_lots_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Functions: {
       adjust_inventory_quantity: {
         Args: { p_delta: number; p_lot_id: string }
         Returns: undefined
       }
-      get_account_balance: {
-        Args: { p_as_of?: string; p_org_id: string }
+      ask_cheque_by_number: {
+        Args: { p_number: string; p_tenant_id: string }
         Returns: {
-          account_id: string
+          amount: number
+          cheque_due_date: string
+          cheque_number: string
+          direction: string
+          doc_serial: string
+          party_name: string
+          pdc_status: string
+          source: string
+        }[]
+      }
+      ask_cheque_summary: {
+        Args: { p_tenant_id: string }
+        Returns: {
+          direction: string
+          n: number
+          pdc_status: string
+          total: number
+        }[]
+      }
+      ask_cheques: {
+        Args: {
+          p_direction: string
+          p_limit: number
+          p_overdue: boolean
+          p_status: string
+          p_tenant_id: string
+        }
+        Returns: {
+          amount: number
+          cheque_due_date: string
+          cheque_number: string
+          direction: string
+          doc_serial: string
+          party_name: string
+          pdc_status: string
+          source: string
+        }[]
+      }
+      ask_customer_ledger: {
+        Args: { p_customer_id: string; p_tenant_id: string }
+        Returns: {
+          credit: number
+          debit: number
+          description: string
+          entry_date: string
+          voucher: string
+        }[]
+      }
+      ask_customer_summary: {
+        Args: { p_customer_id: string; p_tenant_id: string }
+        Returns: {
           balance: number
-          code: string
-          credit_total: number
-          debit_total: number
+          first_order: string
+          last_order: string
+          order_count: number
+          returns_value: number
+          sales_qty: number
+          total_received: number
+          total_sales: number
+        }[]
+      }
+      ask_item_ledger: {
+        Args: { p_item_id: string; p_tenant_id: string }
+        Returns: {
+          entry_date: string
+          kind: string
+          qty_in: number
+          qty_out: number
+          reference: string
+        }[]
+      }
+      ask_low_stock: {
+        Args: { p_limit: number; p_tenant_id: string }
+        Returns: {
+          current_quantity: number
           name: string
-          type: Database["public"]["Enums"]["account_type"]
+          unit_of_measure: string
+        }[]
+      }
+      ask_payables: {
+        Args: { p_limit: number; p_tenant_id: string }
+        Returns: {
+          balance: number
+          name: string
+        }[]
+      }
+      ask_receivables: {
+        Args: { p_limit: number; p_tenant_id: string }
+        Returns: {
+          balance: number
+          name: string
+        }[]
+      }
+      ask_slow_customers: {
+        Args: { p_days: number; p_limit: number; p_tenant_id: string }
+        Returns: {
+          balance: number
+          last_order: string
+          name: string
+          recent_sales: number
+        }[]
+      }
+      ask_slow_items: {
+        Args: { p_days: number; p_limit: number; p_tenant_id: string }
+        Returns: {
+          current_quantity: number
+          last_sold: string
+          name: string
+          sold_qty: number
+        }[]
+      }
+      ask_supplier_ledger: {
+        Args: { p_supplier_id: string; p_tenant_id: string }
+        Returns: {
+          credit: number
+          debit: number
+          description: string
+          entry_date: string
+          voucher: string
+        }[]
+      }
+      ask_supplier_summary: {
+        Args: { p_supplier_id: string; p_tenant_id: string }
+        Returns: {
+          balance: number
+          first_order: string
+          last_order: string
+          order_count: number
+          purchase_qty: number
+          returns_value: number
+          total_paid: number
+          total_purchases: number
+        }[]
+      }
+      ask_top_customers: {
+        Args: { p_days: number; p_limit: number; p_tenant_id: string }
+        Returns: {
+          last_order: string
+          name: string
+          order_count: number
+          recent_sales: number
         }[]
       }
       get_next_voucher_number: {
         Args: { p_prefix?: string; p_tenant_id: string }
         Returns: string
-      }
-      is_org_member: { Args: { org_uuid: string }; Returns: boolean }
-      is_org_member_with_role: {
-        Args: {
-          org_uuid: string
-          required_roles: Database["public"]["Enums"]["user_role"][]
-        }
-        Returns: boolean
       }
       next_document_serial: {
         Args: { p_date: string; p_doc_type: string; p_tenant_id: string }
