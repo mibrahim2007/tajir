@@ -363,6 +363,46 @@ async function payables(ctx: Ctx): Promise<AskResponse> {
   }
 }
 
+// A partial name that matches several parties → list them all (case-insensitive
+// ILIKE search in SQL), so "Ali" shows every customer/supplier containing "Ali"
+// instead of the engine picking one. Each row carries its current balance and a
+// tappable "Ledger of …" follow-up.
+async function partySearch(
+  admin: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  term: string,
+): Promise<AskResponse> {
+  const raw = await callRpc(admin, 'ask_search_parties', { p_tenant_id: tenantId, p_term: term })
+  if (!raw.length) return text(`No customer or supplier matches "${term}".`, ASK_EXAMPLES)
+  const rows = raw.map((r) => {
+    const kind = (r.kind as string) === 'supplier' ? 'supplier' : 'customer'
+    const bal = num(r.balance)
+    const settled = Math.abs(bal) < 0.01
+    return {
+      name: (r.name as string) ?? '—',
+      type: kind === 'customer' ? 'Customer' : 'Supplier',
+      status: settled ? 'Settled' : kind === 'customer'
+        ? (bal > 0 ? 'Owes you' : 'In credit')
+        : (bal > 0 ? 'You owe' : 'Advance paid'),
+      balance: Math.abs(bal),
+    }
+  })
+  return {
+    kind: 'table',
+    title: `Parties matching "${term}"`,
+    subtitle: `${rows.length} customer/supplier match${rows.length !== 1 ? 'es' : ''} — tap one for its ledger`,
+    columns: [
+      { key: 'name', label: 'Name' },
+      { key: 'type', label: 'Type' },
+      { key: 'status', label: 'Status' },
+      { key: 'balance', label: 'Balance', kind: 'money' },
+    ],
+    rows,
+    summary: `${rows.length} parties match "${term}".`,
+    suggestions: rows.slice(0, 6).map((r) => `Ledger of ${r.name}`),
+  }
+}
+
 async function lowStock(ctx: Ctx): Promise<AskResponse> {
   const rows = (await callRpc(ctx.admin, 'ask_low_stock', { p_tenant_id: ctx.tenantId, p_limit: 20 })).map((r: Record<string, unknown>) => ({
     name: r.name as string,
@@ -599,8 +639,29 @@ export async function runAsk(question: string): Promise<AskResponse> {
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).limit(2000),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).limit(2000),
   ])
-  const customer = resolveEntity(lowerQ, (customers ?? []) as Entity[])
-  const supplier = resolveEntity(lowerQ, (suppliers ?? []) as Entity[])
+  const custList = (customers ?? []) as Entity[]
+  const supList = (suppliers ?? []) as Entity[]
+
+  // Disambiguation: a partial name matching several parties lists them all,
+  // rather than the engine silently picking one. Skipped when the query already
+  // contains a party's full name (then the user has named a specific one). The
+  // search term is the question's most-matching non-stopword word.
+  const hasExactParty = [...custList, ...supList].some((e) => {
+    const n = (e.name ?? '').trim().toLowerCase()
+    return n.length >= 2 && lowerQ.includes(n)
+  })
+  if (!hasExactParty) {
+    let term = ''
+    let termHits = 0
+    for (const t of tokenize(lowerQ).filter((t) => t.length >= 3 && !NAME_STOPWORDS.has(t))) {
+      const hits = [...custList, ...supList].filter((e) => (e.name ?? '').toLowerCase().includes(t)).length
+      if (hits > termHits) { termHits = hits; term = t }
+    }
+    if (term && termHits >= 2) return partySearch(admin, tenantId, term)
+  }
+
+  const customer = resolveEntity(lowerQ, custList)
+  const supplier = resolveEntity(lowerQ, supList)
   const item = resolveEntity(lowerQ, (items ?? []) as Entity[])
 
   // Score each intent.
