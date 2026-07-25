@@ -14,28 +14,60 @@ import { ASK_EXAMPLES } from '@/lib/ask/types'
 
 type Entity = { id: string; name: string }
 
+// Structural / intent words that are never part of a party or item name, so a
+// partial-name match never latches onto them (e.g. "top customers" must not
+// resolve a customer literally called "Top Store").
+const NAME_STOPWORDS = new Set([
+  'ledger', 'statement', 'account', 'accounts', 'khata', 'movement', 'movements', 'history',
+  'balance', 'balances', 'summary', 'overview', 'dealing', 'dealings', 'profile', 'business',
+  'show', 'give', 'tell', 'get', 'find', 'list', 'the', 'and', 'for', 'from', 'with', 'all',
+  'what', 'whats', 'which', 'who', 'whom', 'how', 'much', 'many', 'are', 'is', 'do', 'does',
+  'my', 'me', 'our', 'total', 'report', 'detail', 'details', 'about', 'any', 'due', 'past',
+  'customer', 'customers', 'supplier', 'suppliers', 'party', 'item', 'items', 'stock', 'inventory',
+  'sale', 'sales', 'purchase', 'purchases', 'receivable', 'receivables', 'payable', 'payables',
+  'payment', 'payments', 'receipt', 'receipts', 'cheque', 'cheques', 'pdc', 'overdue', 'money',
+  'owe', 'owes', 'top', 'low', 'slow', 'best', 'pending', 'bounced', 'cleared', 'value', 'worth',
+])
+
+const tokenize = (s: string): string[] => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+
 // ── Entity resolution ───────────────────────────────────────────────
-// Find the customer/supplier/item named in the question. Prefer a full-name
-// substring (longest wins); fall back to distinctive-token overlap so
-// "ledger of ali traders" still finds "Ali Traders & Co".
+// Find the customer/supplier/item named in the question. Matching is
+// case-insensitive and works like SQL ILIKE '%…%': it first tries the full name
+// as a substring of the question (longest wins), then falls back to a partial
+// match — any distinctive word in the question that appears inside a name (or
+// vice-versa) — so "star" finds "Star Technologies Pvt Ltd" and "ali traders"
+// finds "Ali Traders & Co".
 function resolveEntity(lowerQ: string, list: Entity[]): Entity | null {
+  // Pass 1 — the whole name appears in the question (most reliable).
   let best: Entity | null = null
   for (const e of list) {
     const n = (e.name ?? '').trim().toLowerCase()
     if (n.length < 2) continue
-    if (lowerQ.includes(n) && (!best || n.length > best.name.length)) best = e
+    if (lowerQ.includes(n) && (!best || n.length > (best.name ?? '').length)) best = e
   }
   if (best) return best
 
+  // Pass 2 — partial (ILIKE-style). Score each name by how much of the
+  // question's non-stopword content it shares, in either direction.
+  const qTokens = tokenize(lowerQ).filter((t) => t.length >= 3 && !NAME_STOPWORDS.has(t))
+  if (!qTokens.length) return null
+
   let bestScore = 0
   for (const e of list) {
-    const tokens = (e.name ?? '').toLowerCase().split(/\s+/).filter((t) => t.length >= 3)
-    if (!tokens.length) continue
-    const hits = tokens.filter((t) => lowerQ.includes(t)).length
-    const score = hits / tokens.length
-    if (hits >= 1 && score > bestScore) { bestScore = score; best = e }
+    const nameLower = (e.name ?? '').toLowerCase()
+    if (nameLower.length < 2) continue
+    const nameTokens = tokenize(nameLower).filter((t) => t.length >= 2)
+    let score = 0
+    for (const qt of qTokens) {
+      if (nameLower.includes(qt)) score += qt.length                      // question word inside the name
+      else if (nameTokens.some((nt) => nt.length >= 3 && qt.includes(nt))) score += 2  // name word inside the question word
+    }
+    if (score > bestScore) { bestScore = score; best = e }
   }
-  return bestScore >= 0.5 ? best : null
+  // Require a reasonably distinctive overlap (≥3 matched chars) so a single
+  // short/common fragment can't pull in an unrelated party.
+  return bestScore >= 3 ? best : null
 }
 
 function parseDays(q: string, def: number): number {
