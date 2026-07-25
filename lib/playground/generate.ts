@@ -249,29 +249,6 @@ export async function runGeneration(
   return { batchId, summary, credentials }
 }
 
-// Safety net for the leftover SaaS-boilerplate rows (organizations / org_members
-// / subscriptions) that used to be created on every signup and blocked
-// auth.admin.deleteUser. Migration 0047 fixed the root cause (dropped the
-// trigger + made those FKs ON DELETE CASCADE), so this is now belt-and-suspenders
-// for any environment where 0047 hasn't been applied. Best-effort — tables may
-// not exist everywhere.
-async function clearAuthSideRows(
-  admin: ReturnType<typeof createAdminClient>,
-  userId: string,
-): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const raw = admin as any
-  try {
-    const { data: orgs } = await raw.from('organizations').select('id').eq('owner_id', userId)
-    const orgIds = (orgs ?? []).map((o: { id: string }) => o.id)
-    if (orgIds.length > 0) await raw.from('subscriptions').delete().in('org_id', orgIds)
-    await raw.from('org_members').delete().eq('user_id', userId)
-    if (orgIds.length > 0) await raw.from('organizations').delete().in('id', orgIds)
-  } catch {
-    // Boilerplate tables absent — nothing to clean.
-  }
-}
-
 // ── teardown ─────────────────────────────────────────────────────────────
 export async function runRemoval(tenantId: string, batchId: string): Promise<{ removed: number }> {
   const admin = createAdminClient()
@@ -335,10 +312,10 @@ export async function runRemoval(tenantId: string, batchId: string): Promise<{ r
   await del('tajir_customers', byEntity('customer'))
   await del('locations', byEntity('location'))
 
-  // Users: unlink, clear boilerplate side-rows, then remove the auth account.
+  // Users: unlink from the tenant, then remove the auth account. (Migration 0048
+  // dropped the old SaaS-starter tables that used to block auth.users deletion.)
   for (const uid of byEntity('user')) {
     await admin.from('tenant_users').delete().eq('user_id', uid).eq('tenant_id', tenantId)
-    await clearAuthSideRows(admin, uid)
     const { error } = await admin.auth.admin.deleteUser(uid)
     if (!error) removed++
   }
