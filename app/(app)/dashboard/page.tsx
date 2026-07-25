@@ -2,7 +2,7 @@ import Link from 'next/link'
 import {
   Package, ShoppingCart, ShoppingBag, ClipboardList,
   ArrowDownLeft, ArrowUpRight, ArrowDownRight,
-  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy, Bell, BookOpen, Video,
+  Receipt, PenLine, TrendingUp, Landmark, BarChart2, LifeBuoy, Bell, BookOpen, Video, FlaskConical,
 } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
@@ -380,6 +380,7 @@ export default async function DashboardPage({
     { href: '/help',           label: 'Help Videos',  icon: Video },
     { href: '/user-guide',     label: 'User Guide',   icon: BookOpen },
     ...(isOwner ? [{ href: '/vouchers/new', label: 'New Voucher', icon: PenLine }] : []),
+    ...(isOwner ? [{ href: '/playground', label: 'Demo Playground', icon: FlaskConical }] : []),
   ]
 
   return (

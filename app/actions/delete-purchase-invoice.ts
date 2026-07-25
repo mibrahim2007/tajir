@@ -5,6 +5,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { checkPeriodOpen } from '@/lib/accounting/period-lock'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ invoiceId: z.string().uuid() })
@@ -23,11 +24,16 @@ export async function deletePurchaseInvoiceAction(input: unknown): Promise<Actio
   const admin = createAdminClient()
 
   const { data: orders } = await admin.from('purchase_orders')
-    .select('id, stock_item_id, quantity')
+    .select('id, stock_item_id, quantity, date')
     .eq('invoice_id', invoiceId)
     .eq('tenant_id', tenantId)
 
   if (!orders || orders.length === 0) return { success: false, error: 'Invoice not found', code: 'NOT_FOUND' }
+
+  // Stop before touching anything if the period is locked — the trigger would
+  // refuse to remove the journal entry, and the invoice rows would already be gone.
+  const locked = await checkPeriodOpen(tenantId, orders[0].date as string, 'This invoice')
+  if (locked) return locked
 
   // Check no item would go negative
   const stockIds = [...new Set(orders.map((o) => o.stock_item_id))]
@@ -48,6 +54,21 @@ export async function deletePurchaseInvoiceAction(input: unknown): Promise<Actio
 
   for (const [stockItemId, qty] of removeMap) {
     await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -qty })
+  }
+
+  // Remove the invoice's GL entry (lines + header) so inventory/AP aren't left
+  // overstated. Mirrors the reversal in deleteSaleInvoiceAction / editPurchaseInvoiceAction.
+  const { data: entry } = await admin
+    .from('tajir_journal_entries')
+    .select('id')
+    .eq('source_type', 'purchase_invoice')
+    .eq('source_id', invoiceId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle()
+
+  if (entry) {
+    await admin.from('tajir_journal_entry_lines').delete().eq('journal_entry_id', entry.id)
+    await admin.from('tajir_journal_entries').delete().eq('id', entry.id)
   }
 
   await createAuditEntry({
