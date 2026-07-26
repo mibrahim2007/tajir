@@ -1798,6 +1798,85 @@ export type Database = {
           },
         ]
       }
+      pdc_opening_cheques: {
+        Row: {
+          amount: number
+          as_of_date: string
+          bank_id: string | null
+          cheque_due_date: string
+          cheque_number: string
+          created_at: string
+          direction: string
+          id: string
+          party_id: string | null
+          party_kind: string | null
+          party_label: string | null
+          pdc_status: string
+          serial_number: string | null
+          settled_at: string | null
+          settled_bank_id: string | null
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          as_of_date: string
+          bank_id?: string | null
+          cheque_due_date: string
+          cheque_number: string
+          created_at?: string
+          direction: string
+          id?: string
+          party_id?: string | null
+          party_kind?: string | null
+          party_label?: string | null
+          pdc_status?: string
+          serial_number?: string | null
+          settled_at?: string | null
+          settled_bank_id?: string | null
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          as_of_date?: string
+          bank_id?: string | null
+          cheque_due_date?: string
+          cheque_number?: string
+          created_at?: string
+          direction?: string
+          id?: string
+          party_id?: string | null
+          party_kind?: string | null
+          party_label?: string | null
+          pdc_status?: string
+          serial_number?: string | null
+          settled_at?: string | null
+          settled_bank_id?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pdc_opening_cheques_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdc_opening_cheques_settled_bank_id_fkey"
+            columns: ["settled_bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdc_opening_cheques_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profit_allocation_lines: {
         Row: {
           allocation_id: string
