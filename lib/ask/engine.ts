@@ -10,8 +10,9 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
 import type { AskResponse, AskColumn } from '@/lib/ask/types'
-import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES } from '@/lib/ask/types'
+import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES } from '@/lib/ask/types'
 import { GUIDES, GUIDE_INDEX_KEYWORDS, matchGuide, type Guide } from '@/lib/ask/guides'
+import { FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
 
 type Entity = { id: string; name: string }
 
@@ -641,8 +642,20 @@ export async function runAsk(question: string): Promise<AskResponse> {
   // ledger. matchGuide() only fires on an explicit how-to cue or a phrase that
   // can only be a question about the software, so data queries are unaffected.
   if (GUIDE_INDEX_KEYWORDS.some((k) => lowerQ.includes(k))) return guideIndex()
+  if (FAQ_INDEX_KEYWORDS.some((k) => lowerQ.includes(k))) return faqIndex()
+  // "Difference between a sale return and a credit note" names a topic the
+  // guides cover, but it is asking which to use — not for the steps of the one
+  // it happened to name first. Comparative wording goes to the FAQ.
+  if (isComparativeQuestion(lowerQ)) {
+    const compared = matchFaq(lowerQ)
+    if (compared) return faqResponse(compared)
+  }
   const guide = matchGuide(lowerQ)
   if (guide) return guideResponse(guide)
+  // Otherwise FAQs run after the how-to guides: "how to create a sale invoice"
+  // should get the steps, not the concept.
+  const faq = matchFaq(lowerQ)
+  if (faq) return faqResponse(faq)
 
   const [{ data: customers }, { data: suppliers }, { data: items }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).limit(2000),
@@ -786,12 +799,34 @@ function guideIndex(): AskResponse {
   }
 }
 
+function faqResponse(f: Faq): AskResponse {
+  return {
+    kind: 'faq',
+    title: f.question,
+    category: f.category,
+    answer: f.answer,
+    points: f.points,
+    links: f.links,
+    suggestions: f.related ?? ASK_NEWCOMER_EXAMPLES.slice(0, 3),
+  }
+}
+
+function faqIndex(): AskResponse {
+  return {
+    kind: 'topics',
+    title: 'Common questions',
+    subtitle: 'Tap any question for a plain-language answer',
+    groups: faqsByCategory(),
+    suggestions: ['I am new — where do I start?', 'What can I ask about my data?'],
+  }
+}
+
 function help(): AskResponse {
   return {
     kind: 'text',
     title: 'Ask about your business',
-    body: 'Type a question about your own data — ledgers, balances, and activity — or ask how to do something, like "how to create a sale invoice" or "what is PDC". I only report what is already recorded, nothing is estimated. Try one of these:',
-    suggestions: [...ASK_EXAMPLES.slice(0, 8), ...ASK_HOWTO_EXAMPLES.slice(0, 4)],
+    body: 'Type a question about your own data — ledgers, balances, and activity — or ask how to do something ("how to create a sale invoice"), or what something means ("what is an opening balance"). I only report what is already recorded, nothing is estimated. Try one of these:',
+    suggestions: [...ASK_EXAMPLES.slice(0, 6), ...ASK_HOWTO_EXAMPLES.slice(0, 3), ...ASK_NEWCOMER_EXAMPLES.slice(0, 3)],
   }
 }
 

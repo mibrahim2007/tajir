@@ -8,7 +8,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "check:ask": "tsx scripts/ask-routing-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

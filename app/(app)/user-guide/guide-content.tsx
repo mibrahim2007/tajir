@@ -231,6 +231,16 @@ export function GuideContent() {
             <p className="text-sm text-gray-500 mt-3">Complete guide to all features and reports</p>
           </div>
 
+          <Link
+            href="/ask"
+            className="print-hide flex items-center gap-3 rounded-xl border border-primary/30 bg-accent/40 px-4 py-3 mb-2 hover:bg-accent transition-colors"
+          >
+            <span className="text-sm text-foreground flex-1">
+              <strong>Have a question right now?</strong> Ask answers common questions in plain language, and can look up your own ledgers and balances.
+            </span>
+            <span className="text-xs font-semibold text-primary shrink-0">Open Ask →</span>
+          </Link>
+
           <H2 n="1">Introduction</H2>
           <P>
             <strong>Tajir</strong> is a complete business management platform for traders — covering purchases, sales, stock, customers, suppliers, accounting, and reports in one place.
@@ -557,6 +567,16 @@ export function GuideContent() {
             <h1 className="text-4xl font-extrabold">صارف راہنما</h1>
             <p className="text-sm text-gray-500 mt-3">تمام خصوصیات اور رپورٹوں کی مکمل راہنما</p>
           </div>
+
+          <Link
+            href="/ask"
+            className="print-hide flex items-center gap-3 rounded-xl border border-primary/30 bg-accent/40 px-4 py-3 mb-2 hover:bg-accent transition-colors flex-row-reverse"
+          >
+            <span className="text-sm text-foreground flex-1">
+              <strong>ابھی کوئی سوال ہے؟</strong> &rdquo;پوچھیں&ldquo; عام سوالوں کے آسان جواب دیتا ہے اور آپ کے اپنے کھاتے اور بیلنس بھی نکال کر دکھاتا ہے۔
+            </span>
+            <span className="text-xs font-semibold text-primary shrink-0">← پوچھیں کھولیں</span>
+          </Link>
 
           <UH2 n="۱">تعارف</UH2>
           <UP>

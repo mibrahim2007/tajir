@@ -4,7 +4,7 @@ import { useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
 import { Sparkles, ArrowUp, User } from 'lucide-react'
 import { askAction } from '@/app/actions/ask'
-import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
+import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
 import { formatPKR } from '@/lib/utils/currency'
 
 type Turn =
@@ -40,6 +40,57 @@ function ResponseView({ r, onPick }: { r: AskResponse; onPick: (q: string) => vo
       {'subtitle' in r && r.subtitle && <p className="text-xs text-muted-foreground -mt-2">{r.subtitle}</p>}
 
       {r.kind === 'text' && <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.body}</p>}
+
+      {r.kind === 'faq' && (
+        <>
+          {r.category && <p className="text-[11px] uppercase tracking-wide text-muted-foreground -mt-2">{r.category}</p>}
+          <p className="text-sm leading-relaxed">{r.answer}</p>
+          {r.points && r.points.length > 0 && (
+            <ul className="space-y-1.5">
+              {r.points.map((p, i) => (
+                <li key={i} className="text-sm leading-relaxed text-muted-foreground flex gap-2">
+                  <span className="shrink-0 text-primary">•</span>
+                  <span className="min-w-0">{p}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {r.links && r.links.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {r.links.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-card hover:bg-accent hover:text-primary transition-colors"
+                >
+                  {l.label} →
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {r.kind === 'topics' && (
+        <div className="space-y-3">
+          {r.groups.map((g) => (
+            <div key={g.category}>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground mb-1.5">{g.category}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {g.questions.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => onPick(q)}
+                    className="text-xs px-2.5 py-1 rounded-full border bg-card hover:bg-accent hover:text-primary transition-colors text-left"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {r.kind === 'guide' && (
         <>
@@ -188,6 +239,21 @@ export function AskChat() {
         {turns.length === 0 && (
           <div className="rounded-2xl border bg-card p-5 space-y-4">
             <div>
+              <p className="text-sm font-medium mb-1">New to Tajir?</p>
+              <p className="text-xs text-muted-foreground mb-3">Start here — plain answers, no accounting jargon.</p>
+              <div className="flex flex-wrap gap-2">
+                {ASK_NEWCOMER_EXAMPLES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => pick(s)}
+                    className="text-sm px-3 py-1.5 rounded-full border border-primary/30 bg-accent/40 text-primary font-medium hover:bg-accent transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="border-t pt-4">
               <p className="text-sm font-medium mb-3">Ask about your data…</p>
               <div className="flex flex-wrap gap-2">
                 {ASK_EXAMPLES.map((s) => (

@@ -46,10 +46,37 @@ export type AskGuide = {
   links?: { label: string; href: string }[]
 }
 
-export type AskResponse = (AskTable | AskStats | AskText | AskGuide) & {
+/** A plain-language answer to a newcomer question: answer first, then detail. */
+export type AskFaq = {
+  kind: 'faq'
+  title: string
+  category?: string
+  answer: string
+  points?: string[]
+  links?: { label: string; href: string }[]
+}
+
+/** A browsable list of question topics, grouped. */
+export type AskTopics = {
+  kind: 'topics'
+  title: string
+  subtitle?: string
+  groups: { category: string; questions: string[] }[]
+}
+
+export type AskResponse = (AskTable | AskStats | AskText | AskGuide | AskFaq | AskTopics) & {
   /** Follow-up questions the user can tap. */
   suggestions?: string[]
 }
+
+/** Starter questions for someone who has just been given a login. */
+export const ASK_NEWCOMER_EXAMPLES = [
+  'I am new — where do I start?',
+  'What is an opening balance?',
+  'Do I need to know accounting?',
+  'What is a location and do I need one?',
+  'Common questions',
+]
 
 /** How-to prompts, shown alongside the data ones on an empty page. */
 export const ASK_HOWTO_EXAMPLES = [
