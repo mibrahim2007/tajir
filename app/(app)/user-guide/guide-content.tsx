@@ -343,10 +343,52 @@ export function GuideContent() {
             <Li>The supplier&apos;s outstanding balance decreases when a payment is saved.</Li>
           </Ul>
 
-          <H2 n="13">Pricing</H2>
+          <H2 n="13">Post-Dated Cheques (PDC)</H2>
+          <P>A post-dated cheque carries a future date, so it is a promise to pay rather than money in hand. Tajir keeps it in its own account until the bank actually acts on it, so your cash is never overstated.</P>
+          <H3>Recording a cheque</H3>
+          <Step n={1}>On a Receipt or a Payment, add a tender line and set its type to <strong>PDC</strong>. Refunds, employee loans and owner movements accept PDC lines too.</Step>
+          <Step n={2}>Enter the <strong>Cheque No.</strong> and the <strong>Due Date</strong>. Both are required — without a due date the cheque can never be flagged as overdue.</Step>
+          <Step n={3}>Pick the bank if you know it, then save. One document can mix Cash, Online and PDC lines in any combination.</Step>
+          <H3>How it is accounted</H3>
+          <Ul>
+            <Li>A cheque you <strong>receive</strong> is debited to <strong>1112 Post-Dated Cheques Received</strong> — an asset.</Li>
+            <Li>A cheque you <strong>issue</strong> is credited to <strong>2115 Post-Dated Cheques Issued</strong> — a liability.</Li>
+            <Li>Either way the customer&apos;s or supplier&apos;s balance settles straight away, because the cheque has changed hands.</Li>
+          </Ul>
+          <H3>The Cheque Register</H3>
+          <P>Go to <strong>Reports → Cheque Register</strong> to see every cheque with its due date, party, amount and status, soonest due first and overdue ones highlighted. Cheques are settled from here.</P>
+          <Ul>
+            <Li><strong>Pending</strong> — with the bank, not yet presented.</Li>
+            <Li><strong>Cleared</strong> — the funds moved. The amount shifts between 1112/2115 and your bank account. The party&apos;s balance does not move, because it settled when you accepted the cheque.</Li>
+            <Li><strong>Bounced</strong> — the cheque failed, so the amount goes back onto the party&apos;s balance: they owe you again, or you owe them again.</Li>
+            <Li><strong>Endorsed</strong> — a cheque received from a customer that you handed straight on to a supplier instead of banking it. The original is consumed so it can never also clear into your account, but it can still bounce.</Li>
+          </Ul>
+          <H3>Cheques from before you started</H3>
+          <P>Cheques that were already outstanding on the day you began using Tajir are loaded at <strong>Settings → Opening Balances → Post-Dated Cheques</strong> — one row per cheque with its number, amount, due date and party. They then behave exactly like any other cheque and can be cleared, bounced or endorsed.</P>
+          <Note>Enter the party&apos;s own opening balance <strong>net of</strong> any cheque you load here, otherwise the same amount is counted twice.</Note>
+
+          <H2 n="14">Employee Loans &amp; Advances</H2>
+          <P>Money lent to a member of staff is not an expense — it is owed back. Tajir holds it in <strong>1135 Employee Loans &amp; Advances</strong> until it is recovered, so it stays on the Balance Sheet as an asset instead of reducing your profit.</P>
+          <H3>Adding an employee</H3>
+          <P>Go to <strong>Accounts → Employees → Add Employee</strong> and enter their name and details.</P>
+          <H3>Disbursing a loan or advance</H3>
+          <Step n={1}>Open the employee and choose <strong>Disburse Loan / Advance</strong>.</Step>
+          <Step n={2}>Enter the amount, the Date and the Currency — with the exchange rate if it is in USD.</Step>
+          <Step n={3}>If it is to be repaid in parts, set <strong>Installments</strong> and the <strong>First Due Date</strong>. Add a note if useful.</Step>
+          <Step n={4}>Choose how the money leaves — cash, bank, or a PDC cheque — on the tender lines, then save.</Step>
+          <Note>A salary advance and a loan are recorded exactly the same way. The only difference is whether you set installments.</Note>
+          <H3>Recovering it</H3>
+          <Ul>
+            <Li><strong>Record Repayment</strong> — the employee pays it back in cash or through the bank.</Li>
+            <Li><strong>Recover via Salary Deduction</strong> — the amount is taken out of their pay.</Li>
+          </Ul>
+          <H3>Tracking</H3>
+          <P><strong>Accounts → Loans</strong> lists every loan with its principal, the amount still outstanding per employee, and the installment schedule.</P>
+
+          <H2 n="15">Pricing</H2>
           <P>Set default or agreed selling prices per item per customer at <strong>Finance → Pricing</strong>. When creating a sale, the system can pre-fill the agreed rate for the selected customer and item.</P>
 
-          <H2 n="14">Expenses</H2>
+          <H2 n="16">Expenses</H2>
           <P>Record operating expenses (rent, salaries, utilities, transport, etc.) at <strong>Finance → Expenses → Add Expense</strong>.</P>
           <Ul>
             <Li>Select the expense account from your Chart of Accounts.</Li>
@@ -354,7 +396,7 @@ export function GuideContent() {
             <Li>Expenses appear in the Profit & Loss report and affect your net profit.</Li>
           </Ul>
 
-          <H2 n="15">Chart of Accounts</H2>
+          <H2 n="17">Chart of Accounts</H2>
           <P>The Chart of Accounts is the list of all your general ledger (GL) accounts — the foundation of double-entry accounting.</P>
           <H3>Account Types</H3>
           <Ul>
@@ -369,19 +411,19 @@ export function GuideContent() {
           <H3>CSV Upload</H3>
           <P>To add accounts in bulk, prepare a CSV with columns: <code>code, name, type</code> and upload it on the Chart of Accounts page. This is the fastest way to migrate from an existing accounting system.</P>
 
-          <H2 n="16">Vouchers</H2>
+          <H2 n="18">Vouchers</H2>
           <P>Vouchers are manual journal entries for accounting adjustments not covered by purchases, sales, or receipts.</P>
           <Step n={1}>Go to <strong>Accounts → Vouchers → New Voucher</strong>.</Step>
           <Step n={2}>Add debit and credit lines — each line has an account and an amount.</Step>
           <Step n={3}>Total debits must equal total credits. The system enforces this rule.</Step>
           <Step n={4}>Save. The voucher posts to the General Ledger immediately.</Step>
 
-          <H2 n="17">Reports</H2>
+          <H2 n="19">Reports</H2>
           <P>All 16 reports are available from the <strong>Reports</strong> menu. Use the date range filters on each report. Every report has a Print / Save as PDF button.</P>
           <ReportTable rows={EN_REPORTS} />
           <Note>Cost figures (COGS) in the P&L reports are estimated using the <em>latest purchase rate</em> per item. Opening balance rate is used for stock that was entered as an opening balance.</Note>
 
-          <H2 n="18">Settings</H2>
+          <H2 n="20">Settings</H2>
           <H3>Item Types</H3>
           <P>Product categories used to group stock items. Add, rename, or remove at <strong>Settings → Item Types</strong>.</P>
           <H3>Team Management</H3>
@@ -395,7 +437,7 @@ export function GuideContent() {
           <H3>Audit Log</H3>
           <P>Every change in the system is recorded in the Audit Log at <strong>Settings → Audit</strong>. Each entry shows the date, user, action, and the data that changed. Useful for reviewing edits or investigating discrepancies.</P>
 
-          <H2 n="19">Support</H2>
+          <H2 n="21">Support</H2>
           <P>If you need help or encounter any issue:</P>
           <Step n={1}>Go to <strong>Support → New Ticket</strong>.</Step>
           <Step n={2}>Describe your issue clearly. Attach any relevant context.</Step>
@@ -543,10 +585,52 @@ export function GuideContent() {
             <ULi>ادائیگی محفوظ ہونے پر سپلائر کا بقایا بیلنس کم ہو جاتا ہے۔</ULi>
           </UUl>
 
-          <UH2 n="۱۳">قیمت تعین</UH2>
+          <UH2 n="۱۳">مؤخر تاریخ چیک (PDC)</UH2>
+          <UP>مؤخر تاریخ چیک وہ چیک ہے جس پر آگے کی تاریخ درج ہو — یعنی ابھی رقم نہیں بلکہ ادائیگی کا وعدہ۔ تاجر ایسے چیک کو الگ حساب میں رکھتا ہے جب تک بینک اس پر عمل نہ کر لے، تاکہ آپ کی نقدی زیادہ ظاہر نہ ہو۔</UP>
+          <UH3>چیک درج کرنا</UH3>
+          <UStep n="۱">وصولی یا ادائیگی میں ایک ٹینڈر سطر شامل کریں اور اس کی قسم <strong>PDC</strong> منتخب کریں۔ ریفنڈ، ملازمین کے قرض اور مالک کے لین دین میں بھی PDC سطر دی جا سکتی ہے۔</UStep>
+          <UStep n="۲"><strong>چیک نمبر</strong> اور <strong>مقررہ تاریخ</strong> دونوں لازمی ہیں — تاریخ کے بغیر چیک کبھی زائد المیعاد ظاہر نہیں ہوگا۔</UStep>
+          <UStep n="۳">بینک منتخب کریں اور محفوظ کریں۔ ایک ہی دستاویز میں نقد، آن لائن اور PDC سطریں ملائی جا سکتی ہیں۔</UStep>
+          <UH3>حسابی اندراج</UH3>
+          <UUl>
+            <ULi>جو چیک آپ <strong>وصول</strong> کرتے ہیں وہ <strong>۱۱۱۲ وصول شدہ مؤخر چیک</strong> (اثاثہ) میں ڈیبٹ ہوتا ہے۔</ULi>
+            <ULi>جو چیک آپ <strong>جاری</strong> کرتے ہیں وہ <strong>۲۱۱۵ جاری کردہ مؤخر چیک</strong> (واجب) میں کریڈٹ ہوتا ہے۔</ULi>
+            <ULi>دونوں صورتوں میں گاہک یا سپلائر کا بیلنس اسی وقت طے ہو جاتا ہے، کیونکہ چیک ہاتھ بدل چکا ہے۔</ULi>
+          </UUl>
+          <UH3>چیک رجسٹر</UH3>
+          <UP>رپورٹیں ← چیک رجسٹر میں ہر چیک اپنی مقررہ تاریخ، فریق، رقم اور حالت کے ساتھ نظر آتا ہے — قریب ترین تاریخ پہلے، اور زائد المیعاد چیک نمایاں۔ چیک یہیں سے نمٹائے جاتے ہیں۔</UP>
+          <UUl>
+            <ULi><strong>زیر التواء</strong> — بینک کے پاس ہے، ابھی پیش نہیں ہوا۔</ULi>
+            <ULi><strong>کلیئر</strong> — رقم منتقل ہو گئی۔ رقم ۱۱۱۲ یا ۲۱۱۵ اور آپ کے بینک کے درمیان منتقل ہوتی ہے۔ فریق کا بیلنس نہیں بدلتا، کیونکہ وہ چیک لیتے وقت ہی طے ہو چکا تھا۔</ULi>
+            <ULi><strong>باؤنس</strong> — چیک ناکام ہو گیا، اس لیے رقم دوبارہ فریق کے بیلنس پر آ جاتی ہے: وہ دوبارہ آپ کے مقروض ہو جاتے ہیں، یا آپ ان کے۔</ULi>
+            <ULi><strong>منتقل شدہ</strong> — گاہک سے ملا چیک بینک میں جمع کرانے کے بجائے سپلائر کو آگے دے دیا گیا۔ اصل چیک ختم ہو جاتا ہے تاکہ وہ دوبارہ آپ کے کھاتے میں کلیئر نہ ہو سکے، مگر باؤنس پھر بھی ہو سکتا ہے۔</ULi>
+          </UUl>
+          <UH3>تاجر شروع کرنے سے پہلے کے چیک</UH3>
+          <UP>جو چیک تاجر استعمال کرنے سے پہلے ہی باقی تھے، انہیں ترتیبات ← ابتدائی بیلنس ← مؤخر تاریخ چیک پر درج کریں — ہر چیک کی الگ سطر بمع نمبر، رقم، مقررہ تاریخ اور فریق۔ اس کے بعد وہ عام چیک کی طرح کلیئر، باؤنس یا منتقل کیے جا سکتے ہیں۔</UP>
+          <UNote>فریق کا اپنا ابتدائی بیلنس ان چیکوں کو <strong>منہا کر کے</strong> درج کریں، ورنہ وہی رقم دو بار شمار ہوگی۔</UNote>
+
+          <UH2 n="۱۴">ملازمین کے قرض اور ایڈوانس</UH2>
+          <UP>ملازم کو دی گئی رقم خرچ نہیں بلکہ واپس ملنے والی رقم ہے۔ تاجر اسے <strong>۱۱۳۵ ملازمین کے قرض و ایڈوانس</strong> میں رکھتا ہے یہاں تک کہ وصول ہو جائے، اس لیے یہ نفع کم کرنے کے بجائے بیلنس شیٹ میں اثاثہ رہتی ہے۔</UP>
+          <UH3>ملازم شامل کرنا</UH3>
+          <UP>اکاؤنٹس ← ملازمین ← ملازم شامل کریں پر جا کر نام اور تفصیلات درج کریں۔</UP>
+          <UH3>قرض یا ایڈوانس دینا</UH3>
+          <UStep n="۱">ملازم کھولیں اور <strong>قرض / ایڈوانس دیں</strong> منتخب کریں۔</UStep>
+          <UStep n="۲">رقم، تاریخ اور کرنسی درج کریں — ڈالر کی صورت میں ایکسچینج ریٹ بھی۔</UStep>
+          <UStep n="۳">اگر واپسی قسطوں میں ہے تو <strong>اقساط</strong> اور <strong>پہلی مقررہ تاریخ</strong> مقرر کریں، اور ضرورت ہو تو نوٹ لکھیں۔</UStep>
+          <UStep n="۴">رقم کس ذریعے جا رہی ہے — نقد، بینک یا PDC چیک — ٹینڈر سطروں میں منتخب کر کے محفوظ کریں۔</UStep>
+          <UNote>تنخواہ کے عوض ایڈوانس اور قرض کا اندراج بالکل ایک ہی طرح ہوتا ہے — فرق صرف اقساط مقرر کرنے کا ہے۔</UNote>
+          <UH3>وصولی</UH3>
+          <UUl>
+            <ULi><strong>ادائیگی درج کریں</strong> — ملازم نقد یا بینک کے ذریعے رقم واپس کرے۔</ULi>
+            <ULi><strong>تنخواہ سے کٹوتی</strong> — رقم اس کی تنخواہ میں سے کاٹ لی جائے۔</ULi>
+          </UUl>
+          <UH3>نگرانی</UH3>
+          <UP>اکاؤنٹس ← قرضے میں ہر قرض کی اصل رقم، ہر ملازم کی باقی رقم اور اقساط کا شیڈول نظر آتا ہے۔</UP>
+
+          <UH2 n="۱۵">قیمت تعین</UH2>
           <UP>ہر گاہک کے لیے فی آئٹم طے شدہ فروخت قیمتیں فنانس ← قیمت تعین پر ترتیب دیں۔ فروخت ریکارڈ کرتے وقت سسٹم خودبخود طے شدہ ریٹ پُر کر دیتا ہے۔</UP>
 
-          <UH2 n="۱۴">اخراجات</UH2>
+          <UH2 n="۱۶">اخراجات</UH2>
           <UP>کاروباری اخراجات (کرایہ، تنخواہ، بجلی، گیس، ٹرانسپورٹ وغیرہ) فنانس ← اخراجات ← اخراج شامل کریں پر ریکارڈ کریں۔</UP>
           <UUl>
             <ULi>اخراجات کا حساب (چارٹ آف اکاؤنٹس سے) منتخب کریں۔</ULi>
@@ -554,7 +638,7 @@ export function GuideContent() {
             <ULi>اخراجات نفع و نقصان رپورٹ میں ظاہر ہوتے ہیں۔</ULi>
           </UUl>
 
-          <UH2 n="۱۵">حسابات کا چارٹ</UH2>
+          <UH2 n="۱۷">حسابات کا چارٹ</UH2>
           <UP>چارٹ آف اکاؤنٹس آپ کے تمام جنرل لیجر اکاؤنٹس کی فہرست ہے — دہری اندراج نظام کی بنیاد۔</UP>
           <UH3>اکاؤنٹ کی اقسام</UH3>
           <UUl>
@@ -569,19 +653,19 @@ export function GuideContent() {
           <UH3>سی ایس وی اپلوڈ</UH3>
           <UP>اکاؤنٹس کثیر تعداد میں شامل کرنے کے لیے ایک CSV فائل تیار کریں جس میں <code>code, name, type</code> کالمز ہوں اور چارٹ آف اکاؤنٹس صفحے پر اپلوڈ کریں۔</UP>
 
-          <UH2 n="۱۶">واؤچر</UH2>
+          <UH2 n="۱۸">واؤچر</UH2>
           <UP>واؤچر دستی جرنل اندراجات ہیں جو خریداری، فروخت یا وصولیوں سے ہٹ کر حسابی ایڈجسٹمنٹ کے لیے استعمال ہوتے ہیں۔</UP>
           <UStep n="۱">اکاؤنٹس ← واؤچر ← نیا واؤچر پر جائیں۔</UStep>
           <UStep n="۲">ڈیبٹ اور کریڈٹ سطریں شامل کریں — ہر سطر میں حساب اور رقم۔</UStep>
           <UStep n="۳">کل ڈیبٹ = کل کریڈٹ ہونا ضروری ہے۔ سسٹم یہ قانون نافذ کرتا ہے۔</UStep>
           <UStep n="۴">محفوظ کریں۔ واؤچر فوری طور پر جنرل لیجر میں درج ہو جاتا ہے۔</UStep>
 
-          <UH2 n="۱۷">رپورٹیں</UH2>
+          <UH2 n="۱۹">رپورٹیں</UH2>
           <UP>تمام ۱۶ رپورٹیں رپورٹیں مینو سے دستیاب ہیں۔ ہر رپورٹ پر تاریخ کے فلٹر موجود ہیں۔ ہر رپورٹ پرنٹ یا پی ڈی ایف میں محفوظ کی جا سکتی ہے۔</UP>
           <UReportTable rows={UR_REPORTS} />
           <UNote>رپورٹوں میں لاگت کے اعداد و شمار (COGS) ہر آئٹم کی <em>آخری خرید قیمت</em> کی بنیاد پر ہیں۔ ابتدائی بیلنس والے اسٹاک کے لیے ابتدائی ریٹ استعمال ہوتا ہے۔</UNote>
 
-          <UH2 n="۱۸">ترتیبات</UH2>
+          <UH2 n="۲۰">ترتیبات</UH2>
           <UH3>آئٹم اقسام</UH3>
           <UP>اسٹاک آئٹمز کے لیے زمرے۔ ترتیبات ← آئٹم اقسام پر شامل، نام تبدیل یا حذف کریں۔</UP>
           <UH3>ٹیم انتظام</UH3>
@@ -595,7 +679,7 @@ export function GuideContent() {
           <UH3>آڈٹ لاگ</UH3>
           <UP>سسٹم میں ہر تبدیلی ترتیبات ← آڈٹ پر ریکارڈ ہوتی ہے — تاریخ، صارف، عمل اور تبدیل شدہ ڈیٹا کے ساتھ۔ غلطیاں تلاش کرنے کے لیے بہت مفید ہے۔</UP>
 
-          <UH2 n="۱۹">معاونت</UH2>
+          <UH2 n="۲۱">معاونت</UH2>
           <UP>مدد کی ضرورت ہو یا کوئی مسئلہ پیش آئے:</UP>
           <UStep n="۱">معاونت ← نئی ٹکٹ پر جائیں۔</UStep>
           <UStep n="۲">اپنا مسئلہ واضح طور پر بیان کریں۔</UStep>
