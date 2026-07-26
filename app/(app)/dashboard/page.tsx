@@ -236,6 +236,14 @@ export default async function DashboardPage({
     { data: allSalesData },
     { data: allReceiptsData },
     { data: allCustomersData },
+    { data: allSaleReturnsData },
+    { data: allCreditNotesData },
+    { data: allCustomerRefundsData },
+    { data: allPurchasesData },
+    { data: allPaymentsData },
+    { data: allPurchaseReturnsData },
+    { data: allDebitNotesData },
+    { data: allSupplierRefundsData },
     { data: recentSalesData },
     { data: recentPurchasesData },
     { data: customersData },
@@ -251,10 +259,18 @@ export default async function DashboardPage({
     admin.from('sales_orders').select('pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('ar_receipts').select('pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('tajir_customers').select('opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('sale_returns').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('credit_notes').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('customer_refunds').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('purchase_orders').select('pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
+    admin.from('ap_payments').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('purchase_returns').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('debit_notes').select('pkr_equivalent').eq('tenant_id', tenantId),
+    admin.from('supplier_refunds').select('pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sales_orders').select('id, date, customer_id, pkr_equivalent').eq('tenant_id', tenantId).order('date', { ascending: false }).limit(6),
     admin.from('purchase_orders').select('id, date, supplier_id, pkr_equivalent').eq('tenant_id', tenantId).order('date', { ascending: false }).limit(6),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId),
+    admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('inventory_lots')
       .select('id, name, count, current_quantity, item_type_id, item_types(id, name)')
       .eq('tenant_id', tenantId),
@@ -296,8 +312,35 @@ export default async function DashboardPage({
   const totalSales    = (allSalesData ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
   const totalReceipts = (allReceiptsData ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
   const openingBal    = (allCustomersData ?? []).reduce((s, c) => s + parse(c.opening_balance_pkr_equivalent), 0)
-  const receivables   = Math.max(0, openingBal + totalSales - totalReceipts)
   const totalInventoryUnits = (inventoryData ?? []).reduce((s, l) => s + parse(l.count), 0)
+
+  /* Receivables & payables — the same formula the Customers and Suppliers
+     pages use. Returns, notes and refunds all move a party's balance, so
+     leaving them out overstates what is actually owed. */
+  const sumPkr = (rows: { pkr_equivalent: unknown }[] | null) =>
+    (rows ?? []).reduce((s, r) => s + parse(r.pkr_equivalent), 0)
+
+  const saleReturns    = sumPkr(allSaleReturnsData)
+  const creditNotes    = sumPkr(allCreditNotesData)
+  const customerRefunds = sumPkr(allCustomerRefundsData)
+  const receivables = Math.max(
+    0,
+    openingBal + totalSales - totalReceipts - saleReturns - creditNotes + customerRefunds,
+  )
+
+  const supplierOpeningBal = (suppliersData ?? []).reduce((s, x) => s + parse(x.opening_balance_pkr_equivalent), 0)
+  // A purchase records the advance paid on the invoice itself, so only the
+  // unpaid remainder is a payable.
+  const totalPurchased = (allPurchasesData ?? [])
+    .reduce((s, p) => s + parse(p.pkr_equivalent) - parse(p.advance_paid), 0)
+  const totalPaid       = sumPkr(allPaymentsData)
+  const purchaseReturns = sumPkr(allPurchaseReturnsData)
+  const debitNotes      = sumPkr(allDebitNotesData)
+  const supplierRefunds = sumPkr(allSupplierRefundsData)
+  const payables = Math.max(
+    0,
+    supplierOpeningBal + totalPurchased - totalPaid - purchaseReturns - debitNotes + supplierRefunds,
+  )
 
   /* 6-month revenue chart */
   const months6 = Array.from({ length: 6 }, (_, i) => {
@@ -414,10 +457,11 @@ export default async function DashboardPage({
       )}
 
       {/* Base KPIs — all users */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <KpiCard label="Sales (MTD)"     value={shortPKR(mtdSales)}     sub={`${monthName} ${year}`} />
         <KpiCard label="Purchases (MTD)" value={shortPKR(mtdPurchases)} sub={`${monthName} ${year}`} />
         <KpiCard label="Receivables"     value={shortPKR(receivables)}  sub={receivables > 0 ? 'Outstanding from customers' : 'All settled'} />
+        <KpiCard label="Payables"        value={shortPKR(payables)}     sub={payables > 0 ? 'Outstanding to suppliers' : 'All settled'} up={payables > 0 ? false : undefined} />
         <KpiCard label="Inventory"       value={totalInventoryUnits > 0 ? totalInventoryUnits.toLocaleString('en-IN') + ' units' : (inventoryData?.length ?? 0) + ' items'} sub="Stock on hand" />
       </div>
 
