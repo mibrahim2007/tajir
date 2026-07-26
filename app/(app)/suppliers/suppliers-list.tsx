@@ -13,6 +13,9 @@ export type SupplierListItem = {
   id: string
   name: string
   outstanding: number
+  openingBalance: number
+  openingBalanceCurrency: string
+  openingBalancePkrEquivalent: number
 }
 
 export function SuppliersList({ suppliers }: { suppliers: SupplierListItem[] }) {
@@ -75,7 +78,13 @@ export function SuppliersList({ suppliers }: { suppliers: SupplierListItem[] }) 
                   <td className="px-4 py-3">
                     <RoleGate allowedRoles={['owner']}>
                       <div className="flex gap-1 justify-end">
-                        <EditSupplierForm id={s.id} currentName={s.name} />
+                        <EditSupplierForm
+                          id={s.id}
+                          currentName={s.name}
+                          currentOpeningBalance={s.openingBalance}
+                          currentOpeningBalanceCurrency={s.openingBalanceCurrency}
+                          currentOpeningBalancePkr={s.openingBalancePkrEquivalent}
+                        />
                         <DeleteButton
                           description={`Delete supplier "${s.name}"? This cannot be undone.`}
                           onDelete={deleteSupplierAction.bind(null, { id: s.id })}

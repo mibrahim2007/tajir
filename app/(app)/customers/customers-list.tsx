@@ -16,6 +16,9 @@ export type CustomerListItem = {
   name: string
   status?: string
   outstanding: number
+  openingBalance: number
+  openingBalanceCurrency: string
+  openingBalancePkrEquivalent: number
 }
 
 export function CustomersList({ customers }: { customers: CustomerListItem[] }) {
@@ -112,7 +115,14 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex gap-1 justify-end">
-                            <EditCustomerForm id={c.id} currentName={c.name} currentStatus={c.status} />
+                            <EditCustomerForm
+                              id={c.id}
+                              currentName={c.name}
+                              currentStatus={c.status}
+                              currentOpeningBalance={c.openingBalance}
+                              currentOpeningBalanceCurrency={c.openingBalanceCurrency}
+                              currentOpeningBalancePkr={c.openingBalancePkrEquivalent}
+                            />
                             <DeleteButton
                               description={`Delete customer "${c.name}"? All associated sales and receipts will also be deleted.`}
                               onDelete={deleteCustomerAction.bind(null, { id: c.id })}
