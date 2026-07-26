@@ -9,6 +9,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
+import { buildReceivablesAging, buildPayablesAging, sumBuckets, type AgingBuckets } from '@/lib/reports/aging'
 import { DashboardPeriodTabs } from './period-tabs'
 
 const CHART_COLORS = ['#0d9488', '#8b5cf6', '#f59e0b', '#3b82f6', '#ef4444', '#10b981', '#ec4899', '#f97316']
@@ -31,6 +32,83 @@ function KpiCard({ label, value, sub, up }: { label: string; value: string; sub?
           {up === false && <ArrowDownRight className="h-3 w-3" />}
           {sub}
         </p>
+      )}
+    </div>
+  )
+}
+
+const AGING_BANDS = [
+  { key: 'bucket0_30',   label: '0–30',  color: '#0d9488' },
+  { key: 'bucket31_60',  label: '31–60', color: '#f59e0b' },
+  { key: 'bucket61_90',  label: '61–90', color: '#f97316' },
+  { key: 'bucket90plus', label: '90+',   color: '#ef4444' },
+] as const
+
+/**
+ * Aging at a glance: how overdue the money is, not just how much of it there
+ * is. The bar is proportional so a heavy red right-hand end reads as trouble
+ * without having to compare the numbers.
+ */
+function AgingCard({ title, href, buckets, emptyMsg }: {
+  title: string
+  href: string
+  buckets: AgingBuckets
+  emptyMsg: string
+}) {
+  const overdue = buckets.total - buckets.bucket0_30
+
+  return (
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="min-w-0">
+          <p className="font-bold text-sm text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {buckets.total > 0
+              ? `${formatPKR(overdue)} past 30 days`
+              : 'Nothing outstanding'}
+          </p>
+        </div>
+        <Link href={href} className="text-xs text-primary font-semibold hover:underline shrink-0">Details →</Link>
+      </div>
+
+      {buckets.total <= 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">{emptyMsg}</p>
+      ) : (
+        <>
+          <div className="flex h-2.5 rounded-full overflow-hidden mb-4" style={{ background: 'hsl(var(--muted))' }}>
+            {AGING_BANDS.map((b) => {
+              const v = buckets[b.key]
+              if (v <= 0) return null
+              return (
+                <span
+                  key={b.key}
+                  title={`${b.label} days · ${formatPKR(v)}`}
+                  style={{ width: `${(v / buckets.total) * 100}%`, backgroundColor: b.color }}
+                />
+              )
+            })}
+          </div>
+
+          <div className="grid grid-cols-4 gap-2">
+            {AGING_BANDS.map((b) => (
+              <div key={b.key} className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: b.color }} />
+                  {b.label}
+                </p>
+                <p className="text-sm font-bold font-mono text-foreground mt-1 truncate">
+                  {buckets[b.key] > 0 ? shortPKR(buckets[b.key]) : '—'}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {buckets.oldestDate && (
+            <p className="text-xs text-muted-foreground mt-3">
+              Oldest outstanding since {formatPKTDate(buckets.oldestDate + 'T00:00:00')}
+            </p>
+          )}
+        </>
       )}
     </div>
   )
@@ -253,6 +331,8 @@ export default async function DashboardPage({
     { data: chartPurchasesData },
     tenant,
     { count: rawSupportCount },
+    receivablesAging,
+    payablesAging,
   ] = await Promise.all([
     admin.from('sales_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
     admin.from('purchase_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
@@ -278,8 +358,13 @@ export default async function DashboardPage({
     admin.from('purchase_orders').select('date, pkr_equivalent').eq('tenant_id', tenantId).gte('date', sixMonAgo),
     getTenant(tenantId),
     supportQ,
+    buildReceivablesAging(tenantId),
+    buildPayablesAging(tenantId),
   ])
   const supportCount = rawSupportCount ?? 0
+
+  const receivablesBuckets = sumBuckets(receivablesAging)
+  const payablesBuckets    = sumBuckets(payablesAging)
 
   const parse = (v: unknown) => parseFloat((v as string) || '0') || 0
 
@@ -463,6 +548,22 @@ export default async function DashboardPage({
         <KpiCard label="Receivables"     value={shortPKR(receivables)}  sub={receivables > 0 ? 'Outstanding from customers' : 'All settled'} />
         <KpiCard label="Payables"        value={shortPKR(payables)}     sub={payables > 0 ? 'Outstanding to suppliers' : 'All settled'} up={payables > 0 ? false : undefined} />
         <KpiCard label="Inventory"       value={totalInventoryUnits > 0 ? totalInventoryUnits.toLocaleString('en-IN') + ' units' : (inventoryData?.length ?? 0) + ' items'} sub="Stock on hand" />
+      </div>
+
+      {/* Aging — how overdue the two balances above actually are */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AgingCard
+          title="Receivables Aging"
+          href="/reports/receivables-aging"
+          buckets={receivablesBuckets}
+          emptyMsg="No outstanding receivables"
+        />
+        <AgingCard
+          title="Payables Aging"
+          href="/reports/payables-aging"
+          buckets={payablesBuckets}
+          emptyMsg="No outstanding payables"
+        />
       </div>
 
       {/* Owner: Sales KPIs */}
