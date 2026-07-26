@@ -9,6 +9,7 @@ import {
   UsersRound,
   Wallet,
   Search,
+  Lock,
   Landmark,
   BookOpen,
   Video,
@@ -68,6 +69,7 @@ function buildNavGroups(role: string, enabledModules: ModuleKey[]): NavGroup[] {
         { href: "/settings/modules",          label: "Modules",           icon: Settings },
         { href: "/settings/opening-balances", label: "Opening Balances",  icon: Wallet },
         { href: "/banks",                     label: "Banks",             icon: Landmark },
+        { href: "/settings/period-lock",      label: "Close the Books",   icon: Lock },
         { href: "/audit",                     label: "Audit Log",         icon: Search },
       ],
     });

@@ -17,6 +17,7 @@ const reports = [
   { href: '/reports/receivables-aging', label: 'Receivables Aging', description: 'Outstanding customer balances by 0–30, 31–60, 61–90, 90+ day buckets.', icon: TrendingUp },
   { href: '/reports/payables-aging', label: 'Payables Aging', description: 'Outstanding supplier balances by aging bucket.', icon: TrendingDown },
   { href: '/reports/employee-loans', label: 'Employee Loans', description: 'Outstanding loan balances and overdue installment amounts per employee, across all staff loans and advances.', icon: HandCoins },
+  { href: '/reports/pdc-register', label: 'Cheque Register', description: 'Every post-dated cheque with its due date, party, amount and status. Overdue cheques are flagged, and cheques are cleared or bounced from here.', icon: BookMarked },
   { href: '/reports/profit-loss', label: 'Profit & Loss', description: 'Revenue, cost of sales, operating expenses, and net profit for a date range.', icon: BarChart2 },
   { href: '/reports/balance-sheet', label: 'Balance Sheet', description: 'Assets, liabilities, and equity as of a given date. Verifies the accounting equation.', icon: Landmark },
   { href: '/reports/trial-balance', label: 'Trial Balance', description: 'All GL account balances as of a given date. Verifies that total debits equal total credits.', icon: Scale },
