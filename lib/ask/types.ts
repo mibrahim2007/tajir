@@ -35,10 +35,34 @@ export type AskText = {
   body: string
 }
 
-export type AskResponse = (AskTable | AskStats | AskText) & {
+/** A how-to / concept answer: numbered steps, caveats, and links to the screen. */
+export type AskGuide = {
+  kind: 'guide'
+  title: string
+  subtitle?: string
+  intro?: string
+  steps: string[]
+  notes?: string[]
+  links?: { label: string; href: string }[]
+}
+
+export type AskResponse = (AskTable | AskStats | AskText | AskGuide) & {
   /** Follow-up questions the user can tap. */
   suggestions?: string[]
 }
+
+/** How-to prompts, shown alongside the data ones on an empty page. */
+export const ASK_HOWTO_EXAMPLES = [
+  'How to load customer opening balances',
+  'How to load supplier opening balances',
+  'How to load opening stock location wise',
+  'How to create a sale invoice',
+  'How to create a purchase order',
+  'How to create a sale return',
+  'How to create a purchase return',
+  'What is PDC',
+  'Employee loans and advances',
+]
 
 /** Prompts shown on an empty page and offered as follow-ups. */
 export const ASK_EXAMPLES = [

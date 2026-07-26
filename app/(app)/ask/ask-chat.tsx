@@ -1,9 +1,10 @@
 'use client'
 
 import { useRef, useState, useTransition, useEffect } from 'react'
+import Link from 'next/link'
 import { Sparkles, ArrowUp, User } from 'lucide-react'
 import { askAction } from '@/app/actions/ask'
-import { ASK_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
+import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
 import { formatPKR } from '@/lib/utils/currency'
 
 type Turn =
@@ -39,6 +40,48 @@ function ResponseView({ r, onPick }: { r: AskResponse; onPick: (q: string) => vo
       {'subtitle' in r && r.subtitle && <p className="text-xs text-muted-foreground -mt-2">{r.subtitle}</p>}
 
       {r.kind === 'text' && <p className="text-sm leading-relaxed whitespace-pre-wrap">{r.body}</p>}
+
+      {r.kind === 'guide' && (
+        <>
+          {r.intro && <p className="text-sm leading-relaxed">{r.intro}</p>}
+
+          <ol className="space-y-2">
+            {r.steps.map((s, i) => (
+              <li key={i} className="flex gap-2.5 text-sm leading-relaxed">
+                <span className="h-5 w-5 rounded-full bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                  {i + 1}
+                </span>
+                <span className="min-w-0">{s}</span>
+              </li>
+            ))}
+          </ol>
+
+          {r.notes && r.notes.length > 0 && (
+            <ul className="rounded-xl border bg-muted/30 px-3.5 py-2.5 space-y-1.5">
+              {r.notes.map((n, i) => (
+                <li key={i} className="text-xs leading-relaxed text-muted-foreground flex gap-2">
+                  <span className="shrink-0">•</span>
+                  <span className="min-w-0">{n}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {r.links && r.links.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {r.links.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className="text-xs font-semibold px-2.5 py-1 rounded-full border bg-card hover:bg-accent hover:text-primary transition-colors"
+                >
+                  {l.label} →
+                </Link>
+              ))}
+            </div>
+          )}
+        </>
+      )}
 
       {r.kind === 'stats' && (
         <>
@@ -137,24 +180,40 @@ export function AskChat() {
           <Sparkles className="h-6 w-6 text-primary" /> Ask
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Ask about your ledgers, balances and activity. Answers come straight from your recorded data — nothing is estimated.
+          Ask about your ledgers, balances and activity, or how to do something in Tajir. Answers come straight from your recorded data — nothing is estimated.
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 space-y-4 pb-4">
         {turns.length === 0 && (
-          <div className="rounded-2xl border bg-card p-5">
-            <p className="text-sm font-medium mb-3">Try asking…</p>
-            <div className="flex flex-wrap gap-2">
-              {ASK_EXAMPLES.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => pick(s)}
-                  className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-primary transition-colors"
-                >
-                  {s.trim()}
-                </button>
-              ))}
+          <div className="rounded-2xl border bg-card p-5 space-y-4">
+            <div>
+              <p className="text-sm font-medium mb-3">Ask about your data…</p>
+              <div className="flex flex-wrap gap-2">
+                {ASK_EXAMPLES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => pick(s)}
+                    className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-primary transition-colors"
+                  >
+                    {s.trim()}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-3">…or how to do something</p>
+              <div className="flex flex-wrap gap-2">
+                {ASK_HOWTO_EXAMPLES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => pick(s)}
+                    className="text-sm px-3 py-1.5 rounded-full border bg-background hover:bg-accent hover:text-primary transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

@@ -10,7 +10,8 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
 import type { AskResponse, AskColumn } from '@/lib/ask/types'
-import { ASK_EXAMPLES } from '@/lib/ask/types'
+import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES } from '@/lib/ask/types'
+import { GUIDES, GUIDE_INDEX_KEYWORDS, matchGuide, type Guide } from '@/lib/ask/guides'
 
 type Entity = { id: string; name: string }
 
@@ -634,6 +635,15 @@ export async function runAsk(question: string): Promise<AskResponse> {
   const lowerQ = q.toLowerCase()
   const admin = createAdminClient()
 
+  // How-to / concept questions are answered before anything touches the data.
+  // They have to come first: "how to create a sale invoice" contains words that
+  // would otherwise partial-match a party or item name and get routed to a
+  // ledger. matchGuide() only fires on an explicit how-to cue or a phrase that
+  // can only be a question about the software, so data queries are unaffected.
+  if (GUIDE_INDEX_KEYWORDS.some((k) => lowerQ.includes(k))) return guideIndex()
+  const guide = matchGuide(lowerQ)
+  if (guide) return guideResponse(guide)
+
   const [{ data: customers }, { data: suppliers }, { data: items }] = await Promise.all([
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).limit(2000),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).limit(2000),
@@ -752,12 +762,36 @@ function text(body: string, suggestions?: string[]): AskResponse {
   return { kind: 'text', body, suggestions }
 }
 
+// ── How-to answers ──────────────────────────────────────────────────
+function guideResponse(g: Guide): AskResponse {
+  return {
+    kind: 'guide',
+    title: g.title,
+    subtitle: g.subtitle,
+    intro: g.intro,
+    steps: g.steps,
+    notes: g.notes,
+    links: g.links,
+    suggestions: g.related ?? ASK_HOWTO_EXAMPLES.slice(0, 3),
+  }
+}
+
+function guideIndex(): AskResponse {
+  return {
+    kind: 'text',
+    title: 'What I can walk you through',
+    body: GUIDES.map((g) => `• ${g.title}`).join('\n')
+      + '\n\nTap one below, or ask about your own data — ledgers, balances, stock and cheques.',
+    suggestions: ASK_HOWTO_EXAMPLES,
+  }
+}
+
 function help(): AskResponse {
   return {
     kind: 'text',
     title: 'Ask about your business',
-    body: 'Type a question about your own data — ledgers, balances, and activity. I only report what is already recorded, nothing is estimated. Try one of these:',
-    suggestions: ASK_EXAMPLES,
+    body: 'Type a question about your own data — ledgers, balances, and activity — or ask how to do something, like "how to create a sale invoice" or "what is PDC". I only report what is already recorded, nothing is estimated. Try one of these:',
+    suggestions: [...ASK_EXAMPLES.slice(0, 8), ...ASK_HOWTO_EXAMPLES.slice(0, 4)],
   }
 }
 
