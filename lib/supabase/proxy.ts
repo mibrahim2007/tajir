@@ -71,7 +71,14 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && isAuthRoute) {
+  // A protected page rejected this session even though the cookie still
+  // decodes here — getClaims() verifies the JWT locally, getUser() asks the
+  // auth server. Bouncing back to /dashboard would loop until the browser
+  // gave up (ERR_TOO_MANY_REDIRECTS), so let the login page render instead:
+  // it clears the dead cookie and takes new credentials.
+  const sessionRejected = request.nextUrl.searchParams.has("expired");
+
+  if (user && isAuthRoute && !sessionRejected) {
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     return NextResponse.redirect(url);

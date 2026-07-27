@@ -3,9 +3,11 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { loginAction } from '@/app/actions/login'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -20,6 +22,16 @@ type FormValues = z.infer<typeof schema>
 
 export function LoginForm() {
   const [serverError, setServerError] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+  const expired = searchParams.get('expired') === '1'
+
+  // We were sent here because a protected page rejected the session. The
+  // cookie is dead but still present, so clear it — otherwise it keeps being
+  // sent and the user stays in limbo. Same call the Logout button makes.
+  useEffect(() => {
+    if (!expired) return
+    createClient().auth.signOut({ scope: 'local' }).catch(() => {})
+  }, [expired])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -45,6 +57,11 @@ export function LoginForm() {
         <CardDescription>Sign in to your Tajir account</CardDescription>
       </CardHeader>
       <CardContent>
+        {expired && (
+          <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+            Your session has ended. Please sign in again.
+          </p>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <FormField
