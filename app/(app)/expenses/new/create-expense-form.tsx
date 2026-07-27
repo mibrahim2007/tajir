@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createExpenseAction } from '@/app/actions/create-expense'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
+import { VoiceExpenseInput } from '@/components/voice-expense-input'
+import type { ParsedExpense } from '@/lib/voice/parse-expense'
 
 type Account = { id: string; code: string; name: string; account_type: string }
 type Bank    = { id: string; name: string; account_number: string | null }
@@ -66,6 +68,20 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
   const selectedAccount  = accounts.find((a) => a.id === watchedAccountId)
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
+  // A voice note only ever pre-fills. Fields it could not make out are left
+  // alone rather than blanked, so a second attempt adds to the draft instead
+  // of wiping what the user has already corrected by hand.
+  const applyVoice = (p: ParsedExpense) => {
+    const opts = { shouldValidate: true, shouldDirty: true } as const
+    if (p.amount !== null) form.setValue('amount', p.amount, opts)
+    if (p.date) form.setValue('date', p.date, opts)
+    if (p.accountId) form.setValue('expenseAccountId', p.accountId, opts)
+    if (p.description) form.setValue('description', p.description, opts)
+    if (p.bankId) form.setValue('bankId', p.bankId, opts)
+    // "cash" is the absence of a bank, so say so explicitly.
+    else if (p.paidBy === 'cash') form.setValue('bankId', '', opts)
+  }
+
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
@@ -82,6 +98,13 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
 
         {/* ── LEFT COLUMN ── */}
         <div className="space-y-5">
+          <VoiceExpenseInput
+            today={today}
+            accounts={accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }))}
+            banks={banks.map((b) => ({ id: b.id, name: b.name }))}
+            onParsed={applyVoice}
+          />
+
           <Card>
             <CardHeader className="pb-3 pt-5 px-5">
               <CardTitle className="text-base">Expense Details</CardTitle>
