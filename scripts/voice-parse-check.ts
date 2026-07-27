@@ -73,6 +73,20 @@ for (const [sentence, want] of CASES) {
   else failures.push(`  "${sentence}"\n     ${problems.join('; ')}`)
 }
 
+// A spelled-out amount must not survive into the description. Caught live on
+// production: "das hazar ka bijli ka bill" produced "Das bijli bill".
+const descCases: [string, string][] = [
+  ['das hazar ka bijli ka bill naqad diya kal', 'Bijli bill'],
+  ['ek lakh ka rent diya', 'Rent'],
+  ['paid 5000 cash for office rent yesterday', 'Office rent'],
+]
+const descFailures = descCases
+  .map(([s, want]) => [s, want, parseExpense(s, { today: TODAY, accounts: ACCOUNTS, banks: BANKS }).description] as const)
+  .filter(([, want, got]) => got !== want)
+  .map(([s, want, got]) => `  "${s}"\n     description "${got}" ≠ "${want}"`)
+
+if (descFailures.length) console.log('DESCRIPTION FAILURES:\n' + descFailures.join('\n'))
+
 // A description is required by the form, so the parser must never leave it blank
 // when it identified an account.
 const blankDesc = CASES
@@ -82,4 +96,4 @@ const blankDesc = CASES
 console.log(`Voice parser: ${pass}/${CASES.length} passed`)
 if (failures.length) console.log('FAILURES:\n' + failures.join('\n'))
 console.log(`blank descriptions where an account was found: ${blankDesc}`)
-process.exit(failures.length === 0 && blankDesc === 0 ? 0 : 1)
+process.exit(failures.length === 0 && blankDesc === 0 && descFailures.length === 0 ? 0 : 1)

@@ -227,10 +227,21 @@ function matchBank(text: string, banks: BankOption[]): BankOption | null {
   return best
 }
 
+// "das hazar" is a spelled-out amount, so both words have to go together —
+// otherwise the description reads "Das bijli bill". Stripping number words on
+// their own is not safe: "do" and "sat" are also ordinary English words, and
+// only the ones sitting in front of a multiplier are certainly part of an
+// amount.
+const SPELLED_AMOUNT = new RegExp(
+  `\\b(${Object.keys(NUMBER_WORDS).join('|')})\\s+(thousand|hazar|hazaar|hazzar|lakh|lac|crore|karor|hundred|sau)\\b`,
+  'gi',
+)
+
 /** Strips the parts already understood, leaving something usable as a description. */
 function buildDescription(text: string, account: ExpenseAccount | null): string {
   const cleaned = text
     .replace(/\b(rs\.?|rupees?|rupay|rupaye|pkr)\b/gi, ' ')
+    .replace(SPELLED_AMOUNT, ' ')
     .replace(/[0-9][0-9,.]*/g, ' ')
     .replace(/\b(thousand|hazar|hazaar|lakh|lac|crore|karor|hundred|sau)\b/gi, ' ')
     .replace(/\b(paid|pay|spent|gave|diya|kiya|today|yesterday|aaj|kal|parso|cash|naqad|bank|online|cheque|transfer)\b/gi, ' ')
