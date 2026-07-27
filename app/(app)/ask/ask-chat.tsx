@@ -2,8 +2,9 @@
 
 import { useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, ArrowUp, User } from 'lucide-react'
+import { Sparkles, ArrowUp, User, Mic, Square } from 'lucide-react'
 import { askAction } from '@/app/actions/ask'
+import { useSpeechRecognition } from '@/hooks/use-speech-recognition'
 import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
 import { formatPKR } from '@/lib/utils/currency'
 
@@ -224,6 +225,18 @@ export function AskChat() {
     else submit(s)
   }
 
+  // Asking is read-only, so a spoken question is sent as soon as you stop
+  // talking — unlike the expense form, where speech only ever pre-fills
+  // because it would otherwise write to the ledger. A misheard question just
+  // returns the wrong answer, which costs nothing but a retry.
+  const speech = useSpeechRecognition((text) => submit(text))
+
+  // Show the words landing in the box while speaking, so it is obvious what
+  // is about to be asked.
+  useEffect(() => {
+    if (speech.listening && speech.transcript) setInput(speech.transcript)
+  }, [speech.listening, speech.transcript])
+
   return (
     <div className="flex flex-col h-[calc(100vh-3.5rem)] lg:h-screen max-w-3xl mx-auto">
       <div className="px-5 pt-6 pb-3 shrink-0">
@@ -318,6 +331,15 @@ export function AskChat() {
       </div>
 
       <div className="shrink-0 border-t bg-background px-5 py-3">
+        {speech.error && (
+          <p className="text-xs text-destructive mb-2">{speech.error}</p>
+        )}
+        {speech.listening && (
+          <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1.5">
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+            Listening… it will send when you stop speaking.
+          </p>
+        )}
         <form
           onSubmit={(e) => { e.preventDefault(); submit(input) }}
           className="flex items-center gap-2"
@@ -329,6 +351,25 @@ export function AskChat() {
             placeholder="Ask about a customer, supplier, item, or your balances…"
             className="flex-1 min-h-[44px] rounded-xl border bg-card px-4 text-sm outline-none focus:ring-2 focus:ring-primary/30"
           />
+
+          {/* Hidden where the browser cannot listen, rather than shown broken. */}
+          {speech.supported !== false && (
+            <button
+              type="button"
+              onClick={() => (speech.listening ? speech.stop() : speech.start())}
+              disabled={pending}
+              className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 border transition-colors disabled:opacity-40 ${
+                speech.listening
+                  ? 'bg-destructive text-white border-destructive'
+                  : 'bg-card hover:bg-accent hover:text-primary'
+              }`}
+              aria-label={speech.listening ? 'Stop listening' : 'Ask by voice'}
+              title={speech.listening ? 'Stop listening' : 'Ask by voice'}
+            >
+              {speech.listening ? <Square className="h-4 w-4" /> : <Mic className="h-5 w-5" />}
+            </button>
+          )}
+
           <button
             type="submit"
             disabled={pending || !input.trim()}

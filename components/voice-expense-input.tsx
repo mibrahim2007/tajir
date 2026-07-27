@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { Mic, Square, Keyboard, Check, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatPKR } from '@/lib/utils/currency'
+import { useSpeechRecognition, SPEECH_LANGS } from '@/hooks/use-speech-recognition'
 import { parseExpense, type ExpenseAccount, type BankOption, type ParsedExpense } from '@/lib/voice/parse-expense'
 
 // Speak an expense instead of typing it. The transcript is parsed on the
@@ -18,31 +19,6 @@ import { parseExpense, type ExpenseAccount, type BankOption, type ParsedExpense 
 // some in-app webviews — the same box takes typed text and parses it
 // identically, so the feature degrades instead of disappearing.
 
-type SpeechResultLike = { isFinal: boolean; 0: { transcript: string } }
-type SpeechEventLike = { resultIndex: number; results: { length: number } & Record<number, SpeechResultLike> }
-type RecognitionLike = {
-  lang: string
-  continuous: boolean
-  interimResults: boolean
-  start: () => void
-  stop: () => void
-  onresult: ((e: SpeechEventLike) => void) | null
-  onerror: ((e: { error: string }) => void) | null
-  onend: (() => void) | null
-}
-
-function getRecognition(): RecognitionLike | null {
-  if (typeof window === 'undefined') return null
-  const w = window as unknown as { SpeechRecognition?: new () => RecognitionLike; webkitSpeechRecognition?: new () => RecognitionLike }
-  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition
-  return Ctor ? new Ctor() : null
-}
-
-const LANGS = [
-  { code: 'en-US', label: 'English' },
-  { code: 'ur-PK', label: 'اردو' },
-]
-
 export function VoiceExpenseInput({
   today,
   accounts,
@@ -54,18 +30,9 @@ export function VoiceExpenseInput({
   banks: BankOption[]
   onParsed: (p: ParsedExpense) => void
 }) {
-  const [supported, setSupported] = useState<boolean | null>(null)
-  const [listening, setListening] = useState(false)
-  const [transcript, setTranscript] = useState('')
   const [typed, setTyped] = useState('')
   const [typing, setTyping] = useState(false)
-  const [lang, setLang] = useState('en-US')
-  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<ParsedExpense | null>(null)
-  const recRef = useRef<RecognitionLike | null>(null)
-
-  // Probed on mount, not during render, so the server and client markup agree.
-  useEffect(() => { setSupported(getRecognition() !== null) }, [])
 
   const apply = (text: string) => {
     const clean = text.trim()
@@ -75,52 +42,11 @@ export function VoiceExpenseInput({
     onParsed(parsed)
   }
 
-  const start = () => {
-    setError(null)
-    setResult(null)
-    setTranscript('')
-    const rec = getRecognition()
-    if (!rec) { setSupported(false); setTyping(true); return }
+  const speech = useSpeechRecognition(apply)
+  const { supported, listening, transcript, error, lang, setLang } = speech
 
-    rec.lang = lang
-    rec.continuous = false
-    rec.interimResults = true
-
-    let finalText = ''
-    rec.onresult = (e) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i]
-        if (r.isFinal) finalText += r[0].transcript
-        else interim += r[0].transcript
-      }
-      setTranscript((finalText + interim).trim())
-    }
-    rec.onerror = (e) => {
-      setListening(false)
-      setError(
-        e.error === 'not-allowed'
-          ? 'Microphone permission was refused. Allow it in the browser, or type instead.'
-          : e.error === 'no-speech'
-            ? 'I did not catch anything. Try again, or type instead.'
-            : `Could not listen (${e.error}). You can type instead.`,
-      )
-    }
-    rec.onend = () => {
-      setListening(false)
-      if (finalText.trim()) apply(finalText)
-    }
-
-    recRef.current = rec
-    try {
-      rec.start()
-      setListening(true)
-    } catch {
-      setError('Could not start the microphone. You can type instead.')
-    }
-  }
-
-  const stop = () => { recRef.current?.stop(); setListening(false) }
+  const start = () => { setResult(null); speech.start() }
+  const stop = () => speech.stop()
 
   return (
     <div className="rounded-2xl border bg-card p-4 space-y-3">
@@ -138,7 +64,7 @@ export function VoiceExpenseInput({
             className="text-xs border rounded-lg px-2 py-1 bg-background shrink-0"
             aria-label="Speech language"
           >
-            {LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
+            {SPEECH_LANGS.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
           </select>
         )}
       </div>
