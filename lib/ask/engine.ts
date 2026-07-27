@@ -365,43 +365,78 @@ async function payables(ctx: Ctx): Promise<AskResponse> {
   }
 }
 
-// A partial name that matches several parties → list them all (case-insensitive
-// ILIKE search in SQL), so "Ali" shows every customer/supplier containing "Ali"
-// instead of the engine picking one. Each row carries its current balance and a
-// tappable "Ledger of …" follow-up.
-async function partySearch(
+// A name fragment lists everything it matches, anywhere in the tenant's
+// records — customers, suppliers, stock items (by name, code or SKU) and
+// employees — the way an ILIKE '%term%' search is expected to behave.
+//
+// This used to search parties only, so a fragment like "card" found nothing to
+// disambiguate, fell through to fuzzy matching, and silently returned ONE
+// item's ledger while the others stayed invisible.
+const TYPE_LABEL: Record<string, string> = {
+  customer: 'Customer', supplier: 'Supplier', item: 'Item', employee: 'Employee',
+}
+
+function searchStatus(kind: string, value: number | null): string {
+  if (kind === 'item') return value === null ? '—' : `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} on hand`
+  if (kind === 'employee') return '—'
+  if (value === null || Math.abs(value) < 0.01) return 'Settled'
+  if (kind === 'customer') return value > 0 ? `Owes you ${formatPKR(value)}` : `In credit ${formatPKR(-value)}`
+  return value > 0 ? `You owe ${formatPKR(value)}` : `Advance paid ${formatPKR(-value)}`
+}
+
+/** The follow-up that makes sense for each kind of match. */
+function searchFollowUp(kind: string, name: string): string | null {
+  if (kind === 'item') return `Item ledger for ${name}`
+  if (kind === 'customer' || kind === 'supplier') return `Ledger of ${name}`
+  return null
+}
+
+async function universalSearch(
   admin: ReturnType<typeof createAdminClient>,
   tenantId: string,
   term: string,
 ): Promise<AskResponse> {
-  const raw = await callRpc(admin, 'ask_search_parties', { p_tenant_id: tenantId, p_term: term })
-  if (!raw.length) return text(`No customer or supplier matches "${term}".`, ASK_EXAMPLES)
+  const raw = await callRpc(admin, 'ask_search_all', { p_tenant_id: tenantId, p_term: term })
+  if (!raw.length) {
+    return text(`Nothing in your records matches "${term}" — no customer, supplier, item or employee.`, ASK_EXAMPLES)
+  }
+
   const rows = raw.map((r) => {
-    const kind = (r.kind as string) === 'supplier' ? 'supplier' : 'customer'
-    const bal = num(r.balance)
-    const settled = Math.abs(bal) < 0.01
+    const kind = (r.kind as string) ?? ''
+    const value = r.value === null || r.value === undefined ? null : num(r.value)
     return {
       name: (r.name as string) ?? '—',
-      type: kind === 'customer' ? 'Customer' : 'Supplier',
-      status: settled ? 'Settled' : kind === 'customer'
-        ? (bal > 0 ? 'Owes you' : 'In credit')
-        : (bal > 0 ? 'You owe' : 'Advance paid'),
-      balance: Math.abs(bal),
+      type: TYPE_LABEL[kind] ?? kind,
+      detail: (r.detail as string) || '',
+      status: searchStatus(kind, value),
+      _kind: kind,
     }
   })
+
+  // "3 items, 2 customers" reads better than a bare total.
+  const counts = new Map<string, number>()
+  for (const r of rows) counts.set(r.type, (counts.get(r.type) ?? 0) + 1)
+  const breakdown = [...counts.entries()]
+    .map(([t, n]) => `${n} ${t.toLowerCase()}${n !== 1 ? 's' : ''}`)
+    .join(', ')
+
   return {
     kind: 'table',
-    title: `Parties matching "${term}"`,
-    subtitle: `${rows.length} customer/supplier match${rows.length !== 1 ? 'es' : ''} — tap one for its ledger`,
+    title: `Matches for "${term}"`,
+    subtitle: raw.length >= 60 ? 'Showing the first 60 matches' : 'Tap one below to open it',
     columns: [
       { key: 'name', label: 'Name' },
       { key: 'type', label: 'Type' },
-      { key: 'status', label: 'Status' },
-      { key: 'balance', label: 'Balance', kind: 'money' },
+      { key: 'detail', label: 'Code' },
+      { key: 'status', label: 'Balance / Stock' },
     ],
-    rows,
-    summary: `${rows.length} parties match "${term}".`,
-    suggestions: rows.slice(0, 6).map((r) => `Ledger of ${r.name}`),
+    // _kind drives the follow-ups below; it is not a column.
+    rows: rows.map((r) => ({ name: r.name, type: r.type, detail: r.detail, status: r.status })),
+    summary: `${breakdown} match “${term}”.`,
+    suggestions: rows
+      .map((r) => searchFollowUp(r._kind, r.name))
+      .filter((s): s is string => s !== null)
+      .slice(0, 6),
   }
 }
 
@@ -665,27 +700,39 @@ export async function runAsk(question: string): Promise<AskResponse> {
   const custList = (customers ?? []) as Entity[]
   const supList = (suppliers ?? []) as Entity[]
 
-  // Disambiguation: a partial name matching several parties lists them all,
-  // rather than the engine silently picking one. Skipped when the query already
-  // contains a party's full name (then the user has named a specific one). The
-  // search term is the question's most-matching non-stopword word.
-  const hasExactParty = [...custList, ...supList].some((e) => {
+  const itemList = (items ?? []) as Entity[]
+  const searchable = [...custList, ...supList, ...itemList]
+
+  // "search card", "find ali" — an explicit request always lists, however many
+  // things match, so there is a reliable way to see everything.
+  const explicit = lowerQ.match(/^(?:search|find|look\s*(?:for|up)|show\s+all|list\s+all|talash)\s+(?:for\s+)?(.{2,40})$/)
+  if (explicit) return universalSearch(admin, tenantId, explicit[1].trim())
+
+  // Disambiguation: a fragment matching several records lists them all, rather
+  // than the engine silently picking one. Skipped when the query already
+  // contains a full name (then the user has named a specific one). The search
+  // term is the question's most-matching non-stopword word.
+  //
+  // Items are included here — when they were not, "card" matched no party, fell
+  // through to fuzzy matching and returned ONE item's ledger with no sign that
+  // other items also matched.
+  const hasExactName = searchable.some((e) => {
     const n = (e.name ?? '').trim().toLowerCase()
     return n.length >= 2 && lowerQ.includes(n)
   })
-  if (!hasExactParty) {
+  if (!hasExactName) {
     let term = ''
     let termHits = 0
     for (const t of tokenize(lowerQ).filter((t) => t.length >= 3 && !NAME_STOPWORDS.has(t))) {
-      const hits = [...custList, ...supList].filter((e) => (e.name ?? '').toLowerCase().includes(t)).length
+      const hits = searchable.filter((e) => (e.name ?? '').toLowerCase().includes(t)).length
       if (hits > termHits) { termHits = hits; term = t }
     }
-    if (term && termHits >= 2) return partySearch(admin, tenantId, term)
+    if (term && termHits >= 2) return universalSearch(admin, tenantId, term)
   }
 
   const customer = resolveEntity(lowerQ, custList)
   const supplier = resolveEntity(lowerQ, supList)
-  const item = resolveEntity(lowerQ, (items ?? []) as Entity[])
+  const item = resolveEntity(lowerQ, itemList)
 
   // Score each intent.
   const score = new Map<string, number>()
