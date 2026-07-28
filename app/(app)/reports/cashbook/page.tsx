@@ -29,14 +29,30 @@ export default async function CashbookPage({ searchParams }: { searchParams: Sea
 
   const admin = createAdminClient()
 
-  // Cash & bank accounts are the non-header children of the "Cash & Bank" group (parent 1100).
+  // The cash & bank accounts, resolved by system_key — the same way every GL
+  // post picks its money account.
+  //
+  // This used to select every non-header child of 1100, described in a comment
+  // as "the Cash & Bank group". 1100 is CURRENT ASSETS, so that also swept in
+  // Accounts Receivable, Employee Loans & Advances, Stock in Trade, Prepaid
+  // Expenses and Freight Clearing. Two things went wrong. A cash loan to an
+  // employee (DR 1135 / CR 1110) appeared TWICE — the 1135 debit as an inflow
+  // and the 1110 credit as an outflow — netting to zero, so cash genuinely
+  // leaving the till looked like no movement at all. And the "All Cash & Bank"
+  // opening and closing figures quietly included receivables and stock, so the
+  // closing balance was not a cash balance.
+  //
+  // PDC (1112) is deliberately NOT here: a cheque in hand is not cash until it
+  // clears, and clearing one posts into 1110/1120, where this report picks it
+  // up on the day it actually becomes cash. Cheques on hand live in the Cheque
+  // Register.
   const { data: rawCashAccounts } = await admin
     .from('chart_of_accounts')
     .select('id, code, name')
     .eq('tenant_id', tenantId)
     .eq('is_active', true)
     .eq('is_header', false)
-    .eq('parent_code', '1100')
+    .in('system_key', ['cash_in_hand', 'cash_at_bank'])
     .order('code')
 
   const cashAccounts = rawCashAccounts ?? []
@@ -166,7 +182,17 @@ export default async function CashbookPage({ searchParams }: { searchParams: Sea
         </div>
       </div>
 
-      {rows.length === 0 ? (
+      {cashAccounts.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-12 text-center mt-4">
+          <p className="text-muted-foreground text-sm">
+            No cash or bank accounts found in your chart of accounts.
+          </p>
+          <p className="text-muted-foreground text-xs mt-1">
+            Seed the standard chart from Accounts — the cashbook reads 1110 Cash in Hand and
+            1120 Cash at Bank.
+          </p>
+        </div>
+      ) : rows.length === 0 ? (
         <div className="rounded-lg border border-dashed p-12 text-center mt-4">
           <p className="text-muted-foreground text-sm">
             No cash or bank movements on {dateLabel}
