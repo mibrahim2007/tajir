@@ -386,7 +386,22 @@ Shows how long customer balances have been outstanding.
 
 **How aging is calculated:** Receipts are applied FIFO (oldest invoice paid first). Whatever remains unpaid is bucketed by the original invoice date.
 
-**Export Excel** downloads the full aging table with a grand total row.
+**Employee loans & advances** appear in a second section below your customers,
+covering money paid to staff that has not yet been recovered, with a combined
+**Total Receivable** underneath. The date an amount ages from depends on the
+loan:
+
+- **With an installment schedule** — each unpaid installment ages from its own
+  due date, so a loan being repaid on time stays current instead of looking
+  months overdue. Installments not yet due sit in the 0–30 column.
+- **Without a schedule** — the whole unrecovered amount ages from the
+  disbursement date, since it is repayable on demand.
+
+Repayments are applied with the same FIFO allocation the employee ledger uses,
+so this section always agrees with **Reports → Employee Loans** and with the
+`1135 Employee Loans & Advances` balance on the Balance Sheet.
+
+**Export Excel** downloads both sections with their subtotals and a grand total row.
 
 ---
 

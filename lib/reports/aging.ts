@@ -8,6 +8,7 @@
 // Both sides now use the same credit set as their party list.
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
 
 export function ageDays(dateStr: string): number {
   const today = new Date()
@@ -127,6 +128,91 @@ export async function buildReceivablesAging(tenantId: string): Promise<AgingRow[
 
     const buckets = bucketParty(lines, credits)
     if (buckets.total > 0.005) rows.push({ partyId: c.id, partyName: c.name, ...buckets })
+  }
+
+  return rows.sort((a, b) => b.total - a.total)
+}
+
+/**
+ * What each employee still owes on loans and advances, aged the same way the
+ * customer side is — so an unrecovered staff advance can be chased like an
+ * unpaid invoice instead of only sitting as a balance on account 1135.
+ *
+ * The date an amount ages from depends on how the loan was set up:
+ *
+ *   • With an installment schedule → each UNPAID installment ages from its own
+ *     due date. A twelve-month loan taken six months ago and repaid on time is
+ *     current, not 90+ days late. Installments not yet due have a future date,
+ *     so they land in the 0–30 (not-yet-overdue) column.
+ *   • Without a schedule → the whole unrecovered amount ages from the
+ *     disbursement date, since it is repayable on demand.
+ *
+ * Repayments are already netted off by allocateEmployeeLoans — the same FIFO
+ * the ledger and the Employee Loans report use — so `credits` is zero here.
+ * Passing them again would settle them twice.
+ */
+export function employeeLoanAgingLines(
+  loans: LoanInput[],
+  repayments: RepaymentInput[],
+  today: string,
+): { date: string; amount: number }[] {
+  const { loans: allocated } = allocateEmployeeLoans(loans, repayments, today)
+  const byId = new Map(loans.map((l) => [l.id, l]))
+
+  const lines: { date: string; amount: number }[] = []
+  for (const loan of allocated) {
+    if (loan.outstandingPkr <= 0.005) continue
+    const source = byId.get(loan.loanId)
+    const unpaid = loan.installments
+      .map((i) => ({ date: i.dueDate, amount: i.amountPkr - i.paidPkr }))
+      .filter((i) => i.amount > 0.005)
+    const unpaidTotal = unpaid.reduce((s, i) => s + i.amount, 0)
+
+    // Fall back to one line at the disbursement date when there is no schedule,
+    // or when the schedule does not account for the full outstanding amount —
+    // the aged total must always equal the Employee Loans report's outstanding,
+    // or the two reports disagree about the same money.
+    if (unpaid.length > 0 && Math.abs(unpaidTotal - loan.outstandingPkr) < 0.01) {
+      lines.push(...unpaid)
+    } else {
+      lines.push({ date: source?.disbursementDate ?? today, amount: loan.outstandingPkr })
+    }
+  }
+  return lines
+}
+
+export async function buildEmployeeLoanAging(tenantId: string): Promise<AgingRow[]> {
+  const admin = createAdminClient()
+  const today = new Date().toISOString().split('T')[0]
+
+  const [{ data: rawEmployees }, { data: rawLoans }, { data: rawRepayments }] = await Promise.all([
+    admin.from('employees').select('id, name').eq('tenant_id', tenantId),
+    admin.from('employee_loans')
+      .select('id, employee_id, disbursement_date, exchange_rate, pkr_equivalent, loan_installments(installment_no, due_date, amount)')
+      .eq('tenant_id', tenantId).neq('status', 'void'),
+    admin.from('loan_repayments').select('id, employee_id, date, pkr_equivalent, loan_id').eq('tenant_id', tenantId),
+  ])
+
+  const loans = rawLoans ?? []
+  const repayments = rawRepayments ?? []
+  const rows: AgingRow[] = []
+
+  for (const emp of rawEmployees ?? []) {
+    const empLoans: LoanInput[] = loans.filter((l) => l.employee_id === emp.id).map((l) => ({
+      id: l.id,
+      disbursementDate: l.disbursement_date,
+      principalPkr: l.pkr_equivalent,
+      installments: ((l.loan_installments ?? []) as { installment_no: number; due_date: string; amount: number }[])
+        .map((i) => ({ installmentNo: i.installment_no, dueDate: i.due_date, amountPkr: i.amount * l.exchange_rate })),
+    }))
+    if (empLoans.length === 0) continue
+
+    const empRepayments: RepaymentInput[] = repayments
+      .filter((r) => r.employee_id === emp.id)
+      .map((r) => ({ id: r.id, date: r.date, pkr: r.pkr_equivalent, loanId: r.loan_id ?? null }))
+
+    const buckets = bucketParty(employeeLoanAgingLines(empLoans, empRepayments, today), 0)
+    if (buckets.total > 0.005) rows.push({ partyId: emp.id, partyName: emp.name, ...buckets })
   }
 
   return rows.sort((a, b) => b.total - a.total)
