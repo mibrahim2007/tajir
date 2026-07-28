@@ -148,6 +148,7 @@ const EN_REPORTS: Report[] = [
   { name: 'Consolidated Ledger', desc: 'One net statement for a party that is both a customer and a supplier.' },
   { name: 'Daily Cashbook', desc: 'Cash and bank movements for a single day with opening and closing balances.' },
   { name: 'Bank Statement', desc: 'All transactions for one bank account over a date range.' },
+  { name: 'Custom Reports', desc: 'Statements you design yourself — your own reporting headers, the account codes mapped to each, and how every line behaves.' },
 ]
 
 const UR_REPORTS: UReport[] = [
@@ -172,6 +173,7 @@ const UR_REPORTS: UReport[] = [
   { name: 'مشترکہ لیجر', desc: 'ایک ہی فریق جو گاہک بھی ہو اور سپلائر بھی — دونوں کا مشترکہ خالص بیان۔' },
   { name: 'روزانہ کیش بک', desc: 'ایک دن کی نقدی آمد و رفت اور ابتدائی و اختتامی بیلنس۔' },
   { name: 'بینک اسٹیٹمنٹ', desc: 'منتخب بینک اکاؤنٹ کا تاریخی بیان۔' },
+  { name: 'کسٹم رپورٹس', desc: 'اپنی مرضی کے مالیاتی بیانات — اپنے رپورٹنگ ہیڈر، ہر ہیڈر کے اکاؤنٹ کوڈز، اور ہر لائن کا رویہ خود منتخب کریں۔' },
 ]
 
 /* ─── MAIN COMPONENT ─────────────────────────── */

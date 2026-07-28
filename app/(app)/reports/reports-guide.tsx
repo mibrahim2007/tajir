@@ -37,6 +37,10 @@ const EN: QA[] = [
     a: 'Yes — most reports have Print and Export buttons so you can save or share them.' },
   { q: 'What do Customer and Item Profit & Loss show?',
     a: 'Gross profit per customer or per item, comparing the sale value against the purchase cost.' },
+  { q: 'Can I design my own financial statement?',
+    a: 'Yes — open Custom Reports. Start from a Profit & Loss, Balance Sheet or blank template, then set your own reporting headers, map the account codes that roll into each one, and choose how every line behaves (sign, roll-up of child accounts, account-level detail, subtotals). Figures are always read live from the general ledger.' },
+  { q: 'What does a custom report’s “behaviour” mean?',
+    a: 'Per line you choose: whether debit or credit balances print as positive (revenue and liabilities normally use credit-positive), whether child accounts roll up into the heading, whether each contributing account is listed underneath, indentation, bold, and a rule above the amount. Subtotal lines add and subtract other lines by their reference, e.g. REV − COGS.' },
 ]
 
 /* ─── Urdu Q&A (RTL) — رپورٹس اور اکاؤنٹنگ ──────────── */
@@ -69,6 +73,10 @@ const UR: QA[] = [
     a: 'جی ہاں — اکثر رپورٹس میں Print اور Export کے بٹن موجود ہیں تاکہ آپ انہیں محفوظ یا شیئر کر سکیں۔' },
   { q: 'Customer اور Item Profit & Loss کیا دکھاتی ہیں؟',
     a: 'فی گاہک یا فی آئٹم مجموعی نفع، فروخت کی قیمت کا خرید لاگت سے موازنہ۔' },
+  { q: 'کیا میں اپنی مرضی کی مالیاتی رپورٹ بنا سکتا ہوں؟',
+    a: 'جی ہاں — Custom Reports کھولیں۔ Profit & Loss، Balance Sheet یا خالی ٹیمپلیٹ سے شروع کریں، پھر اپنے رپورٹنگ ہیڈر بنائیں، ہر ہیڈر کے ساتھ اکاؤنٹ کوڈز منسلک کریں، اور ہر لائن کا رویہ منتخب کریں۔ رقم ہمیشہ جنرل لیجر سے براہِ راست لی جاتی ہے۔' },
+  { q: 'کسٹم رپورٹ میں لائن کا "رویہ" کیا ہوتا ہے؟',
+    a: 'ہر لائن کے لیے: ڈیبٹ یا کریڈٹ بیلنس مثبت دکھایا جائے (آمدنی اور واجبات کے لیے عموماً کریڈٹ مثبت)، ذیلی اکاؤنٹس شامل ہوں یا نہیں، ہر اکاؤنٹ الگ دکھایا جائے یا نہیں، اِنڈینٹ، بولڈ، اور رقم کے اوپر لکیر۔ Subtotal لائنیں دوسری لائنوں کو ان کے حوالے سے جمع/منہا کرتی ہیں، مثلاً REV − COGS۔' },
 ]
 
 export function ReportsGuide() {

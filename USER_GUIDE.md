@@ -401,6 +401,62 @@ Same structure as Receivables Aging but for supplier balances.
 
 ---
 
+### 9.5 Custom Reports
+
+**Path:** Reports → Custom Reports
+
+Design your own financial statement: you choose the reporting headers, the GL
+account codes that roll into each one, and how every line behaves.
+
+**Creating one**
+
+1. Click **New Report** and pick a starting layout — Profit & Loss, Balance
+   Sheet, Expense Summary, or blank. Every part of it stays editable.
+2. The layout builder opens. Save when done, or **Save & View** to run it.
+
+**Report settings**
+
+| Setting | What it does |
+|---|---|
+| Reporting basis | **Date range** shows movement between two dates (P&L style). **As of date** shows cumulative balances to one date (Balance Sheet style). |
+| Hide zero rows | Leaves out lines that come to zero for the selected period. |
+
+**Line types**
+
+| Type | Purpose |
+|---|---|
+| Section heading | A caption only — prints no amount. |
+| Reporting header | Totals the account codes mapped to it. |
+| Subtotal / calculation | Adds and subtracts other lines by their reference, e.g. `REV - COGS`. |
+| Blank line | Visual spacing. |
+
+**Per-line behaviour** (reporting-header lines)
+
+| Option | Effect |
+|---|---|
+| Debit / credit positive | Choose which side prints as a positive number. Revenue, liabilities and equity normally use **credit positive**; assets and expenses use **debit positive**. |
+| Roll up child accounts | Mapping a heading like `4000 REVENUE` also counts everything beneath it, so new sub-accounts appear automatically. |
+| List each account below | Prints every contributing account under the header. |
+| Indent, Bold, Rule above amount | Presentation only. |
+
+**References and formulas**
+
+Give a line a short **Reference** (e.g. `REV`) and a subtotal further down can
+name it. Formulas combine references and numbers with `+` and `-` only, and may
+only use references defined *above* the subtotal.
+
+**Notes**
+
+- Layouts store no amounts. Every figure is read live from the general ledger
+  using the same aggregation as the Profit & Loss, Balance Sheet and Trial
+  Balance — a custom report cannot drift from them.
+- Accounts that have a balance but are not on the report are listed in an amber
+  panel below it, so nothing is silently omitted.
+- Owners create and edit layouts; assistants can run and export them.
+- Reports print, and export to Excel.
+
+---
+
 ## 10. Audit Trail
 
 **Path:** Audit (Owner only)

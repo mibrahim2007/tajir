@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins, Receipt } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins, Receipt, FileSpreadsheet } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { ReportsGuide } from './reports-guide'
 
@@ -25,6 +25,7 @@ const reports = [
   { href: '/reports/consolidated-ledger', label: 'Consolidated Ledger', description: 'Map a customer to its supplier counterpart and view one net statement combining receivables and payables for the same party.', icon: Link2 },
   { href: '/reports/cashbook', label: 'Daily Cashbook', description: 'Cash in, cash out, and running balance across cash & bank accounts for a single day, with opening and closing balances.', icon: Wallet },
   { href: '/reports/bank-statement', label: 'Bank Statement', description: 'All deposits, withdrawals and running balance for a selected bank account over a date range. Printable.', icon: Landmark },
+  { href: '/reports/custom', label: 'Custom Reports', description: 'Build your own financial statements — choose the reporting headers, map the account codes that roll into each, and set how every line behaves.', icon: FileSpreadsheet },
 ]
 
 export default async function ReportsPage() {

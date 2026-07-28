@@ -549,6 +549,161 @@ export type Database = {
           },
         ]
       }
+      custom_report_line_accounts: {
+        Row: {
+          account_code: string
+          created_at: string
+          id: string
+          line_id: string
+          tenant_id: string
+        }
+        Insert: {
+          account_code: string
+          created_at?: string
+          id?: string
+          line_id: string
+          tenant_id: string
+        }
+        Update: {
+          account_code?: string
+          created_at?: string
+          id?: string
+          line_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_report_line_accounts_line_id_fkey"
+            columns: ["line_id"]
+            isOneToOne: false
+            referencedRelation: "custom_report_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_report_line_accounts_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_report_lines: {
+        Row: {
+          created_at: string
+          formula: string | null
+          id: string
+          include_children: boolean
+          indent: number
+          is_bold: boolean
+          label: string
+          line_type: string
+          ref: string | null
+          report_id: string
+          show_detail: boolean
+          sign: string
+          sort_order: number
+          tenant_id: string
+          underline: boolean
+        }
+        Insert: {
+          created_at?: string
+          formula?: string | null
+          id?: string
+          include_children?: boolean
+          indent?: number
+          is_bold?: boolean
+          label?: string
+          line_type: string
+          ref?: string | null
+          report_id: string
+          show_detail?: boolean
+          sign?: string
+          sort_order?: number
+          tenant_id: string
+          underline?: boolean
+        }
+        Update: {
+          created_at?: string
+          formula?: string | null
+          id?: string
+          include_children?: boolean
+          indent?: number
+          is_bold?: boolean
+          label?: string
+          line_type?: string
+          ref?: string | null
+          report_id?: string
+          show_detail?: boolean
+          sign?: string
+          sort_order?: number
+          tenant_id?: string
+          underline?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_report_lines_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "custom_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_report_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_reports: {
+        Row: {
+          basis: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          hide_zero_rows: boolean
+          id: string
+          is_active: boolean
+          name: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          basis?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hide_zero_rows?: boolean
+          id?: string
+          is_active?: boolean
+          name: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          basis?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          hide_zero_rows?: boolean
+          id?: string
+          is_active?: boolean
+          name?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_reports_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_price_lists: {
         Row: {
           created_at: string

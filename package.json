@@ -10,7 +10,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "check:ask": "tsx scripts/ask-routing-check.ts",
-    "check:voice": "tsx scripts/voice-parse-check.ts"
+    "check:voice": "tsx scripts/voice-parse-check.ts",
+    "check:custom-report": "tsx --env-file=.env.local scripts/custom-report-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
