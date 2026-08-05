@@ -16,6 +16,7 @@ import { CUSTOMER_STATUSES, CUSTOMER_STATUS_LABELS, toCustomerStatus, type Custo
 
 type FormValues = {
   name: string
+  email: string
   status: CustomerStatus
   openingBalance: number
   openingBalanceCurrency: 'PKR' | 'USD'
@@ -25,6 +26,7 @@ type FormValues = {
 type Props = {
   id: string
   currentName: string
+  currentEmail?: string | null
   currentStatus?: string
   currentOpeningBalance?: number
   currentOpeningBalanceCurrency?: string
@@ -34,6 +36,7 @@ type Props = {
 export function EditCustomerForm({
   id,
   currentName,
+  currentEmail,
   currentStatus,
   currentOpeningBalance = 0,
   currentOpeningBalanceCurrency,
@@ -52,6 +55,7 @@ export function EditCustomerForm({
 
   const defaults: FormValues = {
     name: currentName,
+    email: currentEmail ?? '',
     status: toCustomerStatus(currentStatus),
     openingBalance: currentOpeningBalance,
     openingBalanceCurrency: currency,
@@ -63,7 +67,7 @@ export function EditCustomerForm({
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
-      const result = await editCustomerAction({ id, name: values.name, status: values.status })
+      const result = await editCustomerAction({ id, name: values.name, email: values.email, status: values.status })
       if (!result.success) { setError(result.error); return }
 
       const amount = Number.isFinite(values.openingBalance) ? values.openingBalance : 0
@@ -107,6 +111,16 @@ export function EditCustomerForm({
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" inputMode="email" placeholder="name@example.com" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">Optional. Lets you email this customer their ledger from Ask.</p>
                 <FormMessage />
               </FormItem>
             )} />

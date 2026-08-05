@@ -64,9 +64,45 @@ export type AskTopics = {
   groups: { category: string; questions: string[] }[]
 }
 
+/**
+ * The one party a data answer is about, when it is about exactly one — set on
+ * ledgers and business summaries. It lets the "email this answer" dialog offer
+ * to send a customer their own statement, without the browser ever choosing a
+ * recipient address: the action looks the address up again server-side.
+ */
+export type AskParty = {
+  type: 'customer' | 'supplier'
+  id: string
+  name: string
+  /** null when no address is on file — the option is shown but disabled. */
+  email: string | null
+}
+
 export type AskResponse = (AskTable | AskStats | AskText | AskGuide | AskFaq | AskTopics) & {
   /** Follow-up questions the user can tap. */
   suggestions?: string[]
+  /** Present only on answers built from stored data about a single party. */
+  party?: AskParty
+  /**
+   * Set when the answer was produced by a typed "email me …" command and has
+   * already been sent, so the chat can show a confirmation above it.
+   */
+  emailed?: { to: string[]; failed?: string }
+  /**
+   * The question actually answered. Differs from what the user typed only when
+   * an "email me …" directive was stripped off the front — the chat keeps this
+   * one, so pressing "Email this answer" later re-runs the query, not the
+   * directive.
+   */
+  asked?: string
+}
+
+/**
+ * Only tabular and stat answers carry data worth emailing — a how-to guide or
+ * an FAQ is the same for every tenant and is already on screen.
+ */
+export function isEmailable(r: AskResponse): boolean {
+  return r.kind === 'table' || r.kind === 'stats'
 }
 
 /** Starter questions for someone who has just been given a login. */

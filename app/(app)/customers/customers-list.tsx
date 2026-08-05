@@ -14,6 +14,7 @@ import { CUSTOMER_STATUSES, CUSTOMER_STATUS_LABELS, CUSTOMER_STATUS_BADGE, toCus
 export type CustomerListItem = {
   id: string
   name: string
+  email?: string | null
   status?: string
   outstanding: number
   openingBalance: number
@@ -118,6 +119,7 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                             <EditCustomerForm
                               id={c.id}
                               currentName={c.name}
+                              currentEmail={c.email}
                               currentStatus={c.status}
                               currentOpeningBalance={c.openingBalance}
                               currentOpeningBalanceCurrency={c.openingBalanceCurrency}

@@ -14,6 +14,7 @@ import { setSupplierOpeningBalance } from '@/app/actions/set-opening-balance'
 
 type FormValues = {
   name: string
+  email: string
   openingBalance: number
   openingBalanceCurrency: 'PKR' | 'USD'
   exchangeRate: number
@@ -22,6 +23,7 @@ type FormValues = {
 type Props = {
   id: string
   currentName: string
+  currentEmail?: string | null
   currentOpeningBalance?: number
   currentOpeningBalanceCurrency?: string
   currentOpeningBalancePkr?: number
@@ -30,6 +32,7 @@ type Props = {
 export function EditSupplierForm({
   id,
   currentName,
+  currentEmail,
   currentOpeningBalance = 0,
   currentOpeningBalanceCurrency,
   currentOpeningBalancePkr = 0,
@@ -47,6 +50,7 @@ export function EditSupplierForm({
 
   const defaults: FormValues = {
     name: currentName,
+    email: currentEmail ?? '',
     openingBalance: currentOpeningBalance,
     openingBalanceCurrency: currency,
     exchangeRate: rate,
@@ -57,7 +61,7 @@ export function EditSupplierForm({
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
-      const result = await editSupplierAction({ id, name: values.name })
+      const result = await editSupplierAction({ id, name: values.name, email: values.email })
       if (!result.success) { setError(result.error); return }
 
       const amount = Number.isFinite(values.openingBalance) ? values.openingBalance : 0
@@ -101,6 +105,16 @@ export function EditSupplierForm({
               <FormItem>
                 <FormLabel>Name</FormLabel>
                 <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" inputMode="email" placeholder="name@example.com" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">Optional. Lets you email this supplier their ledger from Ask.</p>
                 <FormMessage />
               </FormItem>
             )} />

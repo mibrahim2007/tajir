@@ -1,13 +1,76 @@
 import { Resend } from 'resend'
 
-const ADMIN_EMAIL = 'tajiradmin@tajir.app'
-const FROM_EMAIL  = process.env.RESEND_FROM_EMAIL ?? 'Tajir Support <support@tajir.app>'
+// Where support-ticket notifications land. Any address works — a RECIPIENT
+// domain needs no verification, unlike the sender below.
+const ADMIN_EMAIL = 'aamerjamil@gmail.com'
+
+// The sending address must be on a domain verified in Resend, and jappx.com is
+// the only one that is. It deliberately cannot be a gmail.com address: Resend
+// will not let anyone send as gmail.com, because that is exactly the spoofing
+// its domain verification exists to prevent.
+//
+// `||`, not `??`: an env var that exists but is blank is the common way this
+// goes wrong (declared in the dashboard, value never filled in). `??` would
+// keep the empty string and every send would fail at the provider with an
+// unhelpful "invalid from address"; `||` falls back to something valid.
+const FROM_EMAIL  = process.env.RESEND_FROM_EMAIL || 'Tajir <support@jappx.com>'
 
 let _resend: Resend | null = null
 function getResend() {
   if (!process.env.RESEND_API_KEY) return null
   if (!_resend) _resend = new Resend(process.env.RESEND_API_KEY)
   return _resend
+}
+
+/** True when RESEND_API_KEY is set, i.e. sending can actually happen. */
+export function isEmailConfigured(): boolean {
+  return Boolean(process.env.RESEND_API_KEY)
+}
+
+export type SendResult = { ok: true } | { ok: false; error: string }
+
+/**
+ * Send a user-initiated email and report whether it worked.
+ *
+ * The notify* helpers below are fire-and-forget: a failed ticket notification
+ * must not fail the ticket. This one is different — someone pressed "Send" and
+ * is waiting to hear, so the outcome is returned rather than swallowed.
+ */
+export async function sendDataEmail(opts: {
+  to: string[]
+  subject: string
+  html: string
+  text?: string
+  replyTo?: string
+  attachments?: { filename: string; content: Buffer }[]
+}): Promise<SendResult> {
+  const resend = getResend()
+  if (!resend) {
+    return { ok: false, error: 'Email is not configured on this server (RESEND_API_KEY is not set).' }
+  }
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM_EMAIL,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+      ...(opts.text ? { text: opts.text } : {}),
+      ...(opts.replyTo ? { replyTo: opts.replyTo } : {}),
+      ...(opts.attachments?.length
+        ? { attachments: opts.attachments.map((a) => ({ filename: a.filename, content: a.content })) }
+        : {}),
+    })
+    // Resend reports delivery refusals in `error` rather than by throwing —
+    // returning ok:true here would tell the user it was sent when it was not.
+    if (error) {
+      console.error('[email] sendDataEmail rejected:', error)
+      return { ok: false, error: error.message || 'The mail provider rejected the message.' }
+    }
+    return { ok: true }
+  } catch (e) {
+    console.error('[email] sendDataEmail failed:', e)
+    return { ok: false, error: 'Could not reach the mail service. Try again in a moment.' }
+  }
 }
 
 export async function notifyAdminNewTicket(opts: {

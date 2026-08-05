@@ -13,9 +13,11 @@ import { Input } from '@/components/ui/input'
 import { CurrencyInput } from '@/components/currency-input'
 import { createSupplierAction } from '@/app/actions/create-supplier'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { optionalEmailField } from '@/lib/email/address'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  email: optionalEmailField,
   openingBalance: z.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
@@ -32,7 +34,7 @@ export function CreateSupplierForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: '', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
+    defaultValues: { name: '', email: '', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
   })
 
   const onSubmit = (values: FormValues) => {
@@ -62,6 +64,19 @@ export function CreateSupplierForm() {
                 <FormItem>
                   <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
                   <FormControl><Input placeholder="Supplier name" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Optional — but it is what /ask offers when you email this
+                  supplier their own ledger or statement. */}
+              <FormField control={form.control} name="email" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" inputMode="email" placeholder="name@example.com" {...field} value={field.value ?? ''} />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">Optional. Lets you email this supplier their ledger from Ask.</p>
                   <FormMessage />
                 </FormItem>
               )} />

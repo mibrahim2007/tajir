@@ -5,10 +5,12 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { optionalEmailField, toStoredEmail } from '@/lib/email/address'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  email: optionalEmailField,
   openingBalance: z.coerce.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -30,7 +32,7 @@ export async function createSupplierAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
+  const { name, email, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
   const pkrEquivalent = openingBalanceCurrency === 'USD' ? openingBalance * exchangeRate : openingBalance
 
   const admin = createAdminClient()
@@ -39,6 +41,7 @@ export async function createSupplierAction(input: unknown): Promise<ActionResult
     .insert({
       tenant_id: tenantId,
       name,
+      email: toStoredEmail(email),
       opening_balance: openingBalance,
       opening_balance_currency: openingBalanceCurrency,
       opening_balance_pkr_equivalent: pkrEquivalent,
@@ -56,7 +59,7 @@ export async function createSupplierAction(input: unknown): Promise<ActionResult
     action: 'create',
     entity: 'suppliers',
     entityId: supplier.id,
-    after: { name, openingBalance, openingBalanceCurrency },
+    after: { name, email: toStoredEmail(email), openingBalance, openingBalanceCurrency },
   })
 
   return { success: true, data: supplier }

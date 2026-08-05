@@ -9,12 +9,19 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKR } from '@/lib/utils/currency'
-import type { AskResponse, AskColumn } from '@/lib/ask/types'
+import type { AskResponse, AskColumn, AskParty } from '@/lib/ask/types'
 import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES } from '@/lib/ask/types'
 import { GUIDES, GUIDE_INDEX_KEYWORDS, matchGuide, type Guide } from '@/lib/ask/guides'
 import { FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
 
-type Entity = { id: string; name: string }
+// `email` is loaded for parties only (items have none) so an answer about a
+// customer or supplier can offer to be sent to them.
+type Entity = { id: string; name: string; email?: string | null }
+
+/** Tag a party answer with who it is about, for the "email this answer" dialog. */
+function partyOf(e: Entity, type: 'customer' | 'supplier'): AskParty {
+  return { type, id: e.id, name: e.name, email: e.email ?? null }
+}
 
 // Structural / intent words that are never part of a party or item name, so a
 // partial-name match never latches onto them (e.g. "top customers" must not
@@ -151,6 +158,7 @@ async function customerSummary(ctx: Ctx): Promise<AskResponse> {
     ],
     summary: balanceSentence(c.name, bal, 'customer'),
     suggestions: [`Ledger of ${c.name}`, 'Top customers', 'Who owes me money'],
+    party: partyOf(c, 'customer'),
   }
 }
 
@@ -173,6 +181,7 @@ async function supplierSummary(ctx: Ctx): Promise<AskResponse> {
     ],
     summary: balanceSentence(s.name, bal, 'supplier'),
     suggestions: [`Ledger of ${s.name}`, 'Who do I owe'],
+    party: partyOf(s, 'supplier'),
   }
 }
 
@@ -213,6 +222,7 @@ async function partyLedger(ctx: Ctx, kind: 'customer' | 'supplier'): Promise<Ask
     summary: balanceSentence(e.name, bal, kind),
     footer: `Closing balance: ${formatPKR(Math.abs(bal))} ${balanceSide(bal, kind)}`,
     suggestions: kind === 'customer' ? [`Business summary of ${e.name}`, 'Who owes me money'] : [`Business summary of ${e.name}`, 'Who do I owe'],
+    party: partyOf(e, kind),
   }
 }
 
@@ -693,8 +703,8 @@ export async function runAsk(question: string): Promise<AskResponse> {
   if (faq) return faqResponse(faq)
 
   const [{ data: customers }, { data: suppliers }, { data: items }] = await Promise.all([
-    admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).limit(2000),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).limit(2000),
+    admin.from('tajir_customers').select('id, name, email').eq('tenant_id', tenantId).limit(2000),
+    admin.from('suppliers').select('id, name, email').eq('tenant_id', tenantId).limit(2000),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).limit(2000),
   ])
   const custList = (customers ?? []) as Entity[]

@@ -14,10 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { CurrencyInput } from '@/components/currency-input'
 import { createCustomerAction } from '@/app/actions/create-customer'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { optionalEmailField } from '@/lib/email/address'
 import { CUSTOMER_STATUSES, CUSTOMER_STATUS_LABELS } from '@/lib/customer-status'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  email: optionalEmailField,
   status: z.enum(['active', 'inactive', 'low_transaction']).default('active'),
   openingBalance: z.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
@@ -35,7 +37,7 @@ export function CreateCustomerForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: '', status: 'active', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
+    defaultValues: { name: '', email: '', status: 'active', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
   })
 
   const onSubmit = (values: FormValues) => {
@@ -65,6 +67,19 @@ export function CreateCustomerForm() {
               <FormItem>
                 <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input placeholder="Customer name" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Optional — but it is what /ask offers when you email this
+                customer their own ledger or statement. */}
+            <FormField control={form.control} name="email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" inputMode="email" placeholder="name@example.com" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">Optional. Lets you email this customer their ledger from Ask.</p>
                 <FormMessage />
               </FormItem>
             )} />

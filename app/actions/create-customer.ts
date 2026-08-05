@@ -5,10 +5,12 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { optionalEmailField, toStoredEmail } from '@/lib/email/address'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
+  email: optionalEmailField,
   status: z.enum(['active', 'inactive', 'low_transaction']).default('active'),
   openingBalance: z.coerce.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
@@ -29,7 +31,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { name, status, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
+  const { name, email, status, openingBalance, openingBalanceCurrency, exchangeRate } = parsed.data
   const pkrEquivalent = openingBalanceCurrency === 'USD' ? openingBalance * exchangeRate : openingBalance
 
   const admin = createAdminClient()
@@ -38,6 +40,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     .insert({
       tenant_id: tenantId,
       name,
+      email: toStoredEmail(email),
       status,
       opening_balance: openingBalance,
       opening_balance_currency: openingBalanceCurrency,
@@ -50,7 +53,7 @@ export async function createCustomerAction(input: unknown): Promise<ActionResult
     return { success: false, error: 'Failed to create customer', code: 'INTERNAL_ERROR' }
   }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'tajir_customers', entityId: customer.id, after: { name, status, openingBalance, openingBalanceCurrency } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'tajir_customers', entityId: customer.id, after: { name, email: toStoredEmail(email), status, openingBalance, openingBalanceCurrency } })
 
   return { success: true, data: customer }
 }

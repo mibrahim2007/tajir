@@ -12,6 +12,7 @@ import { formatPKR } from '@/lib/utils/currency'
 export type SupplierListItem = {
   id: string
   name: string
+  email?: string | null
   outstanding: number
   openingBalance: number
   openingBalanceCurrency: string
@@ -81,6 +82,7 @@ export function SuppliersList({ suppliers }: { suppliers: SupplierListItem[] }) 
                         <EditSupplierForm
                           id={s.id}
                           currentName={s.name}
+                          currentEmail={s.email}
                           currentOpeningBalance={s.openingBalance}
                           currentOpeningBalanceCurrency={s.openingBalanceCurrency}
                           currentOpeningBalancePkr={s.openingBalancePkrEquivalent}

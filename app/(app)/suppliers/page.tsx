@@ -9,7 +9,7 @@ export default async function SuppliersPage() {
   const admin = createAdminClient()
 
   const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }, { data: allRefunds }] = await Promise.all([
-    admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
+    admin.from('suppliers').select('id, name, email, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
     admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
@@ -48,6 +48,7 @@ export default async function SuppliersPage() {
   const supplierItems = suppliers.map((s) => ({
     id: s.id,
     name: s.name,
+    email: s.email,
     outstanding: outstandingBySupplier.get(s.id) ?? 0,
     openingBalance: s.opening_balance ?? 0,
     openingBalanceCurrency: s.opening_balance_currency ?? 'PKR',

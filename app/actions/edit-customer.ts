@@ -5,11 +5,13 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { optionalEmailField, toStoredEmail } from '@/lib/email/address'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
   id:     z.string().uuid(),
   name:   z.string().min(1, 'Name is required'),
+  email:  optionalEmailField,
   status: z.enum(['active', 'inactive', 'low_transaction']).default('active'),
 })
 
@@ -23,13 +25,14 @@ export async function editCustomerAction(input: unknown): Promise<ActionResult<v
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, name, status } = parsed.data
+  const { id, name, email, status } = parsed.data
+  const storedEmail = toStoredEmail(email)
 
   const admin = createAdminClient()
 
   const { data: existing } = await admin
     .from('tajir_customers')
-    .select('name, status')
+    .select('name, email, status')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -38,13 +41,13 @@ export async function editCustomerAction(input: unknown): Promise<ActionResult<v
 
   const { error } = await admin
     .from('tajir_customers')
-    .update({ name, status })
+    .update({ name, email: storedEmail, status })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 
   if (error) return { success: false, error: 'Failed to update customer', code: 'INTERNAL_ERROR' }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'tajir_customers', entityId: id, before: { name: existing.name, status: existing.status }, after: { name, status } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'tajir_customers', entityId: id, before: { name: existing.name, email: existing.email, status: existing.status }, after: { name, email: storedEmail, status } })
 
   return { success: true, data: undefined }
 }

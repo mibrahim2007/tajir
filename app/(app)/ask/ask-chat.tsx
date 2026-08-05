@@ -2,15 +2,18 @@
 
 import { useRef, useState, useTransition, useEffect } from 'react'
 import Link from 'next/link'
-import { Sparkles, ArrowUp, User, Mic, Square } from 'lucide-react'
+import { Sparkles, ArrowUp, User, Mic, Square, MailCheck, MailX } from 'lucide-react'
 import { askAction } from '@/app/actions/ask'
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition'
-import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES, type AskResponse, type AskColumn } from '@/lib/ask/types'
+import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES, isEmailable, type AskResponse, type AskColumn } from '@/lib/ask/types'
+import { EmailAnswerDialog } from './email-answer-dialog'
 import { formatPKR } from '@/lib/utils/currency'
 
 type Turn =
   | { role: 'user'; text: string }
-  | { role: 'assistant'; response: AskResponse }
+  // `question` is kept alongside the answer because emailing re-runs it
+  // server-side rather than trusting the rows already on screen.
+  | { role: 'assistant'; response: AskResponse; question: string }
 
 function fmtDate(v: unknown): string {
   if (!v) return '—'
@@ -34,9 +37,34 @@ function cell(value: string | number | null, kind?: AskColumn['kind']): string {
 
 const isRight = (k?: AskColumn['kind']) => k === 'money' || k === 'qty' || k === 'number'
 
-function ResponseView({ r, onPick }: { r: AskResponse; onPick: (q: string) => void }) {
+function ResponseView({
+  r,
+  question,
+  userEmail,
+  onPick,
+}: {
+  r: AskResponse
+  question: string
+  userEmail?: string
+  onPick: (q: string) => void
+}) {
   return (
     <div className="space-y-3">
+      {/* Result of a typed "email me …" — shown above the answer, which is
+          still rendered in full so there is something to look at. */}
+      {r.emailed && (
+        <div
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+            r.emailed.failed ? 'border-destructive/40 bg-destructive/5 text-destructive' : 'bg-accent/40'
+          }`}
+        >
+          {r.emailed.failed ? <MailX className="h-4 w-4 shrink-0 mt-px" /> : <MailCheck className="h-4 w-4 shrink-0 mt-px text-primary" />}
+          <span className="min-w-0 break-words">
+            {r.emailed.failed ? `Not sent — ${r.emailed.failed}` : `Emailed to ${r.emailed.to.join(', ')}.`}
+          </span>
+        </div>
+      )}
+
       {'title' in r && r.title && <p className="font-semibold text-[15px]">{r.title}</p>}
       {'subtitle' in r && r.subtitle && <p className="text-xs text-muted-foreground -mt-2">{r.subtitle}</p>}
 
@@ -193,11 +221,19 @@ function ResponseView({ r, onPick }: { r: AskResponse; onPick: (q: string) => vo
           ))}
         </div>
       )}
+
+      {/* Only answers built from stored data can be sent — a how-to guide is
+          the same for everyone and is already on screen. */}
+      {isEmailable(r) && (
+        <div className="pt-2 mt-1 border-t">
+          <EmailAnswerDialog question={question} party={r.party} userEmail={userEmail} />
+        </div>
+      )}
     </div>
   )
 }
 
-export function AskChat() {
+export function AskChat({ userEmail }: { userEmail?: string }) {
   const [turns, setTurns] = useState<Turn[]>([])
   const [input, setInput] = useState('')
   const [pending, startTransition] = useTransition()
@@ -213,7 +249,9 @@ export function AskChat() {
     setTurns((t) => [...t, { role: 'user', text: q }])
     startTransition(async () => {
       const response = await askAction(q)
-      setTurns((t) => [...t, { role: 'assistant', response }])
+      // `asked` is set when an "email me …" directive was stripped, so the
+      // Email button on this answer re-runs the query and not the directive.
+      setTurns((t) => [...t, { role: 'assistant', response, question: response.asked ?? q }])
       inputRef.current?.focus()
     })
   }
@@ -313,7 +351,7 @@ export function AskChat() {
                 <Sparkles className="h-4 w-4 text-primary" />
               </div>
               <div className="rounded-2xl rounded-tl-sm border bg-card px-4 py-3 max-w-full min-w-0 flex-1">
-                <ResponseView r={t.response} onPick={pick} />
+                <ResponseView r={t.response} question={t.question} userEmail={userEmail} onPick={pick} />
               </div>
             </div>
           ),

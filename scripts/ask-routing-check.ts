@@ -11,6 +11,7 @@
 
 import { matchGuide } from '@/lib/ask/guides'
 import { matchFaq, FAQS, FAQ_INDEX_KEYWORDS, FAQ_CATEGORIES, isComparativeQuestion } from '@/lib/ask/faq'
+import { parseEmailCommand } from '@/lib/ask/email-command'
 
 // Mirrors the engine's real precedence: faq index → comparative → guide → faq → data.
 function route(q: string): string {
@@ -89,6 +90,58 @@ for (const [q, expected] of CASES) {
   else failures.push(`  "${q}"\n     expected ${expected}\n     got      ${got}`)
 }
 
+// ── Email commands ──────────────────────────────────────────────────
+// parseEmailCommand runs BEFORE the engine (in askAction), so a false positive
+// here silently mails an answer nobody asked to send, and a false negative just
+// answers the question — which is why the "must stay a question" cases below
+// matter more than the rest. Expected form: 'none', or 'target|question'.
+function routeEmail(q: string): string {
+  const c = parseEmailCommand(q)
+  if (!c) return 'none'
+  return `${c.target}|${c.question}${c.to ? `|${c.to}` : ''}`
+}
+
+const EMAIL_CASES: [string, string][] = [
+  // Plain sends to self
+  ['email me the ledger of Ali Traders', 'me|the ledger of Ali Traders'],
+  ['email me top customers', 'me|top customers'],
+  ['mail me stock summary', 'me|stock summary'],
+  ['send me who owes me money', 'me|who owes me money'],
+  ['e-mail me the cheque summary', 'me|the cheque summary'],
+  ['email the stock summary', 'me|the stock summary'],
+  ['email me a copy of the stock summary', 'me|the stock summary'],
+  ['send me this business summary of Abdul', 'me|business summary of Abdul'],
+
+  // Explicit recipients
+  ['email the ledger of Ali Traders to accounts@example.com', 'other|the ledger of Ali Traders|accounts@example.com'],
+  ['send stock summary to a@b.com, c@d.com', 'other|stock summary|a@b.com, c@d.com'],
+  ['email the ledger of Ali Traders to me', 'me|the ledger of Ali Traders'],
+  ['email the ledger of Star Traders to the customer', 'party|the ledger of Star Traders'],
+  ['send the ledger of Metro Mills to the supplier', 'party|the ledger of Metro Mills'],
+
+  // A party name containing " to " must survive — the tail is not a recipient
+  ['email me the ledger of Top to Toe Traders', 'me|the ledger of Top to Toe Traders'],
+
+  // Must NOT be treated as a send
+  ['ledger of Ali Traders', 'none'],           // no email verb at all
+  ['top customers', 'none'],
+  ['email of Ali Traders', 'none'],            // asking for an address
+  ['email address of Ali Traders', 'none'],
+  ['sending charges ledger', 'none'],          // "sending" is not "send"
+  ['mailtec ledger', 'none'],                  // party name starting with "mail"
+  ['email', 'none'],                           // no question left
+  ['email me', 'none'],
+  ['what is overdue', 'none'],
+  ['how to create a sale invoice', 'none'],
+]
+
+let emailPass = 0
+for (const [q, expected] of EMAIL_CASES) {
+  const got = routeEmail(q)
+  if (got === expected) emailPass++
+  else failures.push(`  [email] "${q}"\n     expected ${expected}\n     got      ${got}`)
+}
+
 // Structural checks on the content itself
 const ids = new Set(FAQS.map((f) => f.id))
 const dupIds = ids.size !== FAQS.length
@@ -97,6 +150,7 @@ const noKeywords = FAQS.filter((f) => f.keywords.length === 0)
 const longAnswers = FAQS.filter((f) => f.answer.length > 320)
 
 console.log(`Routing: ${pass}/${CASES.length} passed`)
+console.log(`Email commands: ${emailPass}/${EMAIL_CASES.length} passed`)
 if (failures.length) console.log('FAILURES:\n' + failures.join('\n'))
 console.log(`FAQs: ${FAQS.length} across ${FAQ_CATEGORIES.length} categories`)
 console.log(`duplicate ids: ${dupIds} | bad category: ${badCat.length} | no keywords: ${noKeywords.length} | overlong answers: ${longAnswers.length}`)
