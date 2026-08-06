@@ -358,6 +358,50 @@ export type Database = {
           },
         ]
       }
+      ask_query_log: {
+        Row: {
+          answer_kind: string | null
+          answer_title: string | null
+          answered: boolean
+          created_at: string
+          id: string
+          normalized: string
+          question: string
+          tenant_id: string
+          user_id: string | null
+        }
+        Insert: {
+          answer_kind?: string | null
+          answer_title?: string | null
+          answered?: boolean
+          created_at?: string
+          id?: string
+          normalized: string
+          question: string
+          tenant_id: string
+          user_id?: string | null
+        }
+        Update: {
+          answer_kind?: string | null
+          answer_title?: string | null
+          answered?: boolean
+          created_at?: string
+          id?: string
+          normalized?: string
+          question?: string
+          tenant_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ask_query_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -3405,6 +3449,27 @@ export type Database = {
       adjust_inventory_quantity: {
         Args: { p_delta: number; p_lot_id: string }
         Returns: undefined
+      }
+      ask_similar_questions: {
+        Args: { p_limit?: number; p_question: string; p_tenant_id: string }
+        Returns: {
+          answer_kind: string
+          answer_title: string
+          hits: number
+          question: string
+          score: number
+        }[]
+      }
+      ask_top_questions: {
+        Args: { p_limit?: number; p_tenant_id: string }
+        Returns: {
+          answer_kind: string
+          answer_title: string
+          answered: boolean
+          hits: number
+          last_asked: string
+          question: string
+        }[]
       }
       ask_cheque_by_number: {
         Args: { p_number: string; p_tenant_id: string }

@@ -792,12 +792,15 @@ export async function runAsk(question: string): Promise<AskResponse> {
     // Nothing matched — but if they clearly wanted a ledger/summary without a
     // recognizable name, say so rather than guessing.
     if (ledgerWord || bizWord) {
-      return text(
-        "I couldn't match that to a customer, supplier, or item on file. Try including the exact name, e.g. \"ledger of Ali Traders\".",
-        ASK_EXAMPLES,
-      )
+      return {
+        ...text(
+          "I couldn't match that to a customer, supplier, or item on file. Try including the exact name, e.g. \"ledger of Ali Traders\".",
+          ASK_EXAMPLES,
+        ),
+        unmatched: true,
+      }
     }
-    return help()
+    return { ...help(), unmatched: true }
   }
 
   const ctx: Ctx = { admin, tenantId, question: q, lowerQ, customer, supplier, item }

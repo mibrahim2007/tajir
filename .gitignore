@@ -47,3 +47,6 @@ next-env.d.ts
 supabase/.temp/
 
 .env*
+
+# Generated Ask history — contains real customer/supplier names from tenant questions
+docs/ask-queries.md

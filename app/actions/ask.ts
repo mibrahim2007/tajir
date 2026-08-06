@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { runAsk } from '@/lib/ask/engine'
 import { parseEmailCommand } from '@/lib/ask/email-command'
 import { sendAskAnswer } from '@/lib/ask/send-answer'
+import { findSimilarQuestions, logAskQuestion, recalledAnswer } from '@/lib/ask/history-store'
 import type { AskResponse } from '@/lib/ask/types'
 
 // Answer a typed question purely from the tenant's own stored data. runAsk
@@ -17,14 +18,31 @@ export async function askAction(question: string): Promise<AskResponse> {
     const command = parseEmailCommand(question)
     const effective = command?.question ?? question
 
-    const response = await runAsk(effective)
+    const answered = await runAsk(effective)
+    const { user, tenantId } = await requireAuth()
+
+    // Nothing matched — but this tenant may have asked something like it
+    // before, and their own past questions are a better prompt than the
+    // generic example list.
+    let response = answered
+    if (answered.unmatched) {
+      const recalls = await findSimilarQuestions(tenantId, effective)
+      response = recalledAnswer(effective, recalls) ?? answered
+    }
+
+    // Recorded against the ORIGINAL answer: a recalled suggestion list does not
+    // mean the question was answered, and logging it as such would let an
+    // unanswered question be recalled to someone else later.
+    await logAskQuestion({ tenantId, userId: user.id, question: effective, response: answered })
+
     if (!command) return response
 
     // The answer above was just computed server-side, so it is passed straight
-    // to the sender rather than re-querying for it.
-    const { user, tenantId } = await requireAuth()
+    // to the sender rather than re-querying for it. The ORIGINAL answer is what
+    // gets sent — a recalled list of past questions carries no data to email,
+    // and sendAskAnswer refuses it with a message saying so.
     const sent = await sendAskAnswer({
-      response,
+      response: answered,
       question: effective,
       target: command.target,
       to: command.to,

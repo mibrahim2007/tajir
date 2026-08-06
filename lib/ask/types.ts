@@ -95,6 +95,13 @@ export type AskResponse = (AskTable | AskStats | AskText | AskGuide | AskFaq | A
    * directive.
    */
   asked?: string
+  /**
+   * Set by the engine's own fallbacks — nothing matched, so this is the generic
+   * help answer rather than a real one. It is what tells the history layer a
+   * question is worth trying to recall, and stops unanswered questions being
+   * offered back as suggestions later.
+   */
+  unmatched?: boolean
 }
 
 /**

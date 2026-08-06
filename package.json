@@ -17,7 +17,9 @@
     "check:opening-stock": "tsx scripts/opening-stock-check.ts",
     "check:email-sender": "tsx scripts/email-sender-check.ts",
     "check:inbox": "tsx scripts/inbox-check.ts",
-    "check:cheque-search": "tsx scripts/cheque-search-check.ts"
+    "check:cheque-search": "tsx scripts/cheque-search-check.ts",
+    "check:ask-history": "tsx scripts/ask-history-check.ts",
+    "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
