@@ -14,7 +14,10 @@
     "check:voice": "tsx scripts/voice-parse-check.ts",
     "check:custom-report": "tsx --env-file=.env.local scripts/custom-report-check.ts",
     "check:aging": "tsx --env-file=.env.local scripts/aging-check.ts",
-    "check:opening-stock": "tsx scripts/opening-stock-check.ts"
+    "check:opening-stock": "tsx scripts/opening-stock-check.ts",
+    "check:email-sender": "tsx scripts/email-sender-check.ts",
+    "check:inbox": "tsx scripts/inbox-check.ts",
+    "check:cheque-search": "tsx scripts/cheque-search-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -33,6 +36,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
+    "imapflow": "^1.6.5",
     "jsbarcode": "^3.12.3",
     "lucide-react": "^0.511.0",
     "next": "latest",

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ChequePicker, NEW_CHEQUE, chequeKey } from '@/components/cheque-picker'
 import { TENDER_TYPES } from '@/lib/constants/tender-types'
 import { formatPKR } from '@/lib/utils/currency'
 
@@ -32,9 +33,6 @@ export type EndorsableCheque = {
   partyName: string | null
   docSerial: string | null
 }
-
-const NEW_CHEQUE = '__new__'
-const chequeKey = (c: { source: string; lineId: string }) => `${c.source}:${c.lineId}`
 
 // Small per-field label shown only on narrow screens (where the column header
 // row is hidden and fields stack), so Bank/Amount can't be confused.
@@ -171,21 +169,11 @@ export function TenderLinesField({
                     write a new one — so the number becomes a picker with an
                     explicit "write a new cheque" escape. */}
                 {chequeRequired && canEndorse && (
-                  <Select value={endorsedKey} onValueChange={(v) => pickCheque(i, v)}>
-                    <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate">
-                      <SelectValue placeholder="Select a cheque…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={NEW_CHEQUE}>Write a new cheque</SelectItem>
-                      {options.map((c) => (
-                        <SelectItem key={chequeKey(c)} value={chequeKey(c)}>
-                          {c.chequeNumber ?? '—'}
-                          {c.partyName ? ` · ${c.partyName}` : ''}
-                          {` · ${formatPKR(c.amount)}`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <ChequePicker
+                    value={endorsedKey}
+                    onValueChange={(v) => pickCheque(i, v)}
+                    cheques={options}
+                  />
                 )}
 
                 {/* An endorsed line's number and date belong to the cheque, so

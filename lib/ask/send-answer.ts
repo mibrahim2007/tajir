@@ -82,6 +82,10 @@ export async function sendAskAnswer(params: SendAskAnswerParams): Promise<Action
     subject: `${title} — ${tenant.name}`,
     html: renderAskEmailHtml(opts),
     text: renderAskEmailText(opts),
+    // Sent as the person who pressed Send when their address is on a verified
+    // sending domain; otherwise as the app, still labelled with the tenant.
+    fromUserEmail: user.email,
+    fromName: tenant.name,
     // Replies go to the person who pressed Send, not to the sending domain.
     replyTo: user.email,
     attachments: attachment && attachmentName ? [{ filename: attachmentName, content: attachment }] : undefined,

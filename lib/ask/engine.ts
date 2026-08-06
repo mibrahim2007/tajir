@@ -12,6 +12,8 @@ import { formatPKR } from '@/lib/utils/currency'
 import type { AskResponse, AskColumn, AskParty } from '@/lib/ask/types'
 import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES } from '@/lib/ask/types'
 import { GUIDES, GUIDE_INDEX_KEYWORDS, matchGuide, type Guide } from '@/lib/ask/guides'
+import { inboxAnswer } from '@/lib/ask/inbox-answer'
+import { isInboxQuestion } from '@/lib/inbox/question'
 import { FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
 
 // `email` is loaded for parties only (items have none) so an answer about a
@@ -686,6 +688,11 @@ export async function runAsk(question: string): Promise<AskResponse> {
   // would otherwise partial-match a party or item name and get routed to a
   // ledger. matchGuide() only fires on an explicit how-to cue or a phrase that
   // can only be a question about the software, so data queries are unaffected.
+  // "Check my email" reads the connected mailbox rather than the tenant's own
+  // tables. It goes ahead of party matching for the same reason the guides do —
+  // "my email" would otherwise fuzzy-match a party name.
+  if (isInboxQuestion(lowerQ)) return inboxAnswer(tenantId)
+
   if (GUIDE_INDEX_KEYWORDS.some((k) => lowerQ.includes(k))) return guideIndex()
   if (FAQ_INDEX_KEYWORDS.some((k) => lowerQ.includes(k))) return faqIndex()
   // "Difference between a sale return and a credit note" names a topic the

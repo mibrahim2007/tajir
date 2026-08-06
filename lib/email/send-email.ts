@@ -1,19 +1,19 @@
 import { Resend } from 'resend'
+import { resolveFrom } from './sender'
 
 // Where support-ticket notifications land. Any address works — a RECIPIENT
 // domain needs no verification, unlike the sender below.
 const ADMIN_EMAIL = 'aamerjamil@gmail.com'
 
-// The sending address must be on a domain verified in Resend, and jappx.com is
-// the only one that is. It deliberately cannot be a gmail.com address: Resend
-// will not let anyone send as gmail.com, because that is exactly the spoofing
-// its domain verification exists to prevent.
+// System mail (ticket notifications) is from the app itself, so it always goes
+// out as the configured address. User-initiated mail resolves its own From from
+// the signed-in user — see resolveFrom, and the sender rules it documents.
 //
 // `||`, not `??`: an env var that exists but is blank is the common way this
 // goes wrong (declared in the dashboard, value never filled in). `??` would
 // keep the empty string and every send would fail at the provider with an
 // unhelpful "invalid from address"; `||` falls back to something valid.
-const FROM_EMAIL  = process.env.RESEND_FROM_EMAIL || 'Tajir <support@jappx.com>'
+const FROM_EMAIL  = process.env.RESEND_FROM_EMAIL || 'Tajir <tajirapp@jappx.com>'
 
 let _resend: Resend | null = null
 function getResend() {
@@ -42,6 +42,10 @@ export async function sendDataEmail(opts: {
   html: string
   text?: string
   replyTo?: string
+  /** The signed-in user's address; used as the From when it is sendable. */
+  fromUserEmail?: string
+  /** Shown alongside the address, e.g. the tenant's name. */
+  fromName?: string
   attachments?: { filename: string; content: Buffer }[]
 }): Promise<SendResult> {
   const resend = getResend()
@@ -50,7 +54,7 @@ export async function sendDataEmail(opts: {
   }
   try {
     const { error } = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: resolveFrom({ userEmail: opts.fromUserEmail, displayName: opts.fromName }),
       to: opts.to,
       subject: opts.subject,
       html: opts.html,
