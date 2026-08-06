@@ -281,6 +281,12 @@ export async function supplierGrades(admin: Admin, tenantId: string): Promise<As
   const a = rows.filter((r) => r.grade === 'A')
   const returners = rows.filter((r) => r.return_rate >= 10)
 
+  // Over 100% means more was returned than was bought — impossible in trade, so
+  // it is a recording error, not a supplier being terrible. Clamping the number
+  // would hide it; saying what it means turns a figure that looks like a bug
+  // into something actionable.
+  const overReturned = rows.filter((r) => r.return_rate > 100)
+
   return {
     kind: 'table',
     title: 'Supplier grading',
@@ -295,7 +301,7 @@ export async function supplierGrades(admin: Admin, tenantId: string): Promise<As
       { key: 'return_rate', label: 'Return %', kind: 'number' },
     ],
     rows,
-    summary: `${rows.length} suppliers, ${formatPKR(total)} spent. ${a.length} graded A.${returners.length > 0 ? ` ${returners.length} demoted for returning 10% or more of what they supplied.` : ''} Grading is by share of spend, with return rate as the quality signal — delivery timeliness is NOT included, because no promised or actual delivery date is recorded anywhere in the system.`,
+    summary: `${rows.length} suppliers, ${formatPKR(total)} spent. ${a.length} graded A.${returners.length > 0 ? ` ${returners.length} demoted for returning 10% or more of what they supplied.` : ''}${overReturned.length > 0 ? ` ⚠ ${overReturned.map((r) => r.name).join(', ')} show${overReturned.length === 1 ? 's' : ''} a return rate above 100% — more has been returned than was ever bought, which means a purchase return was recorded twice or against the wrong order. Worth correcting in Purchase Returns.` : ''} Grading is by share of spend, with return rate as the quality signal — delivery timeliness is NOT included, because no promised or actual delivery date is recorded anywhere in the system.`,
     footer: `Total ${formatPKR(total)}`,
     suggestions: ['Monthly purchase comparison', 'Who do I owe', 'Sales vs purchases'],
   }

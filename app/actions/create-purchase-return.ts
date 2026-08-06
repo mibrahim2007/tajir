@@ -8,6 +8,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy } from '@/lib/yarn'
+import { checkReturnLimit } from '@/lib/purchases/return-limit'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
@@ -69,6 +70,49 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
       success: false,
       error: `Insufficient stock: only ${available.toLocaleString()} units available. Cannot return ${quantity.toLocaleString()} units — this would result in negative stock.`,
       code: 'INSUFFICIENT_STOCK',
+    }
+  }
+
+  /*
+   * Guard: a purchase order cannot be returned more than it was bought.
+   *
+   * The stock check above is not enough. It asks whether enough stock exists
+   * to remove, which says nothing about the order being returned against — so
+   * the same PO could be returned twice, or returned for more than it ever
+   * contained, as long as other stock of that item happened to be on hand.
+   * That is how PO-2026-0016 ended up with 28,000 returned against a 15,000
+   * purchase, and it makes the supplier return rate exceed 100%.
+   */
+  if (purchaseOrderId) {
+    const [{ data: po }, { data: priorReturns }] = await Promise.all([
+      admin
+        .from('purchase_orders')
+        .select('quantity, serial_number')
+        .eq('id', purchaseOrderId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+      admin
+        .from('purchase_returns')
+        .select('quantity')
+        .eq('purchase_order_id', purchaseOrderId)
+        .eq('tenant_id', tenantId),
+    ])
+
+    if (po) {
+      const purchased = Number(po.quantity ?? 0)
+      const alreadyReturned = (priorReturns ?? []).reduce((s, r) => s + Number(r.quantity ?? 0), 0)
+      const limit = checkReturnLimit({ purchased, alreadyReturned, quantity })
+
+      if (!limit.ok) {
+        const label = po.serial_number ? ` ${po.serial_number}` : ''
+        return {
+          success: false,
+          error: limit.reason === 'fully_returned'
+            ? `Purchase order${label} has already been fully returned (${alreadyReturned.toLocaleString()} of ${purchased.toLocaleString()}). There is nothing left to return against it.`
+            : `Only ${limit.remaining.toLocaleString()} of the ${purchased.toLocaleString()} bought on purchase order${label} is left to return — ${alreadyReturned.toLocaleString()} already has been. Cannot return ${quantity.toLocaleString()}.`,
+          code: 'EXCEEDS_PURCHASED',
+        }
+      }
     }
   }
 
