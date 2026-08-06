@@ -2611,6 +2611,75 @@ export type Database = {
           },
         ]
       }
+      stock_opening_balances: {
+        Row: {
+          created_at: string
+          id: string
+          location_id: string
+          quantity: number
+          rate: number
+          stock_item_id: string
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          location_id: string
+          quantity?: number
+          rate?: number
+          stock_item_id: string
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          location_id?: string
+          quantity?: number
+          rate?: number
+          stock_item_id?: string
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_opening_balances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "location_stock_summary"
+            referencedColumns: ["location_id"]
+          },
+          {
+            foreignKeyName: "stock_opening_balances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_opening_balances_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_lots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_opening_balances_stock_item_id_fkey"
+            columns: ["stock_item_id"]
+            isOneToOne: false
+            referencedRelation: "location_stock_summary"
+            referencedColumns: ["stock_item_id"]
+          },
+          {
+            foreignKeyName: "stock_opening_balances_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stock_transfers: {
         Row: {
           created_at: string

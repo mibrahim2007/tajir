@@ -13,7 +13,8 @@
     "check:ask-email": "tsx scripts/ask-email-render-check.ts",
     "check:voice": "tsx scripts/voice-parse-check.ts",
     "check:custom-report": "tsx --env-file=.env.local scripts/custom-report-check.ts",
-    "check:aging": "tsx --env-file=.env.local scripts/aging-check.ts"
+    "check:aging": "tsx --env-file=.env.local scripts/aging-check.ts",
+    "check:opening-stock": "tsx scripts/opening-stock-check.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

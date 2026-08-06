@@ -26,6 +26,7 @@ export default async function LocationStockPage() {
     { data: purchaseReturns },
     { data: transfersIn },
     { data: transfersOut },
+    { data: openingStock },
   ] = await Promise.all([
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -35,6 +36,7 @@ export default async function LocationStockPage() {
     admin.from('purchase_returns').select('location_id, stock_item_id, quantity').eq('tenant_id', tenantId).not('location_id', 'is', null),
     admin.from('stock_transfers').select('to_location_id, stock_item_id, quantity').eq('tenant_id', tenantId),
     admin.from('stock_transfers').select('from_location_id, stock_item_id, quantity').eq('tenant_id', tenantId),
+    admin.from('stock_opening_balances').select('location_id, stock_item_id, quantity').eq('tenant_id', tenantId),
   ])
 
   const parse = (v: unknown) => parseFloat((v as string) || '0') || 0
@@ -52,6 +54,9 @@ export default async function LocationStockPage() {
     stockMap.get(locId)!.set(itemId, stockMap.get(locId)!.get(itemId)! + delta)
   }
 
+  // Opening stock is the baseline each location started from; without it a
+  // warehouse loaded at setup and never traded since reads as empty.
+  ;(openingStock   ?? []).forEach(r => add(r.location_id,      r.stock_item_id,  parse(r.quantity)))
   ;(purchases      ?? []).forEach(r => add(r.location_id,      r.stock_item_id,  parse(r.quantity)))
   ;(sales          ?? []).forEach(r => add(r.location_id,      r.stock_item_id, -parse(r.quantity)))
   ;(saleReturns    ?? []).forEach(r => add(r.location_id,      r.stock_item_id,  parse(r.quantity)))

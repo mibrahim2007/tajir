@@ -108,11 +108,12 @@ export const GUIDES: Guide[] = [
       'Create each stock item: Inventory → Add New Item.',
       'Go to Settings → Opening Balances → Stock Item Quantities.',
       'Click the pencil on an item and set Location, Quantity, and Rate (your cost per unit).',
+      'Held at more than one warehouse? Click Add location and enter a line for each — they are all loaded together.',
       'Save. Value is computed as quantity × rate and totalled at the foot of the table.',
     ],
     notes: [
       'The rate is what stock valuation and profit are calculated from, so use your actual cost, not the selling price.',
-      'An item carries ONE opening location here. To split the same item across two warehouses, load the whole quantity at the main one and then move part of it with Inventory → Stock Transfers.',
+      'Each location line carries its own rate, so the same item can come in at different costs at different warehouses. The item’s valuation rate is their quantity-weighted average.',
       'Location matters at sale time: a sale can only draw stock that is at the location you pick in Dispatch From.',
       'Owner access only.',
     ],

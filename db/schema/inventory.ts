@@ -59,3 +59,38 @@ export const inventoryLots = pgTable(
 
 export type InventoryLot = typeof inventoryLots.$inferSelect
 export type NewInventoryLot = typeof inventoryLots.$inferInsert
+
+// Opening stock, split by warehouse: one row per (item, location). The item's
+// currentQuantity remains the running total; these rows are the per-location
+// breakdown of its opening baseline and are what location_stock_summary
+// attributes to each location. locationId is a plain uuid because `locations`
+// is not in the Drizzle schema (created in migration 0007).
+export const stockOpeningBalances = pgTable(
+  'stock_opening_balances',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    tenantId: uuid('tenant_id')
+      .notNull()
+      .references(() => tenants.id, { onDelete: 'cascade' }),
+    stockItemId: uuid('stock_item_id')
+      .notNull()
+      .references(() => inventoryLots.id, { onDelete: 'cascade' }),
+    locationId: uuid('location_id').notNull(),
+    // Not constrained to >= 0: the 0055 backfill has to carry through items
+    // whose recorded movement exceeds their running total, which makes the
+    // opening baseline negative. The server action refuses negative input.
+    quantity: numeric('quantity', { precision: 15, scale: 3 }).notNull().default('0'),
+    // Cost per unit at this location; the same item can have been bought into
+    // two warehouses at different costs.
+    rate: numeric('rate', { precision: 18, scale: 4 }).notNull().default('0'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('uq_stock_opening_balances_item_location').on(table.tenantId, table.stockItemId, table.locationId),
+    check('chk_stock_opening_balances_rate_non_negative', sql`${table.rate} >= 0`),
+  ],
+)
+
+export type StockOpeningBalance = typeof stockOpeningBalances.$inferSelect
+export type NewStockOpeningBalance = typeof stockOpeningBalances.$inferInsert

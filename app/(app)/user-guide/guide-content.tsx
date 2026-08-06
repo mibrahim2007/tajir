@@ -317,6 +317,7 @@ export function GuideContent() {
           <P>Add items at <strong>Inventory → Add New Item</strong>. Edit or deactivate from the item list.</P>
           <H3>Opening Stock</H3>
           <P>For stock you held before starting Tajir, set the quantity, cost rate and location at <strong>Admin → Opening Balances → Stock Item Quantities</strong>. The rate drives stock valuation and profit, so use your cost, not your selling price.</P>
+          <P>An item sitting in several warehouses on day one is entered at all of them at once: click <strong>Add location</strong> for a line per warehouse, each with its own quantity and rate. No opening stock transfer is needed.</P>
 
           <H2 n="6">Locations & Stock Transfers</H2>
           <H3>Locations</H3>
@@ -519,7 +520,7 @@ export function GuideContent() {
           <H3>Opening Balances</H3>
           <P><strong>Admin → Opening Balances</strong> is where you bring your existing business onto the books. It has four sections:</P>
           <Ul>
-            <Li><strong>Stock Item Quantities</strong> — quantity, cost rate and location per item.</Li>
+            <Li><strong>Stock Item Quantities</strong> — quantity and cost rate per item, split across as many locations as the item was held at.</Li>
             <Li><strong>Customer Opening Balances</strong> — what each customer already owed you. Negative for an advance they had paid.</Li>
             <Li><strong>Supplier Opening Balances</strong> — what you already owed each supplier. Negative for an advance you had paid.</Li>
             <Li><strong>Post-Dated Cheques</strong> — one row per cheque already in hand or already written, with its number, amount and due date.</Li>

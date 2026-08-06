@@ -1,55 +1,37 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
-import { Check, Pencil } from 'lucide-react'
+import { Fragment } from 'react'
+import { MapPin, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { setStockOpeningBalance } from '@/app/actions/set-opening-balance'
+import { StockOpeningForm } from './stock-opening-form'
 
-type Lot = { id: string; name: string; currentQuantity: number; openingRate: number; locationId: string | null }
-type Location = { id: string; name: string }
+/** One warehouse's share of an item's opening stock. */
+export type OpeningLine = { locationId: string; locationName: string; quantity: number; rate: number }
+export type OpeningLot  = { id: string; name: string; lines: OpeningLine[] }
+export type LocationOption = { id: string; name: string }
 
-function fmt(n: string | number) {
-  return parseFloat(String(n)).toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
+function fmt(n: number) {
+  return n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 4 })
 }
 
 function fmtPKR(n: number) {
   return n.toLocaleString('en-PK', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
-export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations: Location[] }) {
-  const router = useRouter()
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [editQty, setEditQty]   = useState('')
-  const [editRate, setEditRate] = useState('')
-  const [editLocationId, setEditLocationId] = useState('')
-  const [error, setError]       = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
+function lotQty(lot: OpeningLot) {
+  return lot.lines.reduce((s, l) => s + l.quantity, 0)
+}
 
+function lotValue(lot: OpeningLot) {
+  return lot.lines.reduce((s, l) => s + l.quantity * l.rate, 0)
+}
+
+export function StockBalanceTable({ lots, locations }: { lots: OpeningLot[]; locations: LocationOption[] }) {
   if (lots.length === 0) {
     return <p className="text-sm text-muted-foreground">No stock items yet. Add items from the Inventory page first.</p>
   }
 
-  const startEdit = (lot: Lot) => {
-    setEditingId(lot.id)
-    setEditQty(lot.currentQuantity.toString())
-    setEditRate(lot.openingRate.toString())
-    setEditLocationId(lot.locationId ?? '')
-    setError(null)
-  }
-
-  const save = (lotId: string) => {
-    if (!editLocationId) { setError('Location is required'); return }
-    startTransition(async () => {
-      setError(null)
-      const result = await setStockOpeningBalance({ lotId, quantity: editQty, rate: editRate, locationId: editLocationId })
-      if (!result.success) { setError(result.error); return }
-      setEditingId(null)
-      router.refresh()
-    })
-  }
+  const grandValue = lots.reduce((s, l) => s + lotValue(l), 0)
 
   return (
     <div className="rounded-lg border overflow-hidden">
@@ -57,8 +39,7 @@ export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations:
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b">
             <tr>
-              <th className="text-left px-4 py-3 font-medium">Item</th>
-              <th className="text-left px-4 py-3 font-medium">Location</th>
+              <th className="text-left px-4 py-3 font-medium">Item / Location</th>
               <th className="text-right px-4 py-3 font-medium">Quantity</th>
               <th className="text-right px-4 py-3 font-medium">Rate (PKR)</th>
               <th className="text-right px-4 py-3 font-medium">Value (PKR)</th>
@@ -67,95 +48,77 @@ export function StockBalanceTable({ lots, locations }: { lots: Lot[]; locations:
           </thead>
           <tbody className="divide-y">
             {lots.map((lot) => {
-              const qty  = lot.currentQuantity || 0
-              const rate = lot.openingRate || 0
-              const val  = qty * rate
-              const isEditing = editingId === lot.id
+              const qty   = lotQty(lot)
+              const value = lotValue(lot)
+              // The weighted average is what the item's fallback valuation rate
+              // becomes, so show that rather than any single line's rate.
+              const avgRate = qty > 0 ? value / qty : 0
+
               return (
-                <tr key={lot.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-medium">{lot.name}</td>
-
-                  {/* Location */}
-                  <td className="px-4 py-3">
-                    {isEditing ? (
-                      <Select value={editLocationId} onValueChange={setEditLocationId} disabled={locations.length === 0}>
-                        <SelectTrigger className="w-40">
-                          <SelectValue placeholder={locations.length === 0 ? 'No locations' : 'Select location…'} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {locations.map((loc) => <SelectItem key={loc.id} value={loc.id}>{loc.name}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      locations.find((loc) => loc.id === lot.locationId)?.name
-                        ?? <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-
-                  {/* Quantity */}
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {isEditing ? (
-                      <Input
-                        type="number" min={0} step="0.001"
-                        value={editQty}
-                        onChange={(e) => setEditQty(e.target.value)}
-                        className="w-32 ml-auto text-right"
-                        autoFocus
+                <Fragment key={lot.id}>
+                  <tr className="hover:bg-muted/30 transition-colors">
+                    <td className="px-4 py-3 font-medium">
+                      {lot.name}
+                      {lot.lines.length > 1 && (
+                        <span className="ml-2 text-xs text-muted-foreground font-normal">
+                          {lot.lines.length} locations
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {lot.lines.length > 0 ? fmt(qty) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {avgRate > 0 ? fmt(avgRate) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums font-medium">
+                      {value > 0 ? fmtPKR(value) : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <StockOpeningForm
+                        lot={lot}
+                        locations={locations}
+                        trigger={
+                          <Button size="sm" variant="ghost" className="min-h-[44px]" aria-label={`Set opening stock for ${lot.name}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        }
                       />
-                    ) : fmt(qty)}
-                  </td>
+                    </td>
+                  </tr>
 
-                  {/* Rate */}
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {isEditing ? (
-                      <Input
-                        type="number" min={0} step="0.01"
-                        value={editRate}
-                        onChange={(e) => setEditRate(e.target.value)}
-                        className="w-36 ml-auto text-right"
-                      />
-                    ) : (rate > 0 ? fmt(rate) : <span className="text-muted-foreground">—</span>)}
-                  </td>
-
-                  {/* Value */}
-                  <td className="px-4 py-3 text-right tabular-nums font-medium">
-                    {isEditing
-                      ? <span className="text-muted-foreground text-xs">auto</span>
-                      : (val > 0 ? fmtPKR(val) : <span className="text-muted-foreground">—</span>)
-                    }
-                  </td>
-
-                  {/* Edit / Save */}
-                  <td className="px-4 py-3 text-right">
-                    {isEditing ? (
-                      <Button size="sm" variant="ghost" className="min-h-[44px]" onClick={() => save(lot.id)} disabled={isPending}>
-                        <Check className="h-4 w-4" />
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="ghost" className="min-h-[44px]" onClick={() => startEdit(lot)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </td>
-                </tr>
+                  {/* Per-warehouse breakdown, only worth the rows once it exists. */}
+                  {lot.lines.map((line) => (
+                    <tr key={`${lot.id}-${line.locationId}`} className="bg-muted/20 text-xs text-muted-foreground">
+                      <td className="pl-10 pr-4 py-2">
+                        <span className="inline-flex items-center gap-1.5">
+                          <MapPin className="h-3 w-3" />
+                          {line.locationName}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2 text-right tabular-nums">{fmt(line.quantity)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{line.rate > 0 ? fmt(line.rate) : '—'}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">
+                        {line.quantity * line.rate > 0 ? fmtPKR(line.quantity * line.rate) : '—'}
+                      </td>
+                      <td />
+                    </tr>
+                  ))}
+                </Fragment>
               )
             })}
           </tbody>
-          {/* Totals */}
-          {lots.some(l => l.openingRate > 0) && (
+          {grandValue > 0 && (
             <tfoot className="border-t-2 bg-muted/30">
               <tr>
-                <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
-                <td className="px-4 py-3 text-right font-bold tabular-nums">
-                  {fmtPKR(lots.reduce((s, l) => s + (l.currentQuantity || 0) * (l.openingRate || 0), 0))}
-                </td>
+                <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
+                <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtPKR(grandValue)}</td>
                 <td />
               </tr>
             </tfoot>
           )}
         </table>
       </div>
-      {error && <p className="text-sm text-destructive px-4 py-2 border-t">{error}</p>}
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { type PdcRegisterRow } from '@/lib/pdc/sources'
-import { StockBalanceTable } from './stock-balance-table'
+import { StockBalanceTable, type OpeningLot } from './stock-balance-table'
 import { CustomerBalanceTable } from './customer-balance-table'
 import { SupplierBalanceTable } from './supplier-balance-table'
 import { OpeningChequesTable, type OpeningChequeRow, type PartyOption } from './opening-cheques-table'
@@ -24,23 +24,40 @@ export default async function OpeningBalancesPage() {
     { data: rawLocations },
     { data: rawCheques },
     { data: rawBanks },
+    { data: rawOpeningStock },
   ] = await Promise.all([
-    admin.from('inventory_lots').select('id, name, current_quantity, opening_rate, location_id').eq('tenant_id', tenantId),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
     admin.from('pdc_register').select('*').eq('tenant_id', tenantId).eq('source', 'pdc_opening'),
     admin.from('banks').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('stock_opening_balances').select('stock_item_id, location_id, quantity, rate').eq('tenant_id', tenantId),
   ])
 
   const locations = (rawLocations ?? []).map((l) => ({ id: l.id, name: l.name }))
+  const locationNames = new Map(locations.map((l) => [l.id, l.name]))
 
-  const lots = (rawLots ?? []).map((l) => ({
+  const num = (v: unknown) => parseFloat(String(v ?? '0')) || 0
+
+  // Opening stock is per (item, location); group it under its item so each row
+  // can list every warehouse the item was loaded at.
+  const linesByLot = new Map<string, OpeningLot['lines']>()
+  for (const row of rawOpeningStock ?? []) {
+    const lines = linesByLot.get(row.stock_item_id) ?? []
+    lines.push({
+      locationId:   row.location_id,
+      locationName: locationNames.get(row.location_id) ?? '—',
+      quantity:     num(row.quantity),
+      rate:         num(row.rate),
+    })
+    linesByLot.set(row.stock_item_id, lines)
+  }
+
+  const lots: OpeningLot[] = (rawLots ?? []).map((l) => ({
     id: l.id,
     name: l.name,
-    currentQuantity: l.current_quantity,
-    openingRate: l.opening_rate ?? '0',
-    locationId: l.location_id,
+    lines: (linesByLot.get(l.id) ?? []).sort((a, b) => a.locationName.localeCompare(b.locationName)),
   }))
 
   const customers = (rawCustomers ?? []).map((c) => ({
@@ -100,6 +117,7 @@ export default async function OpeningBalancesPage() {
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Stock Item Quantities</h2>
+        <p className="text-sm text-muted-foreground mb-3">An item held in more than one warehouse can be loaded at all of them at once — add a line per location.</p>
         <StockBalanceTable lots={lots} locations={locations} />
       </section>
 
