@@ -19,6 +19,7 @@
     "check:inbox": "tsx scripts/inbox-check.ts",
     "check:cheque-search": "tsx scripts/cheque-search-check.ts",
     "check:ask-history": "tsx scripts/ask-history-check.ts",
+    "check:ask-analysis": "tsx scripts/ask-analysis-check.ts",
     "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts"
   },
   "dependencies": {

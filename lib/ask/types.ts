@@ -150,4 +150,11 @@ export const ASK_EXAMPLES = [
   'Pending cheques',
   'Overdue cheques',
   'Cheque summary',
+  // Analysis (migration 0057)
+  'Monthly sale comparison',
+  'Monthly purchase comparison',
+  'Sales vs purchases',
+  'Expense summary',
+  'Customer grading',
+  'Supplier grading',
 ]

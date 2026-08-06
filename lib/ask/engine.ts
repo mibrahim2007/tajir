@@ -13,7 +13,12 @@ import type { AskResponse, AskColumn, AskParty } from '@/lib/ask/types'
 import { ASK_EXAMPLES, ASK_HOWTO_EXAMPLES, ASK_NEWCOMER_EXAMPLES } from '@/lib/ask/types'
 import { GUIDES, GUIDE_INDEX_KEYWORDS, matchGuide, type Guide } from '@/lib/ask/guides'
 import { inboxAnswer } from '@/lib/ask/inbox-answer'
+import {
+  monthlySales, monthlyPurchases, tradeComparison, expenseSummary,
+  itemMonthly, customerGrades, supplierGrades,
+} from '@/lib/ask/analysis'
 import { isInboxQuestion } from '@/lib/inbox/question'
+import { NONENTITY_KEYWORDS, SPECIFIC_KEYWORDS, WHOLE_WORD_ALIASES } from '@/lib/ask/intents'
 import { FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
 
 // `email` is loaded for parties only (items have none) so an answer about a
@@ -92,27 +97,8 @@ function parseDays(q: string, def: number): number {
   return n
 }
 
-// Keywords for intents that need no entity. Multi-word phrases matched as
-// substrings; each hit adds a point.
-const NONENTITY_KEYWORDS: Record<string, string[]> = {
-  slow_items:     ['slow moving', 'slow-moving', 'slow item', 'dead stock', 'non moving', 'non-moving', 'not selling', 'least sold', 'slow stock'],
-  slow_customers: ['slow customer', 'inactive customer', 'slow business customer', 'dormant', 'not buying', 'least active', 'idle customer'],
-  top_customers:  ['top customer', 'best customer', 'biggest customer', 'top buyer', 'highest sales', 'most business', 'top client'],
-  receivables:    ['receivable', 'who owes', 'owes me', 'outstanding customer', 'pending from customer', 'to collect', 'collection'],
-  payables:       ['payable', 'who do i owe', 'whom do i owe', 'we owe', 'i owe', 'outstanding supplier', 'pending to supplier'],
-  low_stock:      ['low stock', 'out of stock', 'reorder', 'running low', 'least stock', 'low quantity'],
-  cheques:        ['cheque', 'cheques', 'pdc', 'post dated', 'post-dated', 'dated cheque'],
-  stock_summary:  ['stock summary', 'inventory summary', 'stock value', 'inventory value', 'stock overview', 'inventory overview', 'total stock', 'stock worth', 'value of stock', 'stock on hand', 'inventory on hand', 'stock report', 'how much stock'],
-  overdue:        ['overdue', 'past due', 'past-due', 'overdue invoice', 'overdue receivable', 'overdue payable', 'overdue receipt', 'overdue payment', 'due invoices', 'late payment', 'late invoice', 'payments overdue', 'receipts overdue', 'what is overdue', 'whats overdue'],
-}
-
-// Higher-weight phrases so a specific cheque intent beats the generic list
-// (which also matches the bare word "cheque").
-const SPECIFIC_KEYWORDS: Record<string, string[]> = {
-  cheque_summary: ['cheque summary', 'cheques summary', 'pdc summary', 'cheque overview', 'how many cheque', 'cheque total', 'cheques total'],
-  cheque_lookup:  ['cheque no', 'cheque number', 'cheque #', 'cheque#', 'status of cheque', 'find cheque', 'trace cheque', 'which cheque'],
-}
-
+// The keyword and alias tables live in ./intents so the routing checks can
+// import them without pulling in this file's server-only dependencies.
 type Ctx = {
   admin: ReturnType<typeof createAdminClient>
   tenantId: string
@@ -673,6 +659,17 @@ const RUNNERS: Record<string, (ctx: Ctx) => Promise<AskResponse>> = {
   cheques: chequesList,
   cheque_summary: chequeSummary,
   cheque_lookup: chequeLookup,
+  monthly_sales:     (c) => monthlySales(c.admin, c.tenantId),
+  monthly_purchases: (c) => monthlyPurchases(c.admin, c.tenantId),
+  trade_comparison:  (c) => tradeComparison(c.admin, c.tenantId),
+  expenses:          (c) => expenseSummary(c.admin, c.tenantId),
+  customer_grades:   (c) => customerGrades(c.admin, c.tenantId),
+  supplier_grades:   (c) => supplierGrades(c.admin, c.tenantId),
+  // Month-by-month needs an item; without one the question is really "which
+  // items", which the slow/low-stock lists already answer.
+  item_monthly: (c) => c.item
+    ? itemMonthly(c.admin, c.tenantId, c.item.id, c.item.name)
+    : Promise.resolve(text('Which item? Try "monthly sales of 20s carded" — name the item and I will break it down by month.', ASK_EXAMPLES)),
 }
 
 // ── Classifier ──────────────────────────────────────────────────────
@@ -762,10 +759,27 @@ export async function runAsk(question: string): Promise<AskResponse> {
   for (const [id, kws] of Object.entries(SPECIFIC_KEYWORDS)) {
     for (const kw of kws) if (lowerQ.includes(kw)) add(id, 3)
   }
+  // A bare word is only an alias when it IS the whole question. Matched as a
+  // substring, "ledger" would hijack "ledger of Ali Traders" and "customer"
+  // would hijack every question naming one.
+  const wholeQ = lowerQ.replace(/[?.!,]/g, '').trim()
+  for (const [id, aliases] of Object.entries(WHOLE_WORD_ALIASES)) {
+    if (aliases.includes(wholeQ)) add(id, 4)
+  }
 
   const has = (...ws: string[]) => ws.some((w) => lowerQ.includes(w))
   const ledgerWord = has('ledger', 'statement', 'account', 'khata', 'movement', 'history')
   const bizWord = has('business', 'summary', 'overview', 'dealing', 'profile')
+  const monthWord = has('month wise', 'monthwise', 'month-wise', 'by month', 'per month', 'monthly', 'each month', 'month by month')
+
+  // "monthly sales of 20s carded" names an item AND asks for a breakdown, so it
+  // beats both the item ledger and the tenant-wide monthly figures. Scored
+  // above either so neither can win on a keyword count.
+  if (item && monthWord) {
+    add('item_monthly', 8)
+    score.delete('monthly_sales')
+    score.delete('monthly_purchases')
+  }
 
   // "overdue cheques" is already served by the cheque intent (it supports an
   // overdue filter); only use the combined overdue view when not cheque-specific.
