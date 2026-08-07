@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { runAsk } from '@/lib/ask/engine'
 import { parseEmailCommand } from '@/lib/ask/email-command'
 import { sendAskAnswer } from '@/lib/ask/send-answer'
-import { findSimilarQuestions, logAskQuestion, recalledAnswer } from '@/lib/ask/history-store'
+import { findSimilarQuestions, logAskQuestion, suggestionAnswer } from '@/lib/ask/history-store'
+import { familyFor } from '@/lib/ask/intents'
 import type { AskResponse } from '@/lib/ask/types'
 
 // Answer a typed question purely from the tenant's own stored data. runAsk
@@ -21,13 +22,15 @@ export async function askAction(question: string): Promise<AskResponse> {
     const answered = await runAsk(effective)
     const { user, tenantId } = await requireAuth()
 
-    // Nothing matched — but this tenant may have asked something like it
-    // before, and their own past questions are a better prompt than the
-    // generic example list.
+    // Nothing matched. Two better options than the generic example list, in
+    // order: what this tenant has asked before (known to work, and the
+    // strongest clue about what they meant), then the reports covering the
+    // area the question names — "month" alone cannot pick between monthly
+    // sales, purchases and expenses, so it offers all three.
     let response = answered
     if (answered.unmatched) {
       const recalls = await findSimilarQuestions(tenantId, effective)
-      response = recalledAnswer(effective, recalls) ?? answered
+      response = suggestionAnswer(effective, recalls, familyFor(effective)) ?? answered
     }
 
     // Recorded against the ORIGINAL answer: a recalled suggestion list does not

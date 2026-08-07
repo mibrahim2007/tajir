@@ -15,7 +15,10 @@
 // The engine needs a database, so this checks the pure classifier inputs — the
 // alias table and the keyword maps — the same way check:ask does for routing.
 
-import { WHOLE_WORD_ALIASES, NONENTITY_KEYWORDS, RUNNER_IDS, aliasFor } from '@/lib/ask/intents'
+import {
+  WHOLE_WORD_ALIASES, NONENTITY_KEYWORDS, RUNNER_IDS, aliasFor,
+  INTENT_FAMILIES, familyFor,
+} from '@/lib/ask/intents'
 
 let failures = 0
 function check(name: string, ok: boolean, detail = '') {
@@ -118,6 +121,62 @@ console.log('\n— Analysis phrasings are covered —')
   for (const [q, id] of expected) {
     check(`"${q}" reaches ${id}`, hits(q).includes(id), hits(q).join(',') || 'nothing')
   }
+}
+
+console.log('\n— A vague word offers the reports instead of giving up —')
+{
+  // "month" was typed and matched nothing: every month-wise keyword is a full
+  // phrase ("monthly sale"), so the bare word fell through to generic help
+  // even though six reports could have answered some version of it.
+  for (const q of ['month', 'monthly', 'month wise', 'this month', 'by month']) {
+    const f = familyFor(q)
+    check(`"${q}" offers the period reports`, f?.id === 'period', f?.id ?? 'nothing')
+  }
+  check('"comparison" offers comparisons', familyFor('comparison')?.id === 'comparison')
+  // Straight from the log — a real user typed it this way.
+  check('"comparision" (as typed) offers comparisons', familyFor('comparision')?.id === 'comparison')
+  check('"show last month sale" offers the period reports', familyFor('show last month sale')?.id === 'period')
+  check('"analysis" offers comparisons', familyFor('analysis')?.id === 'comparison')
+  check('"grading" offers grading', familyFor('grading')?.id === 'grading')
+  check('"performance" offers grading', familyFor('performance')?.id === 'grading')
+  check('"report" offers the full menu', familyFor('report')?.id === 'reports')
+  check('"profit" offers the money figures', familyFor('profit')?.id === 'money')
+}
+
+console.log('\n— Every offer is a question the engine can actually answer —')
+{
+  // An offer that routes nowhere is worse than no offer: the user taps a
+  // suggestion Ask itself produced and gets the generic fallback again.
+  const answerable = (q: string) => {
+    const lower = q.toLowerCase()
+    if (aliasFor(q)) return true
+    if (Object.values(NONENTITY_KEYWORDS).some((kws) => kws.some((k) => lower.includes(k)))) return true
+    // Placeholder offers ask the user to name something; they are prompts.
+    return q.includes('<')
+  }
+  for (const family of INTENT_FAMILIES) {
+    for (const offer of family.offers) {
+      check(`"${offer}" is answerable`, answerable(offer))
+    }
+  }
+}
+
+console.log('\n— A cue never fires inside a real question —')
+{
+  // Families run only after the engine has failed, but a cue matching a
+  // fragment of a longer word would still produce a nonsense suggestion.
+  check('"yearly" does not match the "year" cue as a fragment',
+    familyFor('yearlyrate') === null, familyFor('yearlyrate')?.id ?? 'null')
+  check('a blank question has no family', familyFor('') === null)
+  check('an unrelated question has no family', familyFor('zzz qqq') === null)
+}
+
+console.log('\n— The most specific family wins —')
+{
+  // "month wise comparison" contains cues from two families; the longer cue
+  // decides, so the answer is about months rather than generic comparisons.
+  const f = familyFor('month wise comparison')
+  check('longest cue decides', f?.id === 'period', f?.id ?? 'nothing')
 }
 
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

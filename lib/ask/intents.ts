@@ -71,3 +71,120 @@ export function aliasFor(question: string): string | null {
   }
   return null
 }
+
+/**
+ * A word that names a WHOLE AREA rather than one report.
+ *
+ * "month" is the case that prompted this: every month-wise keyword is a full
+ * phrase ("monthly sale", "month wise purchase"), so the bare word matched
+ * nothing and the user got the generic help — even though six reports could
+ * have answered some version of it. Rather than guess which, offer them.
+ *
+ * These are consulted only AFTER the engine has failed to match, so a cue
+ * appearing inside a real question can never hijack it.
+ */
+export type IntentFamily = {
+  id: string
+  cues: string[]
+  title: string
+  subtitle: string
+  /** Ready-to-tap questions, phrased exactly as the engine expects them. */
+  offers: string[]
+}
+
+export const INTENT_FAMILIES: IntentFamily[] = [
+  {
+    id: 'period',
+    cues: ['month', 'monthly', 'month wise', 'monthwise', 'month-wise', 'by month', 'per month',
+           'this month', 'last month', 'quarter', 'quarterly', 'year', 'yearly', 'annual', 'period'],
+    title: 'Which month-wise view?',
+    subtitle: 'Several reports break your business down by month',
+    offers: [
+      'Monthly sale comparison',
+      'Monthly purchase comparison',
+      'Sales vs purchases',
+      'Expense summary',
+      'Monthly sales of <item name>',
+    ],
+  },
+  {
+    id: 'comparison',
+    // "comparision" is not a typo here — it is what a user actually typed, and
+    // the question log is the reason it is covered.
+    cues: ['compare', 'comparison', 'comparision', 'comparisons', 'trend', 'trends',
+           'growth', 'analysis', 'analyse', 'analyze', 'analytics'],
+    title: 'What would you like compared?',
+    subtitle: 'These answers put figures side by side',
+    offers: [
+      'Monthly sale comparison',
+      'Monthly purchase comparison',
+      'Sales vs purchases',
+      'Customer grading',
+      'Supplier grading',
+    ],
+  },
+  {
+    id: 'grading',
+    cues: ['grading', 'grade', 'grades', 'ranking', 'rank', 'abc', 'classification', 'performance', 'rating'],
+    title: 'Grade customers or suppliers?',
+    subtitle: 'A and B and C by share of value',
+    offers: [
+      'Customer grading',
+      'Supplier grading',
+      'Top customers',
+      'Slow / inactive customers',
+    ],
+  },
+  {
+    id: 'reports',
+    cues: ['report', 'reports', 'dashboard', 'analysis report', 'mis', 'statistics', 'stats', 'figures', 'numbers'],
+    title: 'Which report?',
+    subtitle: 'Everything Ask can work out from your data',
+    offers: [
+      'Monthly sale comparison',
+      'Monthly purchase comparison',
+      'Sales vs purchases',
+      'Expense summary',
+      'Customer grading',
+      'Supplier grading',
+      'Stock summary',
+      'What is overdue',
+    ],
+  },
+  {
+    id: 'money',
+    cues: ['money', 'cash', 'profit', 'income', 'earning', 'revenue', 'turnover', 'business'],
+    title: 'Which figures?',
+    subtitle: 'Money coming in, going out, and what is owed',
+    offers: [
+      'Monthly sale comparison',
+      'Expense summary',
+      'Who owes me money',
+      'Who do I owe',
+      'Sales vs purchases',
+    ],
+  },
+]
+
+/**
+ * The family a question falls into, or null.
+ *
+ * Longest cue wins, so "month wise" beats "month" and the more specific family
+ * is offered when both could apply.
+ */
+export function familyFor(question: string): IntentFamily | null {
+  const q = (question ?? '').toLowerCase().replace(/[?.!,]/g, ' ').trim()
+  if (!q) return null
+
+  let best: IntentFamily | null = null
+  let bestLen = 0
+  for (const family of INTENT_FAMILIES) {
+    for (const cue of family.cues) {
+      // Word-boundary match so "year" does not fire inside "yearly rate" and
+      // more importantly so a cue never matches a fragment of a longer word.
+      const re = new RegExp(`(^|\\s)${cue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\s|$)`)
+      if (re.test(q) && cue.length > bestLen) { best = family; bestLen = cue.length }
+    }
+  }
+  return best
+}

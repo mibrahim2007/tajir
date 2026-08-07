@@ -6,6 +6,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { normalizeQuestion, rankRecalls, type PastQuestion } from '@/lib/ask/history'
+import type { IntentFamily } from '@/lib/ask/intents'
 import type { AskResponse } from '@/lib/ask/types'
 
 /**
@@ -77,20 +78,48 @@ export async function findSimilarQuestions(tenantId: string, question: string): 
 }
 
 /**
- * The answer to show when the engine could not match a question but this
- * tenant has asked something like it before.
+ * What to show when the engine could not match a question.
  *
- * It deliberately does not answer the past question outright. Ask's contract is
- * that it reports what is recorded — silently swapping in a different question
- * would break that. It offers them instead, as tappable suggestions.
+ * This tenant's OWN past questions come first — they are the strongest signal
+ * available about what the person meant, and they are already known to work.
+ * Whatever the family offers is appended, so a brand new account with no
+ * history still gets somewhere to go.
+ *
+ * It deliberately does not answer any of them outright. Ask's contract is that
+ * it reports what is recorded — silently swapping in a different question would
+ * break that. They are offered, not run.
  */
-export function recalledAnswer(question: string, recalls: PastQuestion[]): AskResponse | null {
-  if (recalls.length === 0) return null
+export function suggestionAnswer(
+  question: string,
+  recalls: PastQuestion[],
+  family: IntentFamily | null,
+): AskResponse | null {
+  const asked = question.trim()
+  const past = recalls.map((r) => r.question)
+  // Family offers that are not already covered by the tenant's own history.
+  const seen = new Set(past.map((p) => p.toLowerCase()))
+  const offers = (family?.offers ?? []).filter((o) => !seen.has(o.toLowerCase()))
 
+  if (past.length === 0 && offers.length === 0) return null
+
+  // Both sources: lead with the tenant's own wording, then the rest.
+  if (past.length > 0) {
+    return {
+      kind: 'text',
+      title: family ? family.title : 'You have asked something like this before',
+      body: offers.length > 0
+        ? `You have asked these before — tap one to run it, or pick another below.`
+        : `I could not match "${asked}" directly, but these questions from this account came close. Tap one to run it.`,
+      suggestions: [...past.slice(0, 5), ...offers].slice(0, 9),
+    }
+  }
+
+  // No `suggestions` here: a topics answer already renders its groups as
+  // tappable chips, so repeating them below would show every offer twice.
   return {
-    kind: 'text',
-    title: 'You have asked something like this before',
-    body: `I could not match "${question.trim()}" to your data directly. These are questions from this account that came close — tap one to run it.`,
-    suggestions: recalls.slice(0, 6).map((r) => r.question),
+    kind: 'topics',
+    title: family!.title,
+    subtitle: family!.subtitle,
+    groups: [{ category: `"${asked}" could mean any of these`, questions: offers }],
   }
 }
