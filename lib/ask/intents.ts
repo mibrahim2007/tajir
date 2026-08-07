@@ -152,6 +152,24 @@ export const INTENT_FAMILIES: IntentFamily[] = [
     ],
   },
   {
+    // Setup, not unsettled invoices. "opening" and "open" look alike and mean
+    // opposite things — someone asking about unpaid invoices must not be sent
+    // to a setup screen, so they stay separate families.
+    id: 'opening',
+    cues: ['opening', 'opening balance', 'opening balances', 'opening stock',
+           'starting balance', 'initial balance', 'previous balance', 'old balance',
+           'migrate', 'migration', 'setup', 'set up'],
+    title: 'Which opening balance?',
+    subtitle: 'Four things can be brought onto the books at setup',
+    offers: [
+      'How to load opening stock location wise',
+      'How to load customer opening balances',
+      'How to load supplier opening balances',
+      'How to load opening cheques',
+      'What is an opening balance?',
+    ],
+  },
+  {
     id: 'money',
     cues: ['money', 'cash', 'profit', 'income', 'earning', 'revenue', 'turnover', 'business'],
     title: 'Which figures?',

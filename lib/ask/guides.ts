@@ -126,6 +126,36 @@ export const GUIDES: Guide[] = [
     related: ['How to load customer opening balances', 'How to create a sale invoice', 'Stock summary'],
   },
   {
+    id: 'opening_cheques',
+    title: 'Loading opening post-dated cheques',
+    subtitle: 'Cheques already in hand or already written before Tajir',
+    keywords: [
+      'opening cheque', 'opening cheques', 'opening pdc', 'load opening cheque',
+      'opening balance of cheque', 'cheque opening balance', 'pdc opening balance',
+      'old cheque', 'existing cheque', 'previous cheque', 'purana cheque',
+    ],
+    intro:
+      'A post-dated cheque that changed hands before you started using Tajir. Loading it here puts it on the cheque register so it can clear or bounce normally.',
+    steps: [
+      'Go to Settings → Opening Balances → Post-Dated Cheques.',
+      'Click Load Opening Cheque and pick the side: Received (a cheque you hold) or Issued (one you have written).',
+      'Enter the cheque number, its due date and the amount. All three are required — without the due date it can never show as overdue.',
+      'Link the party if you know it. Linking matters: if the cheque later bounces, the amount goes back onto that customer or supplier’s balance.',
+      'Set the bank and the "opening as at" date, then save.',
+    ],
+    notes: [
+      'It is posted against Opening Balance Equity, so enter the party’s own opening balance NET OF this cheque — otherwise the same money is counted twice.',
+      'A cheque with no party can still be loaded; put the name on the cheque in the label field for your own reference.',
+      'Owner access only.',
+    ],
+    links: [
+      { label: 'Settings → Opening Balances', href: '/settings/opening-balances' },
+      { label: 'Cheque Register', href: '/reports/pdc-register' },
+      { label: 'Banks', href: '/banks' },
+    ],
+    related: ['What is PDC', 'How to load customer opening balances', 'Pending cheques'],
+  },
+  {
     id: 'sale_invoice',
     title: 'Creating a sale invoice',
     keywords: [

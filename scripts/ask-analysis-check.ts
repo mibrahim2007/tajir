@@ -19,6 +19,8 @@ import {
   WHOLE_WORD_ALIASES, NONENTITY_KEYWORDS, RUNNER_IDS, aliasFor,
   INTENT_FAMILIES, familyFor,
 } from '@/lib/ask/intents'
+import { matchGuide } from '@/lib/ask/guides'
+import { matchFaq } from '@/lib/ask/faq'
 
 let failures = 0
 function check(name: string, ok: boolean, detail = '') {
@@ -143,6 +145,38 @@ console.log('\n— A vague word offers the reports instead of giving up —')
   check('"profit" offers the money figures', familyFor('profit')?.id === 'money')
 }
 
+console.log('\n— "opening" reaches all four opening balances —')
+{
+  // Straight from the log: "opening", "opening balance" and "open" were each
+  // typed and each fell through, even though the Opening Balances page has
+  // four sections and Ask has a guide for three of them.
+  for (const q of ['opening', 'opening balance', 'opening balances', 'opening stock', 'setup']) {
+    check(`"${q}" offers the opening balances`, familyFor(q)?.id === 'opening', familyFor(q)?.id ?? 'nothing')
+  }
+
+  const opening = INTENT_FAMILIES.find((f) => f.id === 'opening')!
+  const covers = (needle: string) => opening.offers.some((o) => o.toLowerCase().includes(needle))
+  check('covers opening stock', covers('stock'))
+  check('covers customers', covers('customer'))
+  check('covers suppliers', covers('supplier'))
+  check('covers cheques — the fourth section', covers('cheque'))
+
+  // The cheque guide is new; the other three already existed.
+  check('each opening offer resolves to a guide or FAQ',
+    opening.offers.every((o) => !!matchGuide(o.toLowerCase()) || !!matchFaq(o.toLowerCase())),
+    opening.offers.filter((o) => !matchGuide(o.toLowerCase()) && !matchFaq(o.toLowerCase())).join(' | ') || 'all resolve')
+}
+
+console.log('\n— "open" is NOT the same question as "opening" —')
+{
+  // Unsettled invoices versus setup. Sending someone asking about unpaid
+  // invoices to a setup screen would be worse than the generic help.
+  const open = familyFor('open')
+  const opening = familyFor('opening')
+  check('"opening" is the setup family', opening?.id === 'opening')
+  check('"open" does not land in the setup family', open?.id !== 'opening', open?.id ?? 'no family')
+}
+
 console.log('\n— Every offer is a question the engine can actually answer —')
 {
   // An offer that routes nowhere is worse than no offer: the user taps a
@@ -151,6 +185,10 @@ console.log('\n— Every offer is a question the engine can actually answer —'
     const lower = q.toLowerCase()
     if (aliasFor(q)) return true
     if (Object.values(NONENTITY_KEYWORDS).some((kws) => kws.some((k) => lower.includes(k)))) return true
+    // Guides and FAQs are answers too — the opening-balance offers are all
+    // how-to guides rather than data reports.
+    if (matchGuide(lower)) return true
+    if (matchFaq(lower)) return true
     // Placeholder offers ask the user to name something; they are prompts.
     return q.includes('<')
   }
