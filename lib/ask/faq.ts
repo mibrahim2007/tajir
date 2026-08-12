@@ -517,6 +517,34 @@ export const FAQS: Faq[] = [
     related: ['What is Opening Balance Equity?', 'Do I need to know accounting?'],
   },
   {
+    // Written because "cash in hand ledger" was asked on production and Ask
+    // answered with the ledger of a supplier called "Chand MNC" — "chand"
+    // contains "hand". The resolver bug is fixed; this is the other half, since
+    // the question is a fair one and Ask had nothing to say to it.
+    id: 'account_ledger',
+    category: 'Accounting',
+    question: 'How do I see the ledger of Cash in Hand or another account?',
+    keywords: [
+      'what is cash in hand', 'how do i see an account ledger', 'how to see account ledger',
+      'account ledger', 'ledger of an account', 'gl ledger', 'cash in hand account',
+      'how do i see the general ledger', 'what is the general ledger', 'cash account ledger',
+    ],
+    answer:
+      'Cash in Hand is account 1110 on your Chart of Accounts — one of your own ledger accounts, not a customer or supplier, so it has no party ledger. Open Reports → General Ledger and pick the account to see its movements.',
+    points: [
+      'General Ledger filters by account and date range, and shows the opening balance with a running balance down the page.',
+      'The money accounts are 1110 Cash in Hand, 1120 Cash at Bank and 1112 PDC. To see cash and bank together for one day, use Reports → Daily Cashbook, which gives opening and closing balances.',
+      'Ask answers ledgers for customers, suppliers and stock items. Account ledgers are not in Ask yet — use the report.',
+      'Every account you have is listed at Accounts → Chart of Accounts.',
+    ],
+    links: [
+      { label: 'General Ledger', href: '/reports/general-ledger' },
+      { label: 'Daily Cashbook', href: '/reports/cashbook' },
+      { label: 'Chart of Accounts', href: '/accounts' },
+    ],
+    related: ['What is the Chart of Accounts?', 'What does "Received In" or "Paid From" mean?', 'What is a voucher?'],
+  },
+  {
     id: 'opening_balance_equity',
     category: 'Accounting',
     question: 'What is Opening Balance Equity (3300)?',

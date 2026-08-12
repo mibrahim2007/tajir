@@ -41,6 +41,13 @@ The second constraint: **never guess between answers.** If a word could mean
 three reports, offer all three. Showing one plausible answer when three matched
 is the failure this design exists to prevent.
 
+Its worst form is a mis-resolved name, because nothing on screen says a guess
+was made: "cash in hand ledger" once answered with the ledger of a supplier
+called "Chand MNC", since "chand" contains "hand". When a backlog entry names
+something that is not a customer, supplier or item — an account, a screen, a
+concept — check what it currently resolves to before assuming it is merely
+uncovered. `npm run check:ask-resolve` pins that boundary.
+
 ## How to work
 
 Invoke the `ask-backlog` skill — it carries the full procedure, the layer
@@ -58,8 +65,8 @@ In outline:
 4. Add the regression case in the same edit as the keyword —
    `scripts/ask-routing-check.ts` for static routing, `scripts/ask-analysis-check.ts`
    for aliases and families.
-5. Run `check:ask`, `check:ask-analysis`, `check:ask-history`, `lint`,
-   `typecheck`, then `ask:backlog` again.
+5. Run `check:ask`, `check:ask-analysis`, `check:ask-resolve`,
+   `check:ask-history`, `lint`, `typecheck`, then `ask:backlog` again.
 6. Report per tenant.
 
 ## What you report back

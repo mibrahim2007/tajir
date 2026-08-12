@@ -108,12 +108,37 @@ export const STATIC_ALIASES: Record<string, string> = {
   // not self-evidently instructional, so matchGuide refused it and tapping the
   // chip fell through to the data engine.
   'employee loans and advances': 'guide:employee_loans',
+
+  // Chart-of-accounts ledgers. "Show Chash in Hand Ledger" was asked on
+  // production and answered with the ledger of a supplier called "Chand MNC",
+  // because "chand" contains "hand". The resolver no longer matches inside a
+  // word; these give the question somewhere to land. "chash" is the typo as it
+  // was actually typed, kept for the same reason "comparision" is kept below.
+  'cash in hand':         'faq:account_ledger',
+  'cash in hand ledger':  'faq:account_ledger',
+  'chash in hand ledger': 'faq:account_ledger',
+  'cash ledger':          'faq:account_ledger',
+  'cash account':         'faq:account_ledger',
+  'account ledger':       'faq:account_ledger',
+  'general ledger':       'faq:account_ledger',
+  'cashbook':             'faq:account_ledger',
+  'cash book':            'faq:account_ledger',
 }
+
+/**
+ * Openers people put in front of a question that carry no meaning of their own.
+ *
+ * "Show Chash in Hand Ledger" is the same question as "cash in hand ledger",
+ * and a table keyed on the bare phrase would miss it. Stripped only for the
+ * whole-question alias lookup — the engine's own matching still sees the
+ * original text.
+ */
+const LEAD_INS = /^(?:please\s+)?(?:show\s+me|show|give\s+me|give|tell\s+me|open|display|view|see)\s+/
 
 /** A static alias fires only when it IS the whole question. */
 export function staticAliasFor(question: string): string | null {
   const whole = (question ?? '').toLowerCase().replace(/[?.!,]/g, '').trim()
-  return STATIC_ALIASES[whole] ?? null
+  return STATIC_ALIASES[whole] ?? STATIC_ALIASES[whole.replace(LEAD_INS, '').trim()] ?? null
 }
 
 /**

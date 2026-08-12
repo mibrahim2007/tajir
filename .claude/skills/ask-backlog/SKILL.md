@@ -70,6 +70,7 @@ recipe for each layer.
 | "how do I …" — wants steps | guide | `lib/ask/guides.ts` → `GUIDES` |
 | "what is …" / "why did …" — wants a concept | FAQ | `lib/ask/faq.ts` → `FAQS` |
 | an entity's name typed alone or misspelled | usually already handled | verify before touching the engine |
+| **not a party at all** — an account, a screen, a concept | check what it resolved to | `lib/ask/resolve.ts`; a word must not match inside a name |
 | a report that does not exist | **do not invent an answer** | write it up as a proposal (Step 5) |
 
 Two rules that are load-bearing:
@@ -106,6 +107,7 @@ Run all of these from `tajir/` and show the real output, not a summary:
 ```bash
 npm run check:ask            # static routing + email commands + FAQ structure
 npm run check:ask-analysis   # aliases + intent families
+npm run check:ask-resolve    # entity resolution — a word must not match inside a name
 npm run check:ask-history    # recall / similarity
 npm run lint
 npm run typecheck
