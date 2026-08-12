@@ -123,6 +123,25 @@ export const STATIC_ALIASES: Record<string, string> = {
   'general ledger':       'faq:account_ledger',
   'cashbook':             'faq:account_ledger',
   'cash book':            'faq:account_ledger',
+
+  // Financial statements. Ask does not assemble them; the reports do, and
+  // saying so beats a loose match. "show balance sheet" was asked by Makks
+  // International and matched nothing.
+  'balance sheet':        'faq:financial_statements',
+  'profit and loss':      'faq:financial_statements',
+  'profit & loss':        'faq:financial_statements',
+  'p&l':                  'faq:financial_statements',
+  'pnl':                  'faq:financial_statements',
+  'trial balance':        'faq:financial_statements',
+  'income statement':     'faq:financial_statements',
+  'financial statements': 'faq:financial_statements',
+
+  // "Show Owner record" — the business owners' capital and drawings, at
+  // Admin → Owners. Not the Owner user role, which owner_vs_assistant covers.
+  'owner record':         'faq:owner_money',
+  'owner records':        'faq:owner_money',
+  'owners':               'faq:owner_money',
+  'owner':                'faq:owner_money',
 }
 
 /**

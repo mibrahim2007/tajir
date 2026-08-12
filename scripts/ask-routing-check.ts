@@ -9,10 +9,10 @@
 // Add a case whenever you add a keyword. It is not a full test suite — the repo
 // has no test runner — but it is the check that matters most for this feature.
 
-import { matchGuide } from '@/lib/ask/guides'
+import { matchGuide, GUIDES } from '@/lib/ask/guides'
 import { matchFaq, FAQS, FAQ_INDEX_KEYWORDS, FAQ_CATEGORIES, isComparativeQuestion } from '@/lib/ask/faq'
 import { parseEmailCommand } from '@/lib/ask/email-command'
-import { staticAliasFor } from '@/lib/ask/intents'
+import { staticAliasFor, NONENTITY_KEYWORDS } from '@/lib/ask/intents'
 
 // Mirrors the engine's real precedence:
 // faq index → comparative → guide → faq → static alias → data.
@@ -93,6 +93,17 @@ const CASES: [string, string][] = [
   ['what is cash in hand', 'faq:account_ledger'],
   // A named party still wins — "cash" must not swallow a real ledger question.
   ['ledger of Cash & Carry Mart', 'data'],
+
+  // Financial statements are reports, not Ask answers.
+  ['show balance sheet', 'faq:financial_statements'],
+  ['balance sheet', 'faq:financial_statements'],
+  ['trial balance', 'faq:financial_statements'],
+  ['profit and loss', 'faq:financial_statements'],
+  ['where is the balance sheet', 'faq:financial_statements'],
+  // The owners' capital record, not the Owner user role.
+  ['Show Owner record', 'faq:owner_money'],
+  ['owners', 'faq:owner_money'],
+  ['what is the difference between owner and assistant', 'faq:owner_vs_assistant'],
 
   // ...and the same words inside a real question must NOT be captured, which is
   // why static aliases match the whole question only.
@@ -178,6 +189,27 @@ for (const [q, expected] of EMAIL_CASES) {
   else failures.push(`  [email] "${q}"\n     expected ${expected}\n     got      ${got}`)
 }
 
+// ── Every follow-up chip must lead somewhere ────────────────────────
+// A `related` entry is rendered as a tappable chip. One that routes nowhere is
+// worse than no chip at all: the user taps a suggestion Ask itself produced and
+// gets the generic fallback. This has shipped twice — "Employee loans and
+// advances" (the guide's own title, which carries no how-to cue) and the
+// account-ledger FAQ, whose title did not match its own keywords.
+const relatedFailures: string[] = []
+for (const f of [...FAQS, ...GUIDES]) {
+  for (const rel of f.related ?? []) {
+    const l = rel.toLowerCase()
+    const reached =
+      !!matchGuide(l) || !!matchFaq(l) || !!staticAliasFor(rel) ||
+      FAQ_INDEX_KEYWORDS.some((k) => l.includes(k)) ||
+      Object.values(NONENTITY_KEYWORDS).some((kws) => kws.some((k) => l.includes(k))) ||
+      rel.includes('<')
+    if (!reached) relatedFailures.push(`  "${rel}"  (offered by ${f.id})`)
+  }
+}
+console.log(`Follow-up chips: ${relatedFailures.length === 0 ? 'all lead somewhere' : `${relatedFailures.length} dead end`}`)
+if (relatedFailures.length) console.log(relatedFailures.join('\n'))
+
 // Structural checks on the content itself
 const ids = new Set(FAQS.map((f) => f.id))
 const dupIds = ids.size !== FAQS.length
@@ -190,4 +222,4 @@ console.log(`Email commands: ${emailPass}/${EMAIL_CASES.length} passed`)
 if (failures.length) console.log('FAILURES:\n' + failures.join('\n'))
 console.log(`FAQs: ${FAQS.length} across ${FAQ_CATEGORIES.length} categories`)
 console.log(`duplicate ids: ${dupIds} | bad category: ${badCat.length} | no keywords: ${noKeywords.length} | overlong answers: ${longAnswers.length}`)
-process.exit(failures.length === 0 && !dupIds && !badCat.length && !noKeywords.length ? 0 : 1)
+process.exit(failures.length === 0 && !dupIds && !badCat.length && !noKeywords.length && !relatedFailures.length ? 0 : 1)

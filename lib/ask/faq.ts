@@ -44,7 +44,7 @@ const FAQ_CUES = [
   'why does', 'why did', 'why is', 'why can', 'why cant', "why can't", 'why do',
   'can i', 'can we', 'do i need', 'should i', 'am i able', 'is it possible',
   'how do i', 'how to', 'how is', 'how are', 'explain', 'meaning', 'mean',
-  'where do i', 'where to', 'i am new', 'im new', "i'm new",
+  'where do i', 'where to', 'where is', 'where are', 'i am new', 'im new', "i'm new",
   'kya', 'kaise', 'kyun', 'kyu', 'farq',
 ]
 
@@ -171,6 +171,8 @@ export const FAQS: Faq[] = [
     question: 'Why does a customer show "Credit"?',
     keywords: [
       'customer shows credit', 'credit badge', 'why credit', 'negative balance customer',
+      // Its own title, so the chip that offers it leads somewhere.
+      'why does a customer show',
       'customer in credit', 'advance from customer', 'green credit',
     ],
     answer:
@@ -228,6 +230,8 @@ export const FAQS: Faq[] = [
     question: 'How do I see everything a customer has done?',
     keywords: [
       'customer statement', 'customer history', 'see all transactions of', 'party ledger',
+      // Its own title, so the chip that offers it leads somewhere.
+      'how do i see everything a customer',
       'account statement', 'khata', 'full history of customer',
     ],
     answer:
@@ -528,6 +532,10 @@ export const FAQS: Faq[] = [
       'what is cash in hand', 'how do i see an account ledger', 'how to see account ledger',
       'account ledger', 'ledger of an account', 'gl ledger', 'cash in hand account',
       'how do i see the general ledger', 'what is the general ledger', 'cash account ledger',
+      // Bare "cash in hand" needs a cue to fire, so this cannot capture
+      // "received 5000 cash in hand". It exists so this entry's own title
+      // matches — a related chip that dead-ends is a broken promise.
+      'cash in hand',
     ],
     answer:
       'Cash in Hand is account 1110 on your Chart of Accounts — one of your own ledger accounts, not a customer or supplier, so it has no party ledger. Open Reports → General Ledger and pick the account to see its movements.',
@@ -543,6 +551,37 @@ export const FAQS: Faq[] = [
       { label: 'Chart of Accounts', href: '/accounts' },
     ],
     related: ['What is the Chart of Accounts?', 'What does "Received In" or "Paid From" mean?', 'What is a voucher?'],
+  },
+  {
+    // "show balance sheet" was asked by Makks International and matched
+    // nothing. Ask reports ledgers and activity; the statements are assembled
+    // by the reports, and saying so plainly beats routing it to a loose match.
+    id: 'financial_statements',
+    category: 'Accounting',
+    question: 'Where are the Balance Sheet, Profit & Loss and Trial Balance?',
+    keywords: [
+      'where is the balance sheet', 'how do i see the balance sheet', 'what is the balance sheet',
+      'balance sheet report', 'profit and loss report', 'where is profit and loss',
+      'trial balance report', 'what is the trial balance', 'financial statements',
+      'income statement', 'balance sheet', 'trial balance',
+    ],
+    answer:
+      'In Reports, not in Ask. Balance Sheet shows assets, liabilities and equity on a date; Profit & Loss shows revenue, cost and net profit over a range; Trial Balance lists every GL account and proves debits equal credits.',
+    points: [
+      'Balance Sheet verifies the accounting equation, so it is the quickest check that your books balance.',
+      'For profit on one item or one customer, use Item Profit & Loss or Customer Profit & Loss instead of the overall statement.',
+      'Ask reports ledgers, balances and activity straight from your records. Assembling them into a statement is what the reports do.',
+    ],
+    links: [
+      { label: 'Balance Sheet', href: '/reports/balance-sheet' },
+      { label: 'Profit & Loss', href: '/reports/profit-loss' },
+      { label: 'Trial Balance', href: '/reports/trial-balance' },
+    ],
+    related: [
+      'Why does my Balance Sheet not match the customer or supplier list?',
+      'What is the Chart of Accounts?',
+      'What is closing the books?',
+    ],
   },
   {
     id: 'opening_balance_equity',

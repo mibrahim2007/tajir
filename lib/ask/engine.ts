@@ -26,7 +26,7 @@ import { FAQS, FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuesti
 // Entity resolution lives in its own pure module so the checks can run it —
 // a mis-resolved name answers confidently about the wrong party, which is the
 // least visible way this feature can fail.
-import { NAME_STOPWORDS, tokenize, resolveEntity, countNameMatches } from '@/lib/ask/resolve'
+import { NAME_STOPWORDS, tokenize, questionTokens, resolveEntity, countNameMatches } from '@/lib/ask/resolve'
 
 // `email` is loaded for parties only (items have none) so an answer about a
 // customer or supplier can offer to be sent to them.
@@ -800,12 +800,23 @@ export async function runAsk(question: string): Promise<AskResponse> {
     // fallback offers the reports instead — that is a better answer than
     // searching the records for the word "invoice".
     const tokens = tokenize(wholeQ)
-    if (tokens.length > 0 && tokens.length <= 2 && wholeQ.length >= 3 && !familyFor(q)) {
+    const content = questionTokens(lowerQ)
+    let term: string | null = null
+    if (tokens.length > 0 && tokens.length <= 2 && wholeQ.length >= 3) {
+      // One or two words — search the phrase, so "10 gb" stays together.
+      term = wholeQ
+    } else if (content.length > 0 && content.length <= 2) {
+      // Longer, but nearly all of it was structural: "summary of power",
+      // "item leather for cars". What survives the stopword list is what they
+      // were asking about, and the longest of those is the most distinctive.
+      term = content.reduce((a, b) => (b.length > a.length ? b : a))
+    }
+    if (term && !familyFor(q)) {
       const named = (t: string) => searchable.some((e) => (e.name ?? '').toLowerCase().includes(t))
       // "cards" matches nothing; "card" matches three items. Only consulted
       // when the word as typed found nothing, so it cannot mislead.
-      const singular = named(wholeQ) ? null : singularize(wholeQ)
-      return universalSearch(admin, tenantId, singular && named(singular) ? singular : wholeQ)
+      const singular = named(term) ? null : singularize(term)
+      return universalSearch(admin, tenantId, singular && named(singular) ? singular : term)
     }
 
     return { ...help(), unmatched: true }
