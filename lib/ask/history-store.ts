@@ -5,7 +5,7 @@
 
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { normalizeQuestion, rankRecalls, type PastQuestion } from '@/lib/ask/history'
+import { normalizeQuestion, rankRecalls, answerLabel, type PastQuestion } from '@/lib/ask/history'
 import type { IntentFamily } from '@/lib/ask/intents'
 import type { AskResponse } from '@/lib/ask/types'
 
@@ -24,7 +24,9 @@ export async function logAskQuestion(opts: {
   const question = (opts.question ?? '').trim()
   if (!question) return
 
-  const title = 'title' in opts.response ? opts.response.title ?? null : null
+  // Falls back to the opening of a text answer, so a dead end is legible in the
+  // exported history instead of reading "Answered with: text".
+  const title = answerLabel(opts.response as { kind: string; title?: string | null; body?: string })
 
   try {
     await createAdminClient()

@@ -108,6 +108,31 @@ export function rankRecalls(candidates: PastQuestion[], question: string): PastQ
 }
 
 /**
+ * What to record as "answered with", for the exported question history.
+ *
+ * Table, stats, guide and FAQ answers all carry a title. A text answer usually
+ * does not — "No ledger movements found for Ali Traders", "Nothing in your
+ * records matches cards" — and storing null for those makes the history read
+ * "Answered with: text", which hides the answers most worth reviewing: the
+ * dead ends. A question answered with a sentence about nothing being found is
+ * technically answered and genuinely unhelpful, and you cannot tell the two
+ * apart from the word "text".
+ *
+ * This is how "cash in hand ledger" hid: it answered "No ledger movements found
+ * for Chand MNC" — a party nobody asked about — and read as an ordinary
+ * answered question in the export.
+ */
+export function answerLabel(response: { kind: string; title?: string | null; body?: string }): string | null {
+  const titled = response.title ?? null
+  if (titled) return titled
+  if (response.kind === 'text' && response.body) {
+    const body = response.body.trim().replace(/\s+/g, ' ')
+    return body.length > 120 ? `${body.slice(0, 117)}…` : body
+  }
+  return null
+}
+
+/**
  * True when a past question is close enough that answering it outright is
  * better than asking "did you mean". Reserved for near-identical wording —
  * anything less and the user should choose.
