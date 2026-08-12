@@ -32,6 +32,7 @@ import path from 'node:path'
 import { matchGuide, hasHowToCue, GUIDE_INDEX_KEYWORDS } from '@/lib/ask/guides'
 import { matchFaq, hasFaqCue, FAQ_INDEX_KEYWORDS, isComparativeQuestion } from '@/lib/ask/faq'
 import { aliasFor, staticAliasFor, familyFor, NONENTITY_KEYWORDS, SPECIFIC_KEYWORDS } from '@/lib/ask/intents'
+import { tokenize, questionTokens } from '@/lib/ask/resolve'
 
 const DOC_DIR = path.join(process.cwd(), 'docs', 'ask-queries')
 
@@ -144,13 +145,20 @@ function classify(question: string): { status: Status; route: string } {
   const family = familyFor(question)
   if (family) return { status: 'partial', route: `family:${family.id}` }
 
-  // A one- or two-word question with no family reaches the engine's name
-  // search, which answers in both directions — it lists what matches, and says
-  // plainly that nothing does when nothing does. Whether this tenant HAS a
-  // record by that name cannot be known here, but either way it is answered.
-  const words = lowerQ.split(/\s+/).filter(Boolean)
+  // A short question with no family reaches the engine's name search, which
+  // answers in both directions — it lists what matches, and says plainly that
+  // nothing does when nothing does. Whether this tenant HAS a record by that
+  // name cannot be known here, but either way it is answered.
+  //
+  // Mirrors runAsk's two conditions: one or two words outright, or a longer
+  // question whose structural words are all stopwords ("summary of power").
+  const words = tokenize(lowerQ)
+  const content = questionTokens(lowerQ)
   if (words.length > 0 && words.length <= 2 && lowerQ.length >= 3) {
     return { status: 'fixed', route: 'search:name' }
+  }
+  if (content.length > 0 && content.length <= 2) {
+    return { status: 'fixed', route: `search:${content.reduce((a, b) => (b.length > a.length ? b : a))}` }
   }
 
   return { status: 'open', route: 'none' }
