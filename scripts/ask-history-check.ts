@@ -12,7 +12,7 @@
 
 import {
   normalizeQuestion, contentTokens, overlapScore, confidence,
-  rankRecalls, isConfidentMatch, RECALL_THRESHOLD, type PastQuestion,
+  rankRecalls, isConfidentMatch, RECALL_THRESHOLD, answerLabel, type PastQuestion,
 } from '@/lib/ask/history'
 
 let failures = 0
@@ -116,6 +116,28 @@ console.log('\n— Nothing to recall —')
 {
   check('an empty history offers nothing', rankRecalls([], 'anything').length === 0)
   check('an empty question offers nothing', rankRecalls([past('stock summary')], '').length === 0)
+}
+
+console.log('\n— A dead end is legible in the exported history —')
+{
+  // "cash in hand ledger" answered "No ledger movements found for Chand MNC" —
+  // a party nobody asked about — and the export recorded it as "text", which is
+  // indistinguishable from a useful answer. The label is what makes a wrong
+  // answer visible to whoever reads the backlog.
+  check('a titled answer keeps its title',
+    answerLabel({ kind: 'table', title: 'Stock summary' }) === 'Stock summary')
+  check('an untitled text answer records what it said',
+    answerLabel({ kind: 'text', body: 'No ledger movements found for Chand MNC.' })
+      === 'No ledger movements found for Chand MNC.')
+  check('whitespace is collapsed',
+    answerLabel({ kind: 'text', body: '  No activity\n  found yet.  ' }) === 'No activity found yet.')
+
+  const long = 'x'.repeat(300)
+  const labelled = answerLabel({ kind: 'text', body: long }) ?? ''
+  check('a long body is truncated', labelled.length === 118 && labelled.endsWith('…'), `${labelled.length} chars`)
+
+  check('a titleless non-text answer stays null', answerLabel({ kind: 'topics' }) === null)
+  check('an empty body stays null', answerLabel({ kind: 'text', body: '' }) === null)
 }
 
 console.log(failures === 0 ? '\nAll checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
