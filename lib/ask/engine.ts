@@ -18,8 +18,11 @@ import {
   itemMonthly, customerGrades, supplierGrades,
 } from '@/lib/ask/analysis'
 import { isInboxQuestion } from '@/lib/inbox/question'
-import { NONENTITY_KEYWORDS, SPECIFIC_KEYWORDS, WHOLE_WORD_ALIASES } from '@/lib/ask/intents'
-import { FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
+import {
+  NONENTITY_KEYWORDS, SPECIFIC_KEYWORDS, WHOLE_WORD_ALIASES,
+  staticAliasFor, singularize, familyFor,
+} from '@/lib/ask/intents'
+import { FAQS, FAQ_INDEX_KEYWORDS, matchFaq, faqsByCategory, isComparativeQuestion, type Faq } from '@/lib/ask/faq'
 
 // `email` is loaded for parties only (items have none) so an answer about a
 // customer or supplier can offer to be sent to them.
@@ -706,6 +709,23 @@ export async function runAsk(question: string): Promise<AskResponse> {
   const faq = matchFaq(lowerQ)
   if (faq) return faqResponse(faq)
 
+  // A bare word naming a guide or an FAQ. Both matchers above need a how-to or
+  // concept cue, so a one-word question can never reach them — "start" and
+  // "location" were each typed alone and answered with the generic help card
+  // while the answer sat in faq.ts. Whole question only, so this cannot hijack
+  // a real one.
+  const staticAlias = staticAliasFor(q)
+  if (staticAlias) {
+    const [layer, id] = staticAlias.split(':')
+    if (layer === 'faq') {
+      const f = FAQS.find((x) => x.id === id)
+      if (f) return faqResponse(f)
+    } else {
+      const g = GUIDES.find((x) => x.id === id)
+      if (g) return guideResponse(g)
+    }
+  }
+
   const [{ data: customers }, { data: suppliers }, { data: items }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, email').eq('tenant_id', tenantId).limit(2000),
     admin.from('suppliers').select('id, name, email').eq('tenant_id', tenantId).limit(2000),
@@ -814,6 +834,25 @@ export async function runAsk(question: string): Promise<AskResponse> {
         unmatched: true,
       }
     }
+
+    // A one- or two-word question that reached this far named no intent, no
+    // guide and no FAQ. It is almost always a name — "cards", "computer",
+    // "laptop" were all typed alone and all got the generic help card. Searching
+    // is the honest answer in both directions: it lists what matches, and says
+    // plainly that nothing does when nothing does.
+    //
+    // Skipped when the word names a whole area, because the caller's family
+    // fallback offers the reports instead — that is a better answer than
+    // searching the records for the word "invoice".
+    const tokens = tokenize(wholeQ)
+    if (tokens.length > 0 && tokens.length <= 2 && wholeQ.length >= 3 && !familyFor(q)) {
+      const named = (t: string) => searchable.some((e) => (e.name ?? '').toLowerCase().includes(t))
+      // "cards" matches nothing; "card" matches three items. Only consulted
+      // when the word as typed found nothing, so it cannot mislead.
+      const singular = named(wholeQ) ? null : singularize(wholeQ)
+      return universalSearch(admin, tenantId, singular && named(singular) ? singular : wholeQ)
+    }
+
     return { ...help(), unmatched: true }
   }
 

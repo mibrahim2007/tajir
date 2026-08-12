@@ -12,8 +12,10 @@
 import { matchGuide } from '@/lib/ask/guides'
 import { matchFaq, FAQS, FAQ_INDEX_KEYWORDS, FAQ_CATEGORIES, isComparativeQuestion } from '@/lib/ask/faq'
 import { parseEmailCommand } from '@/lib/ask/email-command'
+import { staticAliasFor } from '@/lib/ask/intents'
 
-// Mirrors the engine's real precedence: faq index → comparative → guide → faq → data.
+// Mirrors the engine's real precedence:
+// faq index → comparative → guide → faq → static alias → data.
 function route(q: string): string {
   const l = q.toLowerCase()
   if (FAQ_INDEX_KEYWORDS.some((k) => l.includes(k))) return 'faq-index'
@@ -22,6 +24,10 @@ function route(q: string): string {
   if (g) return `guide:${g.id}`
   const f = matchFaq(l)
   if (f) return `faq:${f.id}`
+  // Last of the static layers: a bare word whose answer is a guide or an FAQ,
+  // which the two matchers above cannot reach because both need a cue.
+  const s = staticAliasFor(q)
+  if (s) return s
   return 'data'
 }
 
@@ -64,6 +70,24 @@ const CASES: [string, string][] = [
   ['how to load customer opening balances', 'guide:opening_balance_customers'],
   ['how to load opening stock location wise', 'guide:opening_stock'],
   ['how to create a sale return', 'guide:sale_return'],
+
+  // Bare words whose answer is static. Every one of these was typed on its own
+  // and answered with the generic help card. Source: ask_query_log, 2026-08-07.
+  ['start', 'faq:where_to_start'],
+  ['how do i start', 'faq:where_to_start'],
+  ['how to start', 'faq:where_to_start'],
+  ['location', 'faq:what_is_location'],
+  ['locations', 'faq:what_is_location'],
+  // The guide's own title, offered as a chip in ASK_HOWTO_EXAMPLES — it carries
+  // no how-to cue, so only the static alias reaches it.
+  ['employee loans and advances', 'guide:employee_loans'],
+
+  // ...and the same words inside a real question must NOT be captured, which is
+  // why static aliases match the whole question only.
+  ['how to load opening stock location wise', 'guide:opening_stock'],
+  ['ledger of Location Traders', 'data'],
+  ['stock at location 2', 'data'],
+  ['employee loan ledger of Rashid', 'data'],
 
   // Data questions must still reach the data engine
   ['who owes me money', 'data'],

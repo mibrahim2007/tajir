@@ -25,7 +25,10 @@ export const NONENTITY_KEYWORDS: Record<string, string[]> = {
   overdue:        ['overdue', 'past due', 'past-due', 'overdue invoice', 'overdue receivable', 'overdue payable', 'overdue receipt', 'overdue payment', 'due invoices', 'late payment', 'late invoice', 'payments overdue', 'receipts overdue', 'what is overdue', 'whats overdue'],
 
   // ── Analysis (migration 0057) ──
-  monthly_sales:     ['monthly sale', 'monthly sales', 'sales by month', 'sale by month', 'month wise sale', 'monthwise sale', 'sales comparison', 'sale comparison', 'sales trend', 'sales per month', 'compare sales'],
+  // "show last month sale" was typed and matched nothing: every month-wise
+  // keyword here was a phrase built around the word "monthly", and none of them
+  // covers the way people actually name a period out loud.
+  monthly_sales:     ['monthly sale', 'monthly sales', 'sales by month', 'sale by month', 'month wise sale', 'monthwise sale', 'sales comparison', 'sale comparison', 'sales trend', 'sales per month', 'compare sales', 'last month sale', 'last month sales', 'this month sale', 'this month sales'],
   monthly_purchases: ['monthly purchase', 'monthly purchases', 'purchase by month', 'purchases by month', 'month wise purchase', 'monthwise purchase', 'purchase comparison', 'purchase trend', 'purchases per month', 'compare purchases'],
   trade_comparison:  ['sales vs purchase', 'sale vs purchase', 'sales and purchase', 'sale and purchase', 'purchase vs sale', 'buying and selling', 'trade summary', 'trading summary'],
   expenses:          ['expense', 'expenses', 'spending', 'overheads', 'overhead', 'cost breakdown', 'where is money going', 'where money goes', 'expense summary', 'expense report'],
@@ -54,8 +57,8 @@ export const WHOLE_WORD_ALIASES: Record<string, string[]> = {
   stock_summary:     ['stock', 'stocks', 'inventory', 'stock report', 'summary', 'item stock', 'current stock', 'stock position'],
   slow_items:        ['items', 'item', 'stock items', 'show item current stocks', 'item list'],
   receivables:       ['ledger', 'ledgers', 'balances', 'outstanding'],
-  payables:          ['supplier', 'suppliers'],
-  top_customers:     ['customer', 'customers'],
+  payables:          ['supplier', 'suppliers', 'all suppliers'],
+  top_customers:     ['customer', 'customers', 'all customers'],
   cheques:           ['cheque', 'cheques', 'pdc'],
   cheque_summary:    ['bounced', 'bounce'],
   monthly_sales:     ['sale', 'sales'],
@@ -70,6 +73,67 @@ export function aliasFor(question: string): string | null {
     if (aliases.includes(whole)) return id
   }
   return null
+}
+
+/**
+ * Bare questions whose answer is a GUIDE or an FAQ rather than a report.
+ *
+ * WHOLE_WORD_ALIASES above sends a bare word to a data runner. These do the same
+ * for the two static layers, which their own matchers cannot reach: matchGuide
+ * and matchFaq both require a how-to or concept cue, so a one-word question can
+ * never satisfy them however exactly it names the topic.
+ *
+ * Taken from the log, same as the aliases: "start" was typed on its own and
+ * answered with the generic help card, and so was "how do i start" — the FAQ
+ * that answers it exists, but no keyword covered that wording. "location" is
+ * the other shape: the app has locations, Ask has no location report, and the
+ * FAQ explaining what one is for is the honest answer.
+ *
+ * Whole question only, for the reason the data aliases are: as substrings these
+ * would hijack real questions — "location" appears in "opening stock location
+ * wise", which is a guide.
+ *
+ * Values are `faq:<id>` or `guide:<id>`; ask-analysis-check asserts they exist.
+ */
+export const STATIC_ALIASES: Record<string, string> = {
+  'start':           'faq:where_to_start',
+  'how do i start':  'faq:where_to_start',
+  'how to start':    'faq:where_to_start',
+  'how do i begin':  'faq:where_to_start',
+  'where do i begin':'faq:where_to_start',
+  'location':        'faq:what_is_location',
+  'locations':       'faq:what_is_location',
+  // Not from the log — from ASK_HOWTO_EXAMPLES, where it is offered as a
+  // tappable chip. It is the guide's own title, carries no how-to cue and is
+  // not self-evidently instructional, so matchGuide refused it and tapping the
+  // chip fell through to the data engine.
+  'employee loans and advances': 'guide:employee_loans',
+}
+
+/** A static alias fires only when it IS the whole question. */
+export function staticAliasFor(question: string): string | null {
+  const whole = (question ?? '').toLowerCase().replace(/[?.!,]/g, '').trim()
+  return STATIC_ALIASES[whole] ?? null
+}
+
+/**
+ * The singular of a plural the user typed, or null if it does not look plural.
+ *
+ * "cards" matched nothing while "card" listed three items, because stock names
+ * are stored singular ("10 GB CARD") and every match in the engine is a
+ * substring test. The same gap hits any category word a shopkeeper pluralises.
+ *
+ * Deliberately crude — it only has to undo the "s" people add when they mean
+ * the category rather than one item, and it is consulted ONLY after the word as
+ * typed has already matched nothing, so a wrong guess costs nothing. Words
+ * ending in "ss" are left alone ("address", "business").
+ */
+export function singularize(word: string): string | null {
+  const w = (word ?? '').toLowerCase().trim()
+  if (w.length < 4 || !w.endsWith('s') || w.endsWith('ss')) return null
+  if (w.endsWith('ies') && w.length > 4) return `${w.slice(0, -3)}y`
+  if (/(ch|sh|x|z)es$/.test(w)) return w.slice(0, -2)
+  return w.slice(0, -1)
 }
 
 /**
@@ -167,6 +231,51 @@ export const INTENT_FAMILIES: IntentFamily[] = [
       'How to load supplier opening balances',
       'How to load opening cheques',
       'What is an opening balance?',
+    ],
+  },
+  {
+    // "invoice" and "sale invoice" were both typed bare. Ask has no runner that
+    // lists invoices, so the only honest offer is the how-to for raising one
+    // plus the reports that summarise them — which is exactly why this is a
+    // family and not an alias to the sale-invoice guide.
+    id: 'documents',
+    cues: ['invoice', 'invoices', 'bill', 'bills', 'billing', 'document', 'documents', 'voucher', 'vouchers', 'challan'],
+    title: 'Which invoice question?',
+    subtitle: 'Ask can show you how to raise one, or what your invoices add up to',
+    offers: [
+      'How to create a sale invoice',
+      'How to create a purchase order',
+      'How to create a sale return',
+      'Monthly sale comparison',
+      'What is overdue',
+    ],
+  },
+  {
+    // Unpaid items, NOT setup balances — kept apart from the 'opening' family
+    // above for the reason stated there. "open" does not word-boundary match
+    // inside "opening", so the two cannot collide.
+    id: 'outstanding',
+    cues: ['open', 'unpaid', 'unsettled', 'recovery', 'collections', 'remaining', 'left'],
+    title: 'Which outstanding figures?',
+    subtitle: 'What is still unpaid, in each direction',
+    offers: [
+      'Who owes me money',
+      'Who do I owe',
+      'What is overdue',
+      'Pending cheques',
+      'Overdue cheques',
+    ],
+  },
+  {
+    id: 'staff',
+    cues: ['employee', 'employees', 'staff', 'worker', 'workers', 'salary', 'salaries', 'wages', 'mulazim'],
+    title: 'Which staff question?',
+    subtitle: 'Ask covers loans and advances; it has no payroll report',
+    offers: [
+      'Employee loans and advances',
+      'What is the difference between an employee loan and an advance?',
+      'How do I record money I take out of the business?',
+      'Expense summary',
     ],
   },
   {

@@ -21,7 +21,8 @@
     "check:ask-history": "tsx scripts/ask-history-check.ts",
     "check:ask-analysis": "tsx scripts/ask-analysis-check.ts",
     "check:return-limit": "tsx scripts/return-limit-check.ts",
-    "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts"
+    "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts",
+    "ask:backlog": "tsx scripts/ask-backlog.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
