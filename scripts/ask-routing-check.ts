@@ -82,6 +82,18 @@ const CASES: [string, string][] = [
   // no how-to cue, so only the static alias reaches it.
   ['employee loans and advances', 'guide:employee_loans'],
 
+  // Chart-of-accounts ledgers. "Cash in Hand" is account 1110 and belongs to no
+  // party; this reached a supplier's ledger on production before the resolver
+  // was fixed, so both halves are pinned — here, and in check:ask-resolve.
+  ['cash in hand ledger', 'faq:account_ledger'],
+  ['Show Chash in Hand Ledger', 'faq:account_ledger'],   // the question as typed
+  ['show me cash in hand', 'faq:account_ledger'],
+  ['general ledger', 'faq:account_ledger'],
+  ['cashbook', 'faq:account_ledger'],
+  ['what is cash in hand', 'faq:account_ledger'],
+  // A named party still wins — "cash" must not swallow a real ledger question.
+  ['ledger of Cash & Carry Mart', 'data'],
+
   // ...and the same words inside a real question must NOT be captured, which is
   // why static aliases match the whole question only.
   ['how to load opening stock location wise', 'guide:opening_stock'],
