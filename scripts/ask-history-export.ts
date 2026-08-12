@@ -63,6 +63,12 @@ async function main() {
     '',
     '**Unanswered** questions are the ones the engine could not match — they are the backlog.',
     '',
+    'To work it: `npm run ask:backlog` replays the current classifier over these',
+    'questions and says which are already answered, which only get an offer of',
+    'related questions, and which are still unmatched. The `/ask-backlog` command',
+    'hands that list to the **ask-curator** agent, which writes the missing alias,',
+    'keyword, FAQ or guide and pins it with a regression case.',
+    '',
     '| Tenant | Questions | Asked | Unanswered | File |',
     '| --- | ---: | ---: | ---: | --- |',
   ]
