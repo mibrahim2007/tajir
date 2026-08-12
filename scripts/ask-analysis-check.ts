@@ -17,10 +17,10 @@
 
 import {
   WHOLE_WORD_ALIASES, NONENTITY_KEYWORDS, RUNNER_IDS, aliasFor,
-  INTENT_FAMILIES, familyFor,
+  INTENT_FAMILIES, familyFor, STATIC_ALIASES, staticAliasFor, singularize,
 } from '@/lib/ask/intents'
-import { matchGuide } from '@/lib/ask/guides'
-import { matchFaq } from '@/lib/ask/faq'
+import { GUIDES, matchGuide } from '@/lib/ask/guides'
+import { FAQS, matchFaq } from '@/lib/ask/faq'
 
 let failures = 0
 function check(name: string, ok: boolean, detail = '') {
@@ -41,9 +41,71 @@ console.log('\n— The bare words from the log now route —')
     ['ledger', 'receivables'],
     ['supplier', 'payables'],
     ['bounced', 'cheque_summary'],
+    // 2026-08-12: "suppliers" already routed, but the way it was actually typed
+    // did not.
+    ['all suppliers', 'payables'],
+    ['all customers', 'top_customers'],
   ]
   for (const [q, expected] of fromLog) {
     check(`"${q}" → ${expected}`, aliasFor(q) === expected, aliasFor(q) ?? 'no match')
+  }
+}
+
+console.log('\n— Bare words whose answer is a guide or an FAQ —')
+{
+  // matchGuide and matchFaq both need a how-to or concept cue, so a one-word
+  // question can never reach them. These were typed alone and answered with the
+  // generic help card while the answer sat in faq.ts. Source: ask_query_log.
+  const fromLog: [string, string][] = [
+    ['start', 'faq:where_to_start'],
+    ['how do i start', 'faq:where_to_start'],
+    ['location', 'faq:what_is_location'],
+    ['locations', 'faq:what_is_location'],
+    ['employee loans and advances', 'guide:employee_loans'],
+  ]
+  for (const [q, expected] of fromLog) {
+    check(`"${q}" → ${expected}`, staticAliasFor(q) === expected, staticAliasFor(q) ?? 'no match')
+  }
+
+  check('"Location?" survives punctuation', staticAliasFor('Location?') === 'faq:what_is_location')
+
+  // Whole question only — the same word inside a real question must not be
+  // captured. "location" appears in a guide title; "start" in ordinary wording.
+  for (const q of ['how to load opening stock location wise', 'stock at location 2', 'start a new invoice', 'ledger of Location Traders']) {
+    check(`"${q}" is not a static alias`, staticAliasFor(q) === null, staticAliasFor(q) ?? '')
+  }
+
+  // Every target must exist, or the engine silently falls through to the data
+  // layer and the question looks unanswered again.
+  const faqIds = new Set(FAQS.map((f) => f.id))
+  const guideIds = new Set(GUIDES.map((g) => g.id))
+  for (const [q, target] of Object.entries(STATIC_ALIASES)) {
+    const [layer, id] = target.split(':')
+    const exists = layer === 'faq' ? faqIds.has(id) : layer === 'guide' ? guideIds.has(id) : false
+    check(`"${q}" → ${target} exists`, exists)
+  }
+}
+
+console.log('\n— A pluralised name still finds the item —')
+{
+  // "cards" matched nothing while "card" listed three items: stock names are
+  // stored singular ("10 GB CARD") and every match is a substring test.
+  const cases: [string, string | null][] = [
+    ['cards', 'card'],
+    ['laptops', 'laptop'],
+    ['batteries', 'battery'],
+    ['boxes', 'box'],
+    ['watches', 'watch'],
+    // Not plurals — leaving these alone matters more than catching every plural,
+    // because the singular is only ever tried after the real word found nothing.
+    ['card', null],
+    ['business', null],
+    ['address', null],
+    ['gas', null],
+    ['', null],
+  ]
+  for (const [word, expected] of cases) {
+    check(`singularize("${word}") → ${expected ?? 'null'}`, singularize(word) === expected, String(singularize(word)))
   }
 }
 
@@ -175,6 +237,33 @@ console.log('\n— "open" is NOT the same question as "opening" —')
   const opening = familyFor('opening')
   check('"opening" is the setup family', opening?.id === 'opening')
   check('"open" does not land in the setup family', open?.id !== 'opening', open?.id ?? 'no family')
+  // "open" now has a family of its own — unpaid items, the opposite of setup.
+  check('"open" offers the outstanding figures', open?.id === 'outstanding', open?.id ?? 'no family')
+  check('"opening" is unaffected by the "open" cue', opening?.id === 'opening')
+}
+
+console.log('\n— The areas the log showed people naming bare —')
+{
+  // Each of these was typed on its own and matched nothing. None of them names
+  // ONE report, so each offers rather than guesses — which means they stay in
+  // the backlog as "offered, not answered", and that is the honest outcome.
+  const cases: [string, string][] = [
+    ['invoice', 'documents'],
+    ['sale invoice', 'documents'],
+    ['invoices', 'documents'],
+    ['employee', 'staff'],
+    ['employees', 'staff'],
+    ['open', 'outstanding'],
+  ]
+  for (const [q, expected] of cases) {
+    check(`"${q}" offers the ${expected} family`, familyFor(q)?.id === expected, familyFor(q)?.id ?? 'nothing')
+  }
+
+  // Ask has no invoice-list runner and no payroll report. If either is ever
+  // built, these families should shrink to an alias — this comment is the note.
+  const documents = INTENT_FAMILIES.find((f) => f.id === 'documents')!
+  check('the invoice family offers the sale-invoice guide',
+    documents.offers.some((o) => matchGuide(o.toLowerCase())?.id === 'sale_invoice'))
 }
 
 console.log('\n— Every offer is a question the engine can actually answer —')
@@ -184,6 +273,7 @@ console.log('\n— Every offer is a question the engine can actually answer —'
   const answerable = (q: string) => {
     const lower = q.toLowerCase()
     if (aliasFor(q)) return true
+    if (staticAliasFor(q)) return true
     if (Object.values(NONENTITY_KEYWORDS).some((kws) => kws.some((k) => lower.includes(k)))) return true
     // Guides and FAQs are answers too — the opening-balance offers are all
     // how-to guides rather than data reports.
