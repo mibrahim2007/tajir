@@ -20,6 +20,7 @@ import { CUSTOMER_STATUSES, CUSTOMER_STATUS_LABELS } from '@/lib/customer-status
 const schema = z.object({
   name: z.string().min(1, 'Name is required'),
   email: optionalEmailField,
+  phone: z.string().optional(),
   status: z.enum(['active', 'inactive', 'low_transaction']).default('active'),
   openingBalance: z.number().default(0),
   openingBalanceCurrency: z.enum(['PKR', 'USD']).default('PKR'),
@@ -37,7 +38,7 @@ export function CreateCustomerForm() {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
-    defaultValues: { name: '', email: '', status: 'active', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
+    defaultValues: { name: '', email: '', phone: '', status: 'active', openingBalance: 0, openingBalanceCurrency: 'PKR', exchangeRate: 1 },
   })
 
   const onSubmit = (values: FormValues) => {
@@ -80,6 +81,18 @@ export function CreateCustomerForm() {
                   <Input type="email" inputMode="email" placeholder="name@example.com" {...field} value={field.value ?? ''} />
                 </FormControl>
                 <p className="text-xs text-muted-foreground">Optional. Lets you email this customer their ledger from Ask.</p>
+                <FormMessage />
+              </FormItem>
+            )} />
+
+            {/* Drives the wa.me deep link when sharing an invoice. */}
+            <FormField control={form.control} name="phone" render={({ field }) => (
+              <FormItem>
+                <FormLabel>WhatsApp / Phone</FormLabel>
+                <FormControl>
+                  <Input type="tel" inputMode="tel" placeholder="0300 1234567" {...field} value={field.value ?? ''} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">Optional. Lets you send this customer their invoice on WhatsApp.</p>
                 <FormMessage />
               </FormItem>
             )} />

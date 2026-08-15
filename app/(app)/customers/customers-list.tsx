@@ -15,6 +15,7 @@ export type CustomerListItem = {
   id: string
   name: string
   email?: string | null
+  phone?: string | null
   status?: string
   outstanding: number
   openingBalance: number
@@ -29,7 +30,7 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
   const q = query.trim().toLowerCase()
   const filtered = useMemo(
     () => customers.filter((c) =>
-      (!q || c.name.toLowerCase().includes(q)) &&
+      (!q || c.name.toLowerCase().includes(q) || (c.phone ?? '').toLowerCase().includes(q)) &&
       (statusFilter === 'all' || toCustomerStatus(c.status) === statusFilter),
     ),
     [customers, q, statusFilter],
@@ -87,7 +88,10 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                   const st = toCustomerStatus(c.status)
                   return (
                     <tr key={c.id} className="hover:bg-secondary/50 transition-colors">
-                      <td className="px-4 py-3 font-medium">{c.name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {c.name}
+                        {c.phone && <span className="block text-xs font-normal text-muted-foreground tabular-nums">{c.phone}</span>}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CUSTOMER_STATUS_BADGE[st]}`}>
                           {CUSTOMER_STATUS_LABELS[st]}
@@ -120,6 +124,7 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                               id={c.id}
                               currentName={c.name}
                               currentEmail={c.email}
+                              currentPhone={c.phone}
                               currentStatus={c.status}
                               currentOpeningBalance={c.openingBalance}
                               currentOpeningBalanceCurrency={c.openingBalanceCurrency}

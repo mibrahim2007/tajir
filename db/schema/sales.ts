@@ -8,6 +8,8 @@ export const tajirCustomers = pgTable('tajir_customers', {
   name:                         text('name').notNull(),
   // Optional; offered as a recipient when emailing an Ask answer about them.
   email:                        text('email'),
+  // Optional; used to build the wa.me deep link when sharing an invoice.
+  phone:                        text('phone'),
   openingBalance:               numeric('opening_balance', { precision: 15, scale: 2 }).notNull().default('0'),
   openingBalanceCurrency:       char('opening_balance_currency', { length: 3 }).notNull().default('PKR'),
   openingBalancePkrEquivalent:  numeric('opening_balance_pkr_equivalent', { precision: 15, scale: 2 }).notNull().default('0'),

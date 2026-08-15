@@ -3334,6 +3334,7 @@ export type Database = {
           opening_balance: number
           opening_balance_currency: string
           opening_balance_pkr_equivalent: number
+          phone: string | null
           status: string
           tenant_id: string
         }
@@ -3345,6 +3346,7 @@ export type Database = {
           opening_balance?: number
           opening_balance_currency?: string
           opening_balance_pkr_equivalent?: number
+          phone?: string | null
           status?: string
           tenant_id: string
         }
@@ -3356,6 +3358,7 @@ export type Database = {
           opening_balance?: number
           opening_balance_currency?: string
           opening_balance_pkr_equivalent?: number
+          phone?: string | null
           status?: string
           tenant_id?: string
         }

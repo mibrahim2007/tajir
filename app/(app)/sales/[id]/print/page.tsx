@@ -5,7 +5,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { PrintVoucherHeader } from '@/components/print-voucher-header'
 import { Button } from '@/components/ui/button'
-import { PrintButton } from './print-button'
+import { PrintButton } from '@/components/print-button'
+import { SendWhatsAppButton } from '@/components/send-whatsapp-button'
+import { signSaleShareToken } from '@/lib/sales/invoice-share-token'
+import { getBaseUrl } from '@/lib/utils/base-url'
+import { toWaNumber } from '@/lib/utils/phone'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
 
 function fmt(n: number) {
@@ -32,7 +36,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
     { data: journalEntry },
     { data: rawPurchases },
   ] = await Promise.all([
-    admin.from('tajir_customers').select('id, name').eq('id', order.customer_id).single(),
+    admin.from('tajir_customers').select('id, name, phone').eq('id', order.customer_id).single(),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('id', order.stock_item_id).single(),
     admin.from('tajir_journal_entries')
       .select('voucher_number')
@@ -56,6 +60,21 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
   const voucherNo = journalEntry?.voucher_number ?? `SO-${id.slice(-6).toUpperCase()}`
   const entryTime = formatPKTDateTime(new Date(order.created_at)).split(', ')[1]
 
+  // Signed, tamper-proof share link. 'order' rather than 'invoice' — this page
+  // renders a single sales_orders row, so the public route needs the solo loader.
+  const shareUrl = `${getBaseUrl()}/i/${signSaleShareToken('order', id)}`
+  const waMessage =
+    `Assalam-o-Alaikum ${customer?.name ?? ''},
+
+` +
+    `Sale Invoice ${voucherNo} from ${tenant.name}
+` +
+    `Amount: Rs ${fmt(pkrTotal)}
+
+` +
+    `View / download your invoice:
+${shareUrl}`
+
   const lastPurchase = rawPurchases?.[0]
   const costPerUnit  = lastPurchase
     ? lastPurchase.pkr_equivalent / lastPurchase.quantity
@@ -74,6 +93,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
           <Button variant="ghost" size="sm">← Back</Button>
         </Link>
         <span className="text-sm text-muted-foreground flex-1">Sale Invoice · {voucherNo}</span>
+        <SendWhatsAppButton waNumber={toWaNumber(customer?.phone ?? null)} message={waMessage} />
         <PrintButton />
       </div>
 
