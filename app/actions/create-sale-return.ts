@@ -9,6 +9,11 @@ import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy } from '@/lib/yarn'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveCommissionClawback,
+  clawbackJournalLines,
+  syncCommissionClawback,
+} from '@/lib/agents/clawback'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -135,6 +140,24 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
   // Increment inventory (goods returned to stock)
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
 
+  // Goods that came back did not stay sold, so the broker's commission on them
+  // comes off their payable. Computed from the rate stored on the original
+  // accrual, and capped so cumulative returns can never reverse more than was
+  // earned. Null when the return is not linked to an invoice line, the invoice
+  // had no agent, or it accrued nothing.
+  const clawbackResolved = await resolveCommissionClawback(admin, tenantId, {
+    side: 'sale',
+    orderId: saleOrderId,
+    returnedValue: pkrEquivalent,
+    returnedQuantity: quantity,
+  })
+  if (!clawbackResolved.ok) {
+    await admin.from('sale_returns').delete().eq('id', ret.id)
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
+    return { success: false, error: clawbackResolved.error, code: 'INTERNAL_ERROR' }
+  }
+  const clawback = clawbackResolved.clawback
+
   // Auto-post GL:
   //   DR Sales Returns & Allowances (contra-revenue), CR Accounts Receivable
   //   DR Stock in Trade, CR Cost of Goods Sold
@@ -151,6 +174,10 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
       { accountSystemKey: 'accounts_receivable',   debit: 0, credit: pkrEquivalent, customerId },
       { accountSystemKey: 'inventory',             debit: pkrEquivalent, credit: 0, stockItemId },
       { accountSystemKey: 'cogs',                  debit: 0, credit: pkrEquivalent, stockItemId },
+      // Commission reversal: DR Agent Commission Payable / CR Commission
+      // Expense. Rides on the return's own entry, so deleting the return
+      // removes the reversal with it.
+      ...clawbackJournalLines(clawback),
     ],
   })
   // The return already added stock back; remove it again on failure.
@@ -160,10 +187,18 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
     return glCreateFailed(posted.message)
   }
 
+  await syncCommissionClawback(admin, {
+    tenantId, clawback, sourceType: 'sale_return', sourceId: ret.id,
+    documentSerial: serialNumber, partyName: null, date,
+  })
+
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',
     entity: 'sale_returns', entityId: ret.id,
-    after: { customerId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date, reason },
+    after: {
+      customerId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date, reason,
+      commissionReversed: clawback?.amount ?? 0,
+    },
   })
 
   return { success: true, data: ret }

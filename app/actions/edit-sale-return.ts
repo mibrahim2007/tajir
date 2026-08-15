@@ -8,6 +8,11 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy } from '@/lib/yarn'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveCommissionClawback,
+  clawbackJournalLines,
+  syncCommissionClawback,
+} from '@/lib/agents/clawback'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -54,7 +59,7 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
 
   const { data: existing } = await admin
     .from('sale_returns')
-    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code, serial_number')
+    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code, serial_number, sale_order_id')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -109,6 +114,19 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
     await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: qtyDelta })
   }
 
+  // Re-derive the commission reversal from the edited quantities. `excludeReturnId`
+  // keeps this return's own prior clawback out of the "already reversed" total,
+  // which would otherwise make the edit measure itself and under-reverse.
+  const clawbackResolved = await resolveCommissionClawback(admin, tenantId, {
+    side: 'sale',
+    orderId: existing.sale_order_id,
+    returnedValue: pkrEquivalent,
+    returnedQuantity: quantity,
+    excludeReturnId: id,
+  })
+  if (!clawbackResolved.ok) return { success: false, error: clawbackResolved.error, code: 'INTERNAL_ERROR' }
+  const clawback = clawbackResolved.clawback
+
   // Replace GL entry. The helper snapshots the previous one so a failed post
   // restores it, and it carries the original voucher number over.
   const posted = await repostJournalEntry({
@@ -123,15 +141,22 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
       { accountSystemKey: 'accounts_receivable',  debit: 0, credit: pkrEquivalent, customerId },
       { accountSystemKey: 'inventory',            debit: pkrEquivalent, credit: 0, stockItemId },
       { accountSystemKey: 'cogs',                 debit: 0, credit: pkrEquivalent, stockItemId },
+      ...clawbackJournalLines(clawback),
     ],
   })
   if (!posted.ok) return glEditFailed(posted.message)
+
+  // Restate (or clear) the clawback row now that the GL agrees with the edit.
+  await syncCommissionClawback(admin, {
+    tenantId, clawback, sourceType: 'sale_return', sourceId: id,
+    documentSerial: existing.serial_number, partyName: null, date,
+  })
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',
     entity: 'sale_returns', entityId: id,
     before: { quantity: existing.quantity, rate: existing.rate, date: existing.date, reason: existing.reason },
-    after: { quantity, rate, date, reason },
+    after: { quantity, rate, date, reason, commissionReversed: clawback?.amount ?? 0 },
   })
 
   return { success: true, data: undefined }
