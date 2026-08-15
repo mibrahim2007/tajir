@@ -20,6 +20,7 @@ import {
   BarChart2,
   HandCoins,
   Banknote,
+  Handshake,
 } from 'lucide-react'
 
 export type ModuleKey =
@@ -44,13 +45,14 @@ export type ModuleKey =
   | 'reports'
   | 'employees'
   | 'loans'
+  | 'agents'
 
 export const ALL_MODULES: ModuleKey[] = [
   'inventory', 'purchases', 'purchase_returns', 'sales', 'sale_returns',
   'gatepasses', 'locations', 'stock_transfers',
   'customers', 'receipts', 'credit_notes', 'suppliers', 'payments',
   'debit_notes', 'pricing', 'expenses',
-  'accounts', 'vouchers', 'reports', 'employees', 'loans',
+  'accounts', 'vouchers', 'reports', 'employees', 'loans', 'agents',
 ]
 
 export const MODULE_META: Record<ModuleKey, { label: string; section: string; icon: React.ElementType; href: string }> = {
@@ -79,6 +81,7 @@ export const MODULE_META: Record<ModuleKey, { label: string; section: string; ic
   expenses:         { label: 'Expenses',           section: 'Accounts',     icon: Receipt,       href: '/expenses' },
   employees:        { label: 'Employees',          section: 'Accounts',     icon: HandCoins,     href: '/employees' },
   loans:            { label: 'Loans',               section: 'Accounts',     icon: Banknote,      href: '/loans' },
+  agents:           { label: 'Agents',              section: 'Accounts',     icon: Handshake,     href: '/agents' },
 }
 
 /** Modules enabled by default when tenant has no features config */

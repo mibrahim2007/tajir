@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Banknote, BarChart2, BookOpen,
-  ClipboardList, FileMinus, FilePlus, FileSearch, HandCoins, LayoutDashboard,
+  ClipboardList, FileMinus, FilePlus, FileSearch, Handshake, HandCoins, LayoutDashboard,
   Landmark, Layers, Lock, MapPin, Package, PenLine, Plus, Receipt, RefreshCcw, Search,
   PieChart, ShoppingBag, ShoppingCart, Tag, Truck, Undo2, UserCog, Users, UsersRound,
   Wallet,
@@ -54,6 +54,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/expenses',                label: 'Expenses',            group: 'Pages', icon: Receipt, ownerOnly: true },
   { href: '/employees',               label: 'Employees',           group: 'Pages', icon: HandCoins },
   { href: '/loans',                   label: 'Loans',               group: 'Pages', icon: Banknote },
+  { href: '/agents',                  label: 'Agents',              group: 'Pages', icon: Handshake, ownerOnly: true },
   { href: '/owners',                  label: 'Owners',              group: 'Pages', icon: UserCog, ownerOnly: true },
   { href: '/owners/profit-allocation', label: 'Profit Allocation',  group: 'Pages', icon: PieChart, ownerOnly: true },
   { href: '/accounts',                label: 'Accounts',            group: 'Pages', icon: BookOpen, ownerOnly: true },

@@ -4,7 +4,8 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
-import { CreatePurchaseForm } from '../../../new/create-purchase-form'
+import { getAgentOptions } from '@/lib/agents/options'
+import { CreatePurchaseForm, type PurchaseFormValues } from '../../../new/create-purchase-form'
 
 export default async function EditPurchaseInvoicePage({ params }: { params: Promise<{ id: string }> }) {
   const { id: invoiceId } = await params
@@ -17,7 +18,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
     { data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs },
   ] = await Promise.all([
     admin.from('purchase_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, agent_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -27,9 +28,14 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
 
   if (!invoiceLines || invoiceLines.length === 0) notFound()
 
-  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+  const [yarnLotIds, polyesterLotIds, agents, { data: accrual }] = await Promise.all([
     loadYarnLotIds(admin, tenantId),
     loadPolyesterLotIds(admin, tenantId),
+    getAgentOptions(admin, tenantId),
+    admin.from('agent_commissions')
+      .select('commission_type, commission_rate')
+      .eq('tenant_id', tenantId).eq('source_type', 'purchase_invoice').eq('source_id', invoiceId)
+      .maybeSingle(),
   ])
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
@@ -38,7 +44,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
 
   const first = invoiceLines[0]
   // Stored rate is already net of any discount, so discountPct starts at 0.
-  const initialValues = {
+  const initialValues: PurchaseFormValues = {
     supplierId:   first.supplier_id,
     supplierInvoiceNo: first.supplier_invoice_no ?? '',
     date:         first.date,
@@ -47,6 +53,12 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
     currencyCode: (first.currency_code === 'USD' ? 'USD' : 'PKR') as 'PKR' | 'USD',
     exchangeRate: first.exchange_rate,
     locationId:   first.location_id ?? '',
+    // Prefilled from the accrual actually posted, so re-saving an unrelated
+    // field cannot silently restate commission at a rate changed since. Clearing
+    // the override on the form re-derives from the agent's current terms.
+    agentId:             first.agent_id ?? '',
+    agentCommissionType: (accrual?.commission_type as PurchaseFormValues['agentCommissionType']) ?? '',
+    agentCommissionRate: accrual ? Number(accrual.commission_rate) : null,
     lines: invoiceLines.map((l) => ({
       stockItemId:     l.stock_item_id,
       quantity:        l.quantity,
@@ -73,6 +85,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
         customers={customerList}
         lots={lotList}
         locations={locationList}
+        agents={agents}
         mode="edit"
         invoiceId={invoiceId}
         initialValues={initialValues}

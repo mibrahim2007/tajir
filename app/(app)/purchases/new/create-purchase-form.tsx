@@ -19,6 +19,7 @@ import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dial
 import { buildPartyItems, needsMirror } from '@/lib/party-picker'
 import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateSupplier, QuickCreateLot } from '@/components/quick-create-forms'
+import { AgentCommissionField, type AgentOption } from '@/components/agent-commission-field'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { editPurchaseInvoiceAction } from '@/app/actions/edit-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
@@ -61,16 +62,24 @@ const schema = z.object({
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.number().positive().default(1),
   locationId:   z.string().min(1, 'Location is required'),
+  // Broker who arranged the purchase. Blank type/null rate mean "use the
+  // agent's enrolled terms" — only a one-off deal fills these in.
+  agentId:             z.string().optional().default(''),
+  agentCommissionType: z.enum(['percentage', 'per_unit', 'flat', 'none', '']).optional().default(''),
+  agentCommissionRate: z.number().min(0).nullable().optional().default(null),
   lines:        z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD', path: ['exchangeRate'] },
 )
 
-type FormValues = z.infer<typeof schema>
+export type PurchaseFormValues = z.infer<typeof schema>
+type FormValues = PurchaseFormValues
 
 type Props = {
   today: string
+  /** Active agents; empty hides the picker entirely. */
+  agents?:   AgentOption[]
   suppliers: { id: string; name: string }[]
   customers?: { id: string; name: string }[]
   lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean; isPolyester?: boolean }[]
@@ -81,7 +90,7 @@ type Props = {
   initialValues?: FormValues
 }
 
-export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations, mode = 'create', invoiceId, initialValues }: Props) {
+export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations, agents = [], mode = 'create', invoiceId, initialValues }: Props) {
   const isEdit = mode === 'edit'
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -111,6 +120,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     defaultValues: initialValues ?? {
       supplierId: '', supplierInvoiceNo: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
+      agentId: '', agentCommissionType: '', agentCommissionRate: null,
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
   })
@@ -147,6 +157,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     return { subtotal: sub, discountTotal: disc, netTotal: sub - disc }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLines, er, yarnLotIds, polyesterLotIds])
+
+  // Base for a per-unit commission rate; the percentage basis is netTotal.
+  const commissionQty = watchedLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
 
   // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
   // at least one polyester line, so ordinary invoices stay unchanged.
@@ -193,6 +206,11 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
         advancePaid:  values.advancePaid,
         locationId:   values.locationId,
         notes:        values.notes,
+        agentId:             values.agentId || undefined,
+        // Only send an override when one was actually typed; otherwise the
+        // server falls back to the agent's enrolled terms.
+        agentCommissionType: values.agentCommissionType || undefined,
+        agentCommissionRate: values.agentCommissionRate ?? undefined,
         lines: values.lines.map((l) => ({
           stockItemId: l.stockItemId,
           quantity:    l.quantity,
@@ -327,6 +345,17 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                       </FormItem>
                     )} />
                   )}
+                </div>
+
+                {/* Agent + commission preview, spanning both grid columns.
+                    Renders nothing when no agents are enrolled. */}
+                <div className="sm:col-span-2">
+                  <AgentCommissionField
+                    agents={agents}
+                    side="purchase"
+                    baseAmount={netTotal}
+                    baseQuantity={commissionQty}
+                  />
                 </div>
 
               </CardContent>

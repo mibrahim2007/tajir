@@ -11,6 +11,12 @@ import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveAgentCommission,
+  commissionJournalLines,
+  syncAgentCommission,
+} from '@/lib/agents/apply-commission'
+import { commissionTypeSchema } from '@/lib/agents/commission'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -39,6 +45,11 @@ const schema = z.object({
   dcNo:           z.string().trim().max(50, 'DC no. is too long').optional().nullable(),
   notes:          z.string().optional(),
   allowOversell:  z.boolean().optional(),
+  // Broker who introduced the sale. Commission accrues on their enrolled sale
+  // terms unless this invoice overrides them for a one-off deal.
+  agentId:                z.string().uuid().optional().nullable(),
+  agentCommissionType:    commissionTypeSchema.optional().nullable(),
+  agentCommissionRate:    z.coerce.number().min(0).optional().nullable(),
   lines:          z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -66,7 +77,8 @@ export async function createSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines, allowOversell } = parsed.data
+  const { customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines, allowOversell,
+          agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
 
   const { count: coaCount } = await admin
@@ -161,6 +173,9 @@ export async function createSaleInvoiceAction(
       qty_lbs:           isPolyester ? qtyLbs : null,
       // Service lines are not bound to a dispatch location.
       location_id:     isService ? null : (locationId ?? null),
+      // Stamped on every row of the invoice, like serial_number, so the agent
+      // behind a sale is readable from any one of its lines.
+      agent_id:        agentId ?? null,
       invoice_id:      invoiceId,
       confirmed_at:    new Date().toISOString(),
     }).select('id').single()
@@ -191,6 +206,33 @@ export async function createSaleInvoiceAction(
   const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
+  // Agent commission accrues on the GOODS only. A service line is a freight
+  // pass-through we collect and hand straight to a third party — it is not the
+  // agent's trade and paying commission on it would cost real money on a leg
+  // that earns none.
+  const goodsQuantity = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.quantity, 0)
+  const resolved = await resolveAgentCommission(admin, tenantId, {
+    agentId, side: 'sale',
+    baseAmount: goodsRevenue,
+    baseQuantity: goodsQuantity,
+    overrideType: agentCommissionType,
+    overrideRate: agentCommissionRate,
+  })
+  if (!resolved.ok) {
+    // Nothing has posted yet, but the lines are already in — unwind them the
+    // same way the GL failure path below does.
+    if (createdOrders.length > 0) {
+      await admin.from('sales_orders').delete().in('id', createdOrders.map((o) => o.id))
+      for (const o of createdOrders) {
+        if (!o.isService) {
+          await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: o.quantity })
+        }
+      }
+    }
+    return { success: false, error: resolved.error, code: 'NOT_FOUND' }
+  }
+  const accrual = resolved.accrual
+
   // Single GL entry for the whole invoice
   const posted = await postJournalEntry({
     tenantId, date, description: 'Sale Invoice', reference: serialNumber,
@@ -210,6 +252,9 @@ export async function createSaleInvoiceAction(
       // (e.g. freight) have no cost of goods.
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      // Broker's commission: DR Commission Expense / CR Agent Commission Payable.
+      // Rides on the invoice's own entry so it can never outlive the sale.
+      ...commissionJournalLines(accrual),
     ],
   })
   // Same compensation the mid-loop failure path uses: drop every line we
@@ -226,10 +271,24 @@ export async function createSaleInvoiceAction(
     return glCreateFailed(posted.message)
   }
 
+  // Audit detail behind the accrual just posted — the basis and the rate in
+  // force, so a later change to the agent's terms never restates this invoice.
+  if (agentId) {
+    const { data: cust } = await admin
+      .from('tajir_customers').select('name').eq('id', customerId).eq('tenant_id', tenantId).maybeSingle()
+    await syncAgentCommission(admin, {
+      tenantId, accrual, sourceType: 'sale_invoice', sourceId: invoiceId,
+      documentSerial: serialNumber, partyName: cust?.name ?? null, date,
+    })
+  }
+
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',
     entity: 'sales_orders', entityId: invoiceId,
-    after: { customerId, date, currencyCode, totalPKR, lineCount: lines.length },
+    after: {
+      customerId, date, currencyCode, totalPKR, lineCount: lines.length,
+      agentId: agentId ?? null, commission: accrual?.amount ?? 0,
+    },
   })
 
   // Invalidate the sales list server-side so the client can navigate to a fresh

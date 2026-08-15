@@ -4,6 +4,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { getAgentOptions } from '@/lib/agents/options'
 import { EditSaleInvoiceForm } from './edit-sale-invoice-form'
 import type { SaleFormValues } from '../../../sale-invoice-form'
 
@@ -19,7 +20,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, agent_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -56,9 +57,14 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
-  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+  const [yarnLotIds, polyesterLotIds, agents, { data: accrual }] = await Promise.all([
     loadYarnLotIds(admin, tenantId),
     loadPolyesterLotIds(admin, tenantId),
+    getAgentOptions(admin, tenantId),
+    admin.from('agent_commissions')
+      .select('commission_type, commission_rate')
+      .eq('tenant_id', tenantId).eq('source_type', 'sale_invoice').eq('source_id', invoiceId)
+      .maybeSingle(),
   ])
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
@@ -88,6 +94,12 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     exchangeRate:   first.exchange_rate,
     // Service lines store a null location; use the first stockable line's location.
     locationId:     invoiceLines.find((l) => l.location_id)?.location_id ?? '',
+    // Prefilled from the accrual actually posted, so re-saving an unrelated
+    // field cannot silently restate commission at a rate changed since. Clearing
+    // the override on the form re-derives from the agent's current terms.
+    agentId:             first.agent_id ?? '',
+    agentCommissionType: (accrual?.commission_type as SaleFormValues['agentCommissionType']) ?? '',
+    agentCommissionRate: accrual ? Number(accrual.commission_rate) : null,
     lines: invoiceLines.map((l) => ({
       stockItemId: l.stock_item_id,
       quantity:    l.quantity,
@@ -123,6 +135,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
         locationStock={locationStock}
         costMap={costMap}
         customerBalanceMap={customerBalanceMap}
+        agents={agents}
       />
     </div>
   )

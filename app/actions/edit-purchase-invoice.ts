@@ -10,6 +10,12 @@ import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveAgentCommission,
+  commissionJournalLines,
+  syncAgentCommission,
+} from '@/lib/agents/apply-commission'
+import { commissionTypeSchema } from '@/lib/agents/commission'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -34,6 +40,9 @@ const schema = z.object({
   advancePaid:  z.coerce.number().min(0).default(0),
   locationId:   z.string().uuid('Location is required'),
   notes:        z.string().optional(),
+  agentId:              z.string().uuid().optional().nullable(),
+  agentCommissionType:  commissionTypeSchema.optional().nullable(),
+  agentCommissionRate:  z.coerce.number().min(0).optional().nullable(),
   lines:        z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -54,7 +63,8 @@ export async function editPurchaseInvoiceAction(
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { invoiceId, supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, notes, lines } = parsed.data
+  const { invoiceId, supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, notes, lines,
+          agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
   const er = currencyCode === 'USD' ? exchangeRate : 1
 
@@ -120,7 +130,7 @@ export async function editPurchaseInvoiceAction(
 
   // Insert the new lines FIRST (same invoice_id & serial) so the old rows stay
   // intact if an insert fails; only then delete the old rows.
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number }[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -151,6 +161,8 @@ export async function editPurchaseInvoiceAction(
       weight_per_carton: poly ? (line.weightPerCarton ?? null) : null,
       qty_lbs:           poly ? qtyLbs : null,
       location_id:    locationId,
+      // Stamped on every row of the invoice, like serial_number.
+      agent_id:       agentId ?? null,
       invoice_id:     invoiceId,
       confirmed_at:   new Date().toISOString(),
     }).select('id').single()
@@ -159,7 +171,7 @@ export async function editPurchaseInvoiceAction(
       if (createdOrders.length > 0) await admin.from('purchase_orders').delete().in('id', createdOrders.map((o) => o.id))
       return { success: false, error: 'Failed to update invoice', code: 'INTERNAL_ERROR' }
     }
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity })
   }
 
   // Remove the old rows now that the replacements exist. If this fails (e.g. a
@@ -179,6 +191,21 @@ export async function editPurchaseInvoiceAction(
 
   // Re-post the GL entry with the new totals, keeping the voucher stable.
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
+  const totalQty = createdOrders.reduce((s, o) => s + o.quantity, 0)
+
+  // Re-derive the commission from the invoice as it now stands. Because the
+  // accrual is rebuilt rather than adjusted, an edit that changes the value,
+  // swaps the agent, or removes them entirely all land correctly — and
+  // `syncAgentCommission` drops the stored row when nothing is owed any more.
+  const resolved = await resolveAgentCommission(admin, tenantId, {
+    agentId, side: 'purchase',
+    baseAmount: totalPKR,
+    baseQuantity: totalQty,
+    overrideType: agentCommissionType,
+    overrideRate: agentCommissionRate,
+  })
+  if (!resolved.ok) return { success: false, error: resolved.error, code: 'NOT_FOUND' }
+  const accrual = resolved.accrual
 
   // The helper snapshots the previous entry first, so a failed post restores
   // it instead of leaving this invoice with no ledger entry.
@@ -188,15 +215,29 @@ export async function editPurchaseInvoiceAction(
     lines: [
       ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       { accountSystemKey: 'accounts_payable', debit: 0, credit: totalPKR, supplierId },
+      // Broker's commission — expensed, so the inventory debit above stays at
+      // the supplier's invoice value.
+      ...commissionJournalLines(accrual),
     ],
   })
   if (!posted.ok) return glEditFailed(posted.message)
+
+  // Restate (or clear) the accrual row now that the GL agrees with the edit.
+  const { data: supp } = await admin
+    .from('suppliers').select('name').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle()
+  await syncAgentCommission(admin, {
+    tenantId, accrual, sourceType: 'purchase_invoice', sourceId: invoiceId,
+    documentSerial: serialNumber, partyName: supp?.name ?? null, date,
+  })
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',
     entity: 'purchase_orders', entityId: invoiceId,
     before: { lineCount: existingLines.length },
-    after: { supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length, notes },
+    after: {
+      supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length, notes,
+      agentId: agentId ?? null, commission: accrual?.amount ?? 0,
+    },
   })
 
   revalidatePath('/purchases')

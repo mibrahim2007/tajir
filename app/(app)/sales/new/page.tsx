@@ -3,6 +3,7 @@ import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { getAgentOptions } from '@/lib/agents/options'
 import { CreateSaleForm } from './create-sale-form'
 
 export default async function NewSalePage() {
@@ -45,9 +46,10 @@ export default async function NewSalePage() {
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
-  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+  const [yarnLotIds, polyesterLotIds, agents] = await Promise.all([
     loadYarnLotIds(admin, tenantId),
     loadPolyesterLotIds(admin, tenantId),
+    getAgentOptions(admin, tenantId),
   ])
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
@@ -93,6 +95,7 @@ export default async function NewSalePage() {
         locationStock={locationStock}
         costMap={costMap}
         customerBalanceMap={customerBalanceMap}
+        agents={agents}
       />
     </div>
   )
