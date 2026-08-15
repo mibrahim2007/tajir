@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS tenant_users_tenant_role_idx;
