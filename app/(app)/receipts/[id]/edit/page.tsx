@@ -51,6 +51,12 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
         amount: Number(receipt.amount),
       }]
 
+  // Receipts saved before the edit action wrote cheque_due_date lost the date on
+  // every PDC line. The form marks the field required, but only once you try to
+  // save — so say it up front, otherwise a cheque sits with no maturity date and
+  // silently stays off the pending-cheque list.
+  const undatedPdc = lines.filter((l) => l.transactionType === 'pdc' && !l.chequeDueDate)
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <PeriodLockBanner className="mb-4" />
@@ -58,6 +64,18 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
         <h1 className="text-2xl font-extrabold tracking-tight">Edit Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Update the tender breakdown; the ledger re-posts automatically.</p>
       </div>
+
+      {undatedPdc.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+          {undatedPdc.length === 1 ? 'One cheque on this receipt has' : `${undatedPdc.length} cheques on this receipt have`}{' '}
+          no due date
+          {undatedPdc.some((l) => l.chequeNumber) && (
+            <> ({undatedPdc.map((l) => l.chequeNumber).filter(Boolean).join(', ')})</>
+          )}
+          . Set the date below and save — until then {undatedPdc.length === 1 ? 'it does' : 'they do'} not
+          appear in the pending-cheque list and can never show as overdue.
+        </div>
+      )}
       <ReceiptForm
         today={today}
         customers={customer ? [{ id: customer.id, name: customer.name, outstanding: 0 }] : []}
