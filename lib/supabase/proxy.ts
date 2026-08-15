@@ -50,7 +50,8 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname.startsWith("/auth");
-  const isPublicRoute = pathname === "/";
+  // "/i/<token>" = public, tokenized sale-invoice share links (no login required)
+  const isPublicRoute = pathname === "/" || pathname.startsWith("/i/");
 
   const mustChangePassword = (user as { app_metadata?: { must_change_password?: boolean } } | undefined)
     ?.app_metadata?.must_change_password === true;

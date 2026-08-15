@@ -5,7 +5,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { PrintVoucherHeader } from '@/components/print-voucher-header'
 import { Button } from '@/components/ui/button'
-import { PrintButton } from './print-button'
+import { PrintButton } from '@/components/print-button'
+import { SendWhatsAppButton } from '@/components/send-whatsapp-button'
+import { signSaleShareToken } from '@/lib/sales/invoice-share-token'
+import { getBaseUrl } from '@/lib/utils/base-url'
+import { toWaNumber } from '@/lib/utils/phone'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
 
 function fmt(n: number) {
@@ -36,7 +40,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: stockItems }, { data: customers }, { data: journalEntry }, { data: rawPurchases }] = await Promise.all([
     admin.from('inventory_lots').select('id, name, unit_of_measure').in('id', stockIds),
-    admin.from('tajir_customers').select('id, name').in('id', customerIds),
+    admin.from('tajir_customers').select('id, name, phone').in('id', customerIds),
     admin.from('tajir_journal_entries')
       .select('voucher_number')
       .eq('source_id', invoiceId)
@@ -52,6 +56,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const stockMap    = new Map((stockItems ?? []).map((s) => [s.id, { name: s.name, uom: s.unit_of_measure ?? null }]))
   const customerMap = new Map((customers ?? []).map((c) => [c.id, c.name]))
+  const customerPhoneMap = new Map((customers ?? []).map((c) => [c.id, c.phone]))
 
   // Latest cost per stock item
   const costMap: Record<string, number> = {}
@@ -66,6 +71,21 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   const voucherNo  = journalEntry?.voucher_number ?? `SI-${invoiceId.slice(-6).toUpperCase()}`
   const entryTime  = formatPKTDateTime(new Date(first.created_at)).split(', ')[1]
   const customerName = customerMap.get(first.customer_id) ?? '—'
+
+  // Signed, tamper-proof share link. The trader still taps Send inside
+  // WhatsApp — nothing is dispatched automatically.
+  const shareUrl = `${getBaseUrl()}/i/${signSaleShareToken('invoice', invoiceId)}`
+  const waMessage =
+    `Assalam-o-Alaikum ${customerName},
+
+` +
+    `Sale Invoice ${voucherNo} from ${tenant.name}
+` +
+    `Amount: Rs ${fmt(totalPKR)}
+
+` +
+    `View / download your invoice:
+${shareUrl}`
   const notes = lines.find((l) => l.notes && l.notes.trim())?.notes?.trim() ?? null
 
   return (
@@ -80,6 +100,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
         <Link href={`/sales/invoice/${invoiceId}/report`} className="print:hidden">
           <Button variant="ghost" size="sm">A4 Report</Button>
         </Link>
+        <SendWhatsAppButton waNumber={toWaNumber(customerPhoneMap.get(first.customer_id) ?? null)} message={waMessage} />
         <PrintButton />
       </div>
 
