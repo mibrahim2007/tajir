@@ -58,7 +58,11 @@ export async function editSupplierRefundAction(input: unknown): Promise<ActionRe
   await admin.from('supplier_refund_lines').delete().eq('refund_id', id).eq('tenant_id', tenantId)
   const lineRows = lines.map((l, i) => ({
     tenant_id: tenantId, refund_id: id, line_no: i + 1,
-    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null, bank_id: l.bankId ?? null, amount: l.amount,
+    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null,
+    // Same omission as edit-ar-receipt had: create-supplier-refund writes this,
+    // the edit path did not, so every edit wiped the due date.
+    cheque_due_date: l.chequeDueDate || null,
+    bank_id: l.bankId ?? null, amount: l.amount,
   }))
   await admin.from('supplier_refund_lines').insert(lineRows)
 

@@ -58,7 +58,14 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   await admin.from('ar_receipt_lines').delete().eq('receipt_id', id).eq('tenant_id', tenantId)
   const lineRows = lines.map((l, i) => ({
     tenant_id: tenantId, receipt_id: id, line_no: i + 1,
-    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null, bank_id: l.bankId ?? null, amount: l.amount,
+    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null,
+    // Must be written on EDIT as well as create. Omitting it here silently
+    // nulled the due date every time a receipt was saved — the form collects
+    // it and validation demands it for a PDC, so the loss was invisible. A PDC
+    // with no due date never becomes overdue and sorts last forever, so it also
+    // drops out of the pending-cheques panel it exists to appear on.
+    cheque_due_date: l.chequeDueDate || null,
+    bank_id: l.bankId ?? null, amount: l.amount,
   }))
   await admin.from('ar_receipt_lines').insert(lineRows)
 
