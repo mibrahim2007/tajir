@@ -10,6 +10,12 @@ import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveAgentCommission,
+  commissionJournalLines,
+  syncAgentCommission,
+} from '@/lib/agents/apply-commission'
+import { commissionTypeSchema } from '@/lib/agents/commission'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -37,6 +43,9 @@ const schema = z.object({
   dcNo:           z.string().trim().max(50, 'DC no. is too long').optional().nullable(),
   notes:          z.string().optional(),
   allowOversell:  z.boolean().optional(),
+  agentId:                z.string().uuid().optional().nullable(),
+  agentCommissionType:    commissionTypeSchema.optional().nullable(),
+  agentCommissionRate:    z.coerce.number().min(0).optional().nullable(),
   lines:          z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -66,7 +75,8 @@ export async function editSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { invoiceId, customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines } = parsed.data
+  const { invoiceId, customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines,
+          agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
 
   // Existing lines for this invoice — the basis for reversing inventory & GL.
@@ -146,7 +156,7 @@ export async function editSaleInvoiceAction(
   // ── Apply changes ──────────────────────────────────────────────
   // Insert the new lines FIRST (same invoice_id & serial) so the old rows stay
   // intact if an insert fails; only then delete the old rows.
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; isService: boolean }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number; isService: boolean }[] = []
 
   for (const line of lines) {
     const isService = serviceIds.has(line.stockItemId)
@@ -184,6 +194,8 @@ export async function editSaleInvoiceAction(
       qty_lbs:           isPolyester ? qtyLbs : null,
       // Service lines are not bound to a dispatch location.
       location_id:     isService ? null : (locationId ?? null),
+      // Stamped on every row of the invoice, like serial_number.
+      agent_id:        agentId ?? null,
       invoice_id:      invoiceId,
       confirmed_at:    new Date().toISOString(),
     }).select('id').single()
@@ -195,7 +207,7 @@ export async function editSaleInvoiceAction(
       }
       return { success: false, error: 'Failed to update invoice', code: 'INTERNAL_ERROR' }
     }
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, isService })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity, isService })
   }
 
   // Remove the old rows now that the replacements exist. If this fails (e.g. a
@@ -225,6 +237,22 @@ export async function editSaleInvoiceAction(
   const goodsRevenue   = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
   const serviceRevenue = createdOrders.filter((o) =>  o.isService).reduce((s, o) => s + o.pkrEquivalent, 0)
 
+  // Re-derive the commission from the invoice as it now stands, on the goods
+  // only (a freight pass-through is not the agent's trade). Because the accrual
+  // is rebuilt rather than adjusted, an edit that changes the value, swaps the
+  // agent, or removes them entirely all land correctly — and `syncAgentCommission`
+  // below drops the stored row when nothing is owed any more.
+  const goodsQuantity = createdOrders.filter((o) => !o.isService).reduce((s, o) => s + o.quantity, 0)
+  const resolved = await resolveAgentCommission(admin, tenantId, {
+    agentId, side: 'sale',
+    baseAmount: goodsRevenue,
+    baseQuantity: goodsQuantity,
+    overrideType: agentCommissionType,
+    overrideRate: agentCommissionRate,
+  })
+  if (!resolved.ok) return { success: false, error: resolved.error, code: 'NOT_FOUND' }
+  const accrual = resolved.accrual
+
   // The helper snapshots the previous entry first, so a failed post restores
   // it instead of leaving this invoice with no ledger entry.
   const posted = await repostJournalEntry({
@@ -243,15 +271,29 @@ export async function editSaleInvoiceAction(
       // COGS/inventory relief applies to stockable lines only.
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      // Broker's commission — rebuilt from the edited invoice, so the payable
+      // moves with it instead of keeping the amount the original sale accrued.
+      ...commissionJournalLines(accrual),
     ],
   })
   if (!posted.ok) return glEditFailed(posted.message)
+
+  // Restate (or clear) the accrual row now that the GL agrees with the edit.
+  const { data: cust } = await admin
+    .from('tajir_customers').select('name').eq('id', customerId).eq('tenant_id', tenantId).maybeSingle()
+  await syncAgentCommission(admin, {
+    tenantId, accrual, sourceType: 'sale_invoice', sourceId: invoiceId,
+    documentSerial: serialNumber, partyName: cust?.name ?? null, date,
+  })
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'update',
     entity: 'sales_orders', entityId: invoiceId,
     before: { lineCount: existingLines.length },
-    after: { customerId, date, currencyCode, totalPKR, lineCount: lines.length },
+    after: {
+      customerId, date, currencyCode, totalPKR, lineCount: lines.length,
+      agentId: agentId ?? null, commission: accrual?.amount ?? 0,
+    },
   })
 
   revalidatePath('/sales')

@@ -3,6 +3,7 @@ import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
 import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { getAgentOptions } from '@/lib/agents/options'
 import { CreatePurchaseForm } from './create-purchase-form'
 
 export default async function NewPurchasePage() {
@@ -17,9 +18,10 @@ export default async function NewPurchasePage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const [yarnLotIds, polyesterLotIds] = await Promise.all([
+  const [yarnLotIds, polyesterLotIds, agents] = await Promise.all([
     loadYarnLotIds(admin, tenantId),
     loadPolyesterLotIds(admin, tenantId),
+    getAgentOptions(admin, tenantId),
   ])
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
@@ -33,7 +35,7 @@ export default async function NewPurchasePage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a purchase from a supplier.</p>
       </div>
-      <CreatePurchaseForm today={today} suppliers={supplierList} customers={customerList} lots={lotList} locations={locationList} />
+      <CreatePurchaseForm today={today} suppliers={supplierList} customers={customerList} lots={lotList} locations={locationList} agents={agents} />
     </div>
   )
 }

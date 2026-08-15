@@ -21,6 +21,7 @@ import { buildPartyItems, needsMirror } from '@/lib/party-picker'
 import { resolvePartyAction } from '@/app/actions/resolve-party'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
+import { AgentCommissionField, type AgentOption } from '@/components/agent-commission-field'
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
@@ -75,6 +76,11 @@ const baseSchema = z.object({
   currencyCode:    z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate:    z.number().positive().default(1),
   locationId:      z.string().optional(),
+  // Broker who introduced the sale. Blank type/null rate mean "use the agent's
+  // enrolled terms" — only a one-off deal fills these in.
+  agentId:             z.string().optional().default(''),
+  agentCommissionType: z.enum(['percentage', 'per_unit', 'flat', 'none', '']).optional().default(''),
+  agentCommissionRate: z.number().min(0).nullable().optional().default(null),
   lines:           z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -88,6 +94,7 @@ type BelowCostLine = { lineIndex: number; itemName: string; rate: number; cost: 
 export function SaleInvoiceForm({
   mode = 'create', invoiceId, initialValues,
   today, customers, suppliers = [], stockItems, pricingRules, isOwner, locations, locationStock, costMap, customerBalanceMap = {},
+  agents = [],
 }: {
   mode?:             'create' | 'edit'
   invoiceId?:        string
@@ -102,6 +109,8 @@ export function SaleInvoiceForm({
   locationStock:     LocationStock[]
   costMap:           Record<string, number>
   customerBalanceMap?: Record<string, number>
+  /** Active agents; empty hides the picker entirely. */
+  agents?:           AgentOption[]
 }) {
   const isEdit = mode === 'edit'
   const router = useRouter()
@@ -178,6 +187,7 @@ export function SaleInvoiceForm({
       customerId: '', date: today, paymentDueDate: '', dueDays: undefined, notes: '',
       poNo: '', dcNo: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
+      agentId: '', agentCommissionType: '', agentCommissionRate: null,
       lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
     },
   })
@@ -232,6 +242,14 @@ export function SaleInvoiceForm({
   // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
   // at least one polyester line, so ordinary invoices stay unchanged.
   const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterItemIds.has(l.stockItemId))
+
+  // Commission base, mirroring the server: goods only, since a service line is a
+  // freight pass-through and earns the agent nothing.
+  const goodsLines = watchedLines.filter((l) => !!l.stockItemId && !serviceItemIds.has(l.stockItemId))
+  const commissionBase = goodsLines.reduce(
+    (s, l) => s + lineGross(l, er) * (1 - (l.discountPct || 0) / 100), 0,
+  )
+  const commissionQty = goodsLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
 
   // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
   // field in sync so it drives stock and validation. watch() mutates the lines
@@ -337,6 +355,11 @@ export function SaleInvoiceForm({
         dcNo:           values.dcNo?.trim() || undefined,
         notes:          values.notes,
         allowOversell,
+        agentId:             values.agentId || undefined,
+        // Only send an override when one was actually typed; otherwise the
+        // server falls back to the agent's enrolled terms.
+        agentCommissionType: values.agentCommissionType || undefined,
+        agentCommissionRate: values.agentCommissionRate ?? undefined,
         lines: values.lines.map((l) => ({
           stockItemId: l.stockItemId,
           quantity:    l.quantity,
@@ -569,6 +592,15 @@ export function SaleInvoiceForm({
                       )} />
                     )}
                   </div>
+
+                  {/* Agent + commission preview. Renders nothing when no agents
+                      are enrolled, so invoices are untouched until one is. */}
+                  <AgentCommissionField
+                    agents={agents}
+                    side="sale"
+                    baseAmount={commissionBase}
+                    baseQuantity={commissionQty}
+                  />
                 </CardContent>
               </Card>
 

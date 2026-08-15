@@ -1,0 +1,1 @@
+ALTER TABLE inventory_lots ALTER COLUMN count DROP NOT NULL;

@@ -6,6 +6,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { checkPeriodOpen } from '@/lib/accounting/period-lock'
+import { clearAgentCommission } from '@/lib/agents/apply-commission'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({ invoiceId: z.string().uuid() })
@@ -70,6 +71,11 @@ export async function deletePurchaseInvoiceAction(input: unknown): Promise<Actio
     await admin.from('tajir_journal_entry_lines').delete().eq('journal_entry_id', entry.id)
     await admin.from('tajir_journal_entries').delete().eq('id', entry.id)
   }
+
+  // The commission legs lived on that entry, so the payable is already reversed;
+  // drop the accrual row with it or the agent's ledger would keep billing us for
+  // a purchase that no longer exists.
+  await clearAgentCommission(admin, tenantId, 'purchase_invoice', invoiceId)
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'delete',

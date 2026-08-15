@@ -1,6 +1,7 @@
 'use client'
 
 import { SaleInvoiceForm } from '../sale-invoice-form'
+import type { AgentOption } from '@/components/agent-commission-field'
 
 type Customer    = { id: string; name: string }
 type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service' }
@@ -18,6 +19,7 @@ export function CreateSaleForm(props: {
   locationStock:     LocationStock[]
   costMap:           Record<string, number>
   customerBalanceMap?: Record<string, number>
+  agents?:           AgentOption[]
 }) {
   return <SaleInvoiceForm mode="create" {...props} />
 }

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { checkPeriodOpen } from "@/lib/accounting/period-lock"
 import type { ActionResult } from '@/lib/types'
+import { clearCommissionClawback } from '@/lib/agents/clawback'
 
 const schema = z.object({ id: z.string().uuid() })
 
@@ -75,6 +76,12 @@ export async function deleteSaleReturnAction(input: unknown): Promise<ActionResu
   if (error) {
     return { success: false, error: 'Failed to delete sale return', code: 'INTERNAL_ERROR' }
   }
+
+  // The clawback legs lived on that entry, so the payable is already restored;
+  // drop the clawback row with it. Leaving it would keep the agent's ledger
+  // showing commission reversed by a return that no longer exists — and would
+  // permanently eat into the cap on future returns against the same invoice.
+  await clearCommissionClawback(admin, tenantId, 'sale_return', parsed.data.id)
 
   // Reverse inventory (remove goods that were returned to stock)
   await admin.rpc('adjust_inventory_quantity', {

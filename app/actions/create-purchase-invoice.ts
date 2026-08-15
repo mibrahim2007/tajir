@@ -10,6 +10,12 @@ import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
 import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveAgentCommission,
+  commissionJournalLines,
+  syncAgentCommission,
+} from '@/lib/agents/apply-commission'
+import { commissionTypeSchema } from '@/lib/agents/commission'
 import type { ActionResult } from '@/lib/types'
 
 const lineSchema = z.object({
@@ -37,6 +43,11 @@ const schema = z.object({
   advancePaid:  z.coerce.number().min(0).default(0),
   locationId:   z.string().uuid('Location is required'),
   notes:        z.string().optional(),
+  // Broker who arranged the purchase. Commission accrues on their enrolled
+  // purchase terms unless this invoice overrides them for a one-off deal.
+  agentId:              z.string().uuid().optional().nullable(),
+  agentCommissionType:  commissionTypeSchema.optional().nullable(),
+  agentCommissionRate:  z.coerce.number().min(0).optional().nullable(),
   lines:        z.array(lineSchema).min(1, 'Add at least one item'),
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
@@ -59,7 +70,8 @@ export async function createPurchaseInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, lines } = parsed.data
+  const { supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, lines,
+          agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
 
   const { count: coaCount } = await admin
@@ -121,6 +133,9 @@ export async function createPurchaseInvoiceAction(
       weight_per_carton: isPolyester ? (line.weightPerCarton ?? null) : null,
       qty_lbs:           isPolyester ? qtyLbs : null,
       location_id:    locationId,
+      // Stamped on every row of the invoice, like serial_number, so the agent
+      // behind a purchase is readable from any one of its lines.
+      agent_id:       agentId ?? null,
       invoice_id:     invoiceId,
       confirmed_at:   new Date().toISOString(),
     }).select('id').single()
@@ -141,6 +156,30 @@ export async function createPurchaseInvoiceAction(
   }
 
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
+  const totalQty = createdOrders.reduce((s, o) => s + o.quantity, 0)
+
+  // Broker's commission on the purchase. It is EXPENSED, not capitalised into
+  // the landed cost, so Stock in Trade stays at the supplier's invoice value and
+  // neither lot costing nor COGS is disturbed by how the deal was brokered.
+  const resolved = await resolveAgentCommission(admin, tenantId, {
+    agentId, side: 'purchase',
+    baseAmount: totalPKR,
+    baseQuantity: totalQty,
+    overrideType: agentCommissionType,
+    overrideRate: agentCommissionRate,
+  })
+  if (!resolved.ok) {
+    // Nothing has posted yet, but the lines are already in — unwind them the
+    // same way the GL failure path below does.
+    if (createdOrders.length > 0) {
+      await admin.from('purchase_orders').delete().in('id', createdOrders.map((o) => o.id))
+      for (const o of createdOrders) {
+        await admin.rpc('adjust_inventory_quantity', { p_lot_id: o.stockItemId, p_delta: -o.quantity })
+      }
+    }
+    return { success: false, error: resolved.error, code: 'NOT_FOUND' }
+  }
+  const accrual = resolved.accrual
 
   // Single GL entry for the whole invoice
   const posted = await postJournalEntry({
@@ -149,6 +188,9 @@ export async function createPurchaseInvoiceAction(
     lines: [
       ...createdOrders.map((o) => ({ accountSystemKey: 'inventory', debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
       { accountSystemKey: 'accounts_payable', debit: 0, credit: totalPKR, supplierId },
+      // DR Commission Expense / CR Agent Commission Payable — a separate pair of
+      // legs on the same entry, which is what keeps inventory at invoice cost.
+      ...commissionJournalLines(accrual),
     ],
   })
   // Same compensation the mid-loop failure path uses: drop every line we
@@ -163,10 +205,24 @@ export async function createPurchaseInvoiceAction(
     return glCreateFailed(posted.message)
   }
 
+  // Audit detail behind the accrual just posted — the basis and the rate in
+  // force, so a later change to the agent's terms never restates this invoice.
+  if (agentId) {
+    const { data: supp } = await admin
+      .from('suppliers').select('name').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle()
+    await syncAgentCommission(admin, {
+      tenantId, accrual, sourceType: 'purchase_invoice', sourceId: invoiceId,
+      documentSerial: serialNumber, partyName: supp?.name ?? null, date,
+    })
+  }
+
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',
     entity: 'purchase_orders', entityId: invoiceId,
-    after: { supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length },
+    after: {
+      supplierId, supplierInvoiceNo, date, currencyCode, totalPKR, lineCount: lines.length,
+      agentId: agentId ?? null, commission: accrual?.amount ?? 0,
+    },
   })
 
   return { success: true, data: { invoiceId } }

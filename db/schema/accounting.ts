@@ -5,6 +5,7 @@ import { suppliers, purchaseOrders } from './purchases'
 import { inventoryLots } from './inventory'
 import { salesOrders } from './sales'
 import { employees } from './employees'
+import { agents } from './agents'
 
 export const chartOfAccounts = pgTable('chart_of_accounts', {
   id:          uuid('id').primaryKey().defaultRandom(),
@@ -50,6 +51,10 @@ export const journalEntryLines = pgTable('tajir_journal_entry_lines', {
   supplierId:     uuid('supplier_id').references(() => suppliers.id),
   stockItemId:    uuid('stock_item_id').references(() => inventoryLots.id),
   employeeId:     uuid('employee_id').references(() => employees.id),
+  // Party dimensions added by later migrations: owner_id (0036), agent_id (0058).
+  // `owners` lives only in SQL, so that one is a plain uuid column here.
+  ownerId:        uuid('owner_id'),
+  agentId:        uuid('agent_id').references(() => agents.id),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

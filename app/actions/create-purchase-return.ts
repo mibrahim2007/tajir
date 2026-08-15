@@ -10,6 +10,11 @@ import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy } from '@/lib/yarn'
 import { checkReturnLimit } from '@/lib/purchases/return-limit'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import {
+  resolveCommissionClawback,
+  clawbackJournalLines,
+  syncCommissionClawback,
+} from '@/lib/agents/clawback'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -158,6 +163,22 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
   // Decrement inventory (goods going back to supplier)
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -quantity })
 
+  // Goods going back to the supplier undo the trade the broker arranged, so the
+  // commission on them comes off their payable. Read from the rate stored on
+  // the original accrual and capped at what was actually earned.
+  const clawbackResolved = await resolveCommissionClawback(admin, tenantId, {
+    side: 'purchase',
+    orderId: purchaseOrderId,
+    returnedValue: pkrEquivalent,
+    returnedQuantity: quantity,
+  })
+  if (!clawbackResolved.ok) {
+    await admin.from('purchase_returns').delete().eq('id', ret.id)
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: quantity })
+    return { success: false, error: clawbackResolved.error, code: 'INTERNAL_ERROR' }
+  }
+  const clawback = clawbackResolved.clawback
+
   // Auto-post GL: DR Accounts Payable, CR Stock in Trade
   const posted = await postJournalEntry({
     tenantId,
@@ -170,6 +191,10 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     lines: [
       { accountSystemKey: 'accounts_payable', debit: pkrEquivalent, credit: 0, supplierId },
       { accountSystemKey: 'inventory',        debit: 0, credit: pkrEquivalent, stockItemId },
+      // Commission reversal: DR Agent Commission Payable / CR Commission
+      // Expense. Rides on the return's own entry, so deleting the return
+      // removes the reversal with it.
+      ...clawbackJournalLines(clawback),
     ],
   })
   // The return already removed stock; put it back on failure.
@@ -179,10 +204,18 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     return glCreateFailed(posted.message)
   }
 
+  await syncCommissionClawback(admin, {
+    tenantId, clawback, sourceType: 'purchase_return', sourceId: ret.id,
+    documentSerial: serialNumber, partyName: null, date,
+  })
+
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create',
     entity: 'purchase_returns', entityId: ret.id,
-    after: { supplierId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date, reason },
+    after: {
+      supplierId, stockItemId, quantity, rate, currencyCode, pkrEquivalent, date, reason,
+      commissionReversed: clawback?.amount ?? 0,
+    },
   })
 
   return { success: true, data: ret }

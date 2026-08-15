@@ -1,0 +1,1 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto; UPDATE auth.users SET encrypted_password = crypt('1234$abcd', gen_salt('bf')) WHERE email = 'tajiradmin@tajir.app';

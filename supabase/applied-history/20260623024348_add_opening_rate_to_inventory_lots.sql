@@ -1,0 +1,1 @@
+ALTER TABLE inventory_lots ADD COLUMN IF NOT EXISTS opening_rate numeric(18,4) NOT NULL DEFAULT 0;

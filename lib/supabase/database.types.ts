@@ -64,6 +64,270 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_commissions: {
+        Row: {
+          agent_id: string
+          amount: number
+          base_amount: number
+          base_quantity: number
+          commission_rate: number
+          commission_type: string
+          created_at: string
+          date: string
+          document_serial: string | null
+          id: string
+          notes: string | null
+          party_name: string | null
+          related_invoice_id: string | null
+          source_id: string
+          source_type: string
+          tenant_id: string
+        }
+        Insert: {
+          agent_id: string
+          amount: number
+          base_amount?: number
+          base_quantity?: number
+          commission_rate?: number
+          commission_type: string
+          created_at?: string
+          date: string
+          document_serial?: string | null
+          id?: string
+          notes?: string | null
+          party_name?: string | null
+          related_invoice_id?: string | null
+          source_id: string
+          source_type: string
+          tenant_id: string
+        }
+        Update: {
+          agent_id?: string
+          amount?: number
+          base_amount?: number
+          base_quantity?: number
+          commission_rate?: number
+          commission_type?: string
+          created_at?: string
+          date?: string
+          document_serial?: string | null
+          id?: string
+          notes?: string | null
+          party_name?: string | null
+          related_invoice_id?: string | null
+          source_id?: string
+          source_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_commissions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_commissions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_payment_lines: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cheque_due_date: string | null
+          cheque_number: string | null
+          created_at: string
+          id: string
+          line_no: number
+          payment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cheque_due_date?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          payment_id: string
+          tenant_id: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cheque_due_date?: string | null
+          cheque_number?: string | null
+          created_at?: string
+          id?: string
+          line_no?: number
+          payment_id?: string
+          tenant_id?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_payment_lines_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_payment_lines_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "agent_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_payment_lines_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_payments: {
+        Row: {
+          agent_id: string
+          amount: number
+          created_at: string
+          currency_code: string
+          date: string
+          exchange_rate: number
+          id: string
+          notes: string | null
+          pkr_equivalent: number
+          serial_number: string | null
+          tenant_id: string
+        }
+        Insert: {
+          agent_id: string
+          amount: number
+          created_at?: string
+          currency_code?: string
+          date: string
+          exchange_rate?: number
+          id?: string
+          notes?: string | null
+          pkr_equivalent: number
+          serial_number?: string | null
+          tenant_id: string
+        }
+        Update: {
+          agent_id?: string
+          amount?: number
+          created_at?: string
+          currency_code?: string
+          date?: string
+          exchange_rate?: number
+          id?: string
+          notes?: string | null
+          pkr_equivalent?: number
+          serial_number?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_payments_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_payments_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agents: {
+        Row: {
+          address: string | null
+          agent_code: string | null
+          city: string | null
+          cnic: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          opening_balance: number
+          opening_balance_currency: string
+          opening_balance_pkr_equivalent: number
+          phone: string | null
+          purchase_commission_rate: number
+          purchase_commission_type: string
+          sale_commission_rate: number
+          sale_commission_type: string
+          tenant_id: string
+        }
+        Insert: {
+          address?: string | null
+          agent_code?: string | null
+          city?: string | null
+          cnic?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          opening_balance?: number
+          opening_balance_currency?: string
+          opening_balance_pkr_equivalent?: number
+          phone?: string | null
+          purchase_commission_rate?: number
+          purchase_commission_type?: string
+          sale_commission_rate?: number
+          sale_commission_type?: string
+          tenant_id: string
+        }
+        Update: {
+          address?: string | null
+          agent_code?: string | null
+          city?: string | null
+          cnic?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          opening_balance?: number
+          opening_balance_currency?: string
+          opening_balance_pkr_equivalent?: number
+          phone?: string | null
+          purchase_commission_rate?: number
+          purchase_commission_type?: string
+          sale_commission_rate?: number
+          sale_commission_type?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ap_payment_lines: {
         Row: {
           amount: number
@@ -2178,6 +2442,7 @@ export type Database = {
       purchase_orders: {
         Row: {
           advance_paid: number
+          agent_id: string | null
           confirmed_at: string | null
           created_at: string
           currency_code: string
@@ -2204,6 +2469,7 @@ export type Database = {
         }
         Insert: {
           advance_paid?: number
+          agent_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           currency_code: string
@@ -2230,6 +2496,7 @@ export type Database = {
         }
         Update: {
           advance_paid?: number
+          agent_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           currency_code?: string
@@ -2527,6 +2794,7 @@ export type Database = {
       }
       sales_orders: {
         Row: {
+          agent_id: string | null
           confirmed_at: string | null
           created_at: string
           currency_code: string
@@ -2555,6 +2823,7 @@ export type Database = {
           yarn_weight: number | null
         }
         Insert: {
+          agent_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           currency_code: string
@@ -2583,6 +2852,7 @@ export type Database = {
           yarn_weight?: number | null
         }
         Update: {
+          agent_id?: string | null
           confirmed_at?: string | null
           created_at?: string
           currency_code?: string
@@ -3156,6 +3426,7 @@ export type Database = {
       tajir_journal_entry_lines: {
         Row: {
           account_id: string
+          agent_id: string | null
           created_at: string
           credit: number
           customer_id: string | null
@@ -3171,6 +3442,7 @@ export type Database = {
         }
         Insert: {
           account_id: string
+          agent_id?: string | null
           created_at?: string
           credit?: number
           customer_id?: string | null
@@ -3186,6 +3458,7 @@ export type Database = {
         }
         Update: {
           account_id?: string
+          agent_id?: string | null
           created_at?: string
           credit?: number
           customer_id?: string | null

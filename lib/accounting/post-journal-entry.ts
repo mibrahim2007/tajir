@@ -11,6 +11,7 @@ type JournalLine = {
   stockItemId?: string
   employeeId?: string
   ownerId?: string
+  agentId?: string
 }
 
 export type PostJournalEntryParams = {
@@ -121,6 +122,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const partySupplierId = lines.find((l) => l.supplierId)?.supplierId
   const partyEmployeeId = lines.find((l) => l.employeeId)?.employeeId
   const partyOwnerId = lines.find((l) => l.ownerId)?.ownerId
+  const partyAgentId = lines.find((l) => l.agentId)?.agentId
   let partyName: string | null = null
   if (suppressPartyName) {
     partyName = null
@@ -140,6 +142,10 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
     const { data: own } = await admin
       .from('owners').select('name').eq('id', partyOwnerId).eq('tenant_id', tenantId).maybeSingle()
     partyName = own?.name ?? null
+  } else if (partyAgentId) {
+    const { data: agent } = await admin
+      .from('agents').select('name').eq('id', partyAgentId).eq('tenant_id', tenantId).maybeSingle()
+    partyName = agent?.name ?? null
   }
 
   const fullDescription = [partyName, reference, date, description].filter(Boolean).join(' — ')
@@ -187,6 +193,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
     stock_item_id:    l.stockItemId ?? null,
     employee_id:      l.employeeId ?? null,
     owner_id:         l.ownerId ?? null,
+    agent_id:         l.agentId ?? null,
   }))
 
   const { error: linesError } = await admin.from('tajir_journal_entry_lines').insert(lineRows)

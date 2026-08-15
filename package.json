@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
+  "db:export-history": "tsx --env-file=.env.local scripts/export-applied-history.ts",
     "check:ask": "tsx scripts/ask-routing-check.ts",
     "check:ask-email": "tsx scripts/ask-email-render-check.ts",
     "check:voice": "tsx scripts/voice-parse-check.ts",
@@ -22,6 +23,8 @@
     "check:ask-analysis": "tsx scripts/ask-analysis-check.ts",
     "check:ask-resolve": "tsx scripts/ask-resolve-check.ts",
     "check:return-limit": "tsx scripts/return-limit-check.ts",
+  "check:agent-commission": "tsx scripts/agent-commission-check.ts",
+  "check:agent-commission-e2e": "tsx --env-file=.env.local scripts/agent-commission-e2e.ts",
     "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts",
     "ask:backlog": "tsx scripts/ask-backlog.ts"
   },

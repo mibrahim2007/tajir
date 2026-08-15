@@ -37,7 +37,7 @@ export async function repostJournalEntry(
   const { data: oldLines } = oldEntry
     ? await admin
         .from('tajir_journal_entry_lines')
-        .select('account_id, description, debit, credit, customer_id, supplier_id, stock_item_id, employee_id, owner_id')
+        .select('account_id, description, debit, credit, customer_id, supplier_id, stock_item_id, employee_id, owner_id, agent_id')
         .eq('journal_entry_id', oldEntry.id)
     : { data: null }
 
