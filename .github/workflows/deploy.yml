@@ -26,18 +26,32 @@ jobs:
       # this repository, so they are gated rather than left to fail red on
       # every push. Set SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF and
       # VERCEL_DEPLOY_HOOK_URL to switch them on.
+      # NOTE: every secret test has to happen HERE, inside `run`. The `secrets`
+      # context is not available in a step-level `if:` — using it there does not
+      # evaluate false, it makes the whole workflow fail validation, producing a
+      # run with no jobs at all. So the checks emit outputs and the steps below
+      # gate on those instead.
       - name: Check deploy secrets
         id: gate
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
         run: |
-          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] || [ -z "${{ secrets.SUPABASE_PROJECT_REF }}" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$SUPABASE_PROJECT_REF" ]; then
+            echo "supabase=false" >> "$GITHUB_OUTPUT"
             echo "::warning::Supabase deploy secrets are not set — skipping the Supabase steps. Vercel deploys the app independently."
           else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "supabase=true" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -z "$VERCEL_DEPLOY_HOOK_URL" ]; then
+            echo "vercel=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "vercel=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Setup Supabase CLI
-        if: steps.gate.outputs.configured == 'true'
+        if: steps.gate.outputs.supabase == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -71,7 +85,7 @@ jobs:
       #       --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
 
       - name: Deploy Edge Functions
-        if: steps.gate.outputs.configured == 'true'
+        if: steps.gate.outputs.supabase == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
@@ -82,6 +96,6 @@ jobs:
       # started the production build by the time this runs. Kept, but only
       # fires if a hook URL is actually configured.
       - name: Trigger Vercel production deployment
-        if: ${{ secrets.VERCEL_DEPLOY_HOOK_URL != '' }}
+        if: steps.gate.outputs.vercel == 'true'
         run: |
           curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
