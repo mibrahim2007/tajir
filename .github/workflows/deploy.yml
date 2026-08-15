@@ -20,7 +20,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Vercel already deploys master to production through its own Git
+      # integration — that is what actually ships the app. The steps below are
+      # for the Supabase side, and none of the secrets they need are set on
+      # this repository, so they are gated rather than left to fail red on
+      # every push. Set SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF and
+      # VERCEL_DEPLOY_HOOK_URL to switch them on.
+      - name: Check deploy secrets
+        id: gate
+        run: |
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ] || [ -z "${{ secrets.SUPABASE_PROJECT_REF }}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Supabase deploy secrets are not set — skipping the Supabase steps. Vercel deploys the app independently."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Supabase CLI
+        if: steps.gate.outputs.configured == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -54,12 +71,17 @@ jobs:
       #       --password "${{ secrets.SUPABASE_DB_PASSWORD }}"
 
       - name: Deploy Edge Functions
+        if: steps.gate.outputs.configured == 'true'
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           supabase functions deploy subscription-transition \
             --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
 
+      # Redundant while Vercel's Git integration is connected — it has already
+      # started the production build by the time this runs. Kept, but only
+      # fires if a hook URL is actually configured.
       - name: Trigger Vercel production deployment
+        if: ${{ secrets.VERCEL_DEPLOY_HOOK_URL != '' }}
         run: |
-          curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
+          curl -fsS -X POST "${{ secrets.VERCEL_DEPLOY_HOOK_URL }}"
