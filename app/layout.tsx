@@ -31,10 +31,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // `dark` is set on <html> here too, not only by next-themes on mount, so the
+  // very first server-rendered frame is already navy instead of flashing white.
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${sora.variable} ${spaceGrotesk.variable} antialiased`} suppressHydrationWarning>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        {/* The console theme is dark by design, and hundreds of `dark:` variants
+            across the app key off this class — letting it be toggled off would
+            leave light-mode utilities stranded on a navy background. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
           {children}
         </ThemeProvider>
         <Analytics />

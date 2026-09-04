@@ -2,9 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
 import {
-  Menu,
   LayoutDashboard,
   UsersRound,
   Wallet,
@@ -15,7 +13,6 @@ import {
   Video,
   Layers,
   LifeBuoy,
-  Bell,
   Settings,
   Building2,
   UserCog,
@@ -23,15 +20,7 @@ import {
   FlaskConical,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LogoutButton } from "./logout-button";
 import { CommandPaletteTrigger } from "./command-palette";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
 import { MODULE_META, type ModuleKey } from "@/lib/modules";
 
 type NavLink = { href: string; label: string; icon: React.ElementType };
@@ -95,10 +84,6 @@ export type SidebarBaseProps = {
   enabledModules: ModuleKey[];
 };
 
-function initials(name: string) {
-  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
-}
-
 function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]; onNavigate?: () => void; supportCount?: number }) {
   const pathname = usePathname();
 
@@ -106,7 +91,7 @@ function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]
     <nav className="flex-1 overflow-y-auto py-2 px-3">
       {groups.map((group) => (
         <div key={group.title} className="mb-4">
-          <p className="px-2 mb-1 text-[10.5px] font-bold uppercase tracking-widest text-muted-foreground/70">
+          <p className="px-2 mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/60">
             {group.title}
           </p>
           {group.links.map((link) => {
@@ -118,16 +103,16 @@ function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]
                 href={link.href}
                 onClick={onNavigate}
                 className={cn(
-                  "relative flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13.5px] font-medium transition-colors mb-0.5 min-h-[40px]",
+                  "relative flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13.5px] font-medium transition-all mb-0.5 min-h-[40px]",
                   active
-                    ? "bg-accent text-primary font-semibold"
+                    ? "bg-accent text-accent-foreground font-semibold shadow-[0_0_0_1px_hsl(214_95%_60%/0.25)]"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
                 {active && (
-                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary" />
+                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary shadow-[0_0_10px_hsl(214_95%_60%/0.9)]" />
                 )}
-                <link.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "opacity-100" : "opacity-75")} />
+                <link.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "opacity-100" : "opacity-70")} />
                 <span className="truncate flex-1">{link.label}</span>
                 {showBadge && (
                   <span className="shrink-0 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-1 leading-none">
@@ -143,111 +128,44 @@ function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]
   );
 }
 
-function SidebarContent({
+/**
+ * The drawer body. It no longer carries the user/logout footer — that region
+ * moved to the top bar, where it stays reachable while the menu is closed.
+ */
+export function SidebarContent({
   role,
-  userEmail,
   tenantName,
   supportCount = 0,
   enabledModules,
   onNavigate,
 }: SidebarBaseProps & { onNavigate?: () => void }) {
   const groups = buildNavGroups(role, enabledModules);
-  const ini = initials(tenantName);
 
   return (
-    <div className="flex flex-col h-full bg-card">
+    <div className="flex flex-col h-full bg-card/95 backdrop-blur-xl">
       {/* Brand */}
       <div className="px-4 py-5 shrink-0">
         <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5">
-          <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center shadow-sm shrink-0">
-            <span className="text-primary-foreground text-sm font-bold">T</span>
+          <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary to-[hsl(187_92%_52%)] shadow-[0_0_20px_hsl(214_95%_60%/0.45)]">
+            <span className="text-primary-foreground text-sm font-black">T</span>
           </div>
           <div className="min-w-0">
             <p className="font-extrabold text-[15px] leading-tight tracking-tight truncate text-foreground">
-              {tenantName}<span className="text-primary">.</span>
+              {tenantName}<span className="text-[hsl(84_74%_55%)]">.</span>
             </p>
             <p className="text-[11px] text-muted-foreground capitalize">{role}</p>
           </div>
         </Link>
       </div>
 
+      <div className="mx-4 rule-glow shrink-0" />
+
       {/* Search trigger */}
-      <div className="px-3 pb-2 shrink-0">
+      <div className="px-3 pt-3 pb-2 shrink-0">
         <CommandPaletteTrigger />
       </div>
 
-      {/* Nav */}
       <NavItems groups={groups} onNavigate={onNavigate} supportCount={supportCount} />
-
-      {/* Footer */}
-      <div className="border-t border-border p-3 shrink-0">
-        <div className="flex items-center gap-2.5 px-1">
-          <div className="h-8 w-8 rounded-full bg-accent text-primary flex items-center justify-center text-xs font-bold shrink-0">
-            {ini}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-semibold text-foreground truncate">{tenantName}</p>
-            <p className="text-[11px] text-muted-foreground truncate">{userEmail}</p>
-          </div>
-          <LogoutButton />
-        </div>
-      </div>
     </div>
-  );
-}
-
-export function DesktopSidebar(props: SidebarBaseProps) {
-  return (
-    <aside className="hidden lg:flex lg:flex-col w-[260px] shrink-0 border-r border-border h-screen sticky top-0 print:hidden">
-      <SidebarContent {...props} />
-    </aside>
-  );
-}
-
-export function MobileHeader(props: SidebarBaseProps) {
-  const [open, setOpen] = useState(false);
-  const supportCount = props.supportCount ?? 0;
-
-  return (
-    <header className="lg:hidden sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4">
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetTrigger asChild>
-          <button className="p-2 rounded-lg hover:bg-secondary transition-colors" aria-label="Open navigation">
-            <Menu className="h-5 w-5 text-muted-foreground" />
-          </button>
-        </SheetTrigger>
-        <SheetContent side="left" className="p-0 w-[260px] border-r border-border" showCloseButton={false}>
-          <SheetHeader className="sr-only">
-            <SheetTitle>Navigation</SheetTitle>
-          </SheetHeader>
-          <SidebarContent {...props} onNavigate={() => setOpen(false)} />
-        </SheetContent>
-      </Sheet>
-      <Link href="/dashboard" className="font-extrabold text-sm tracking-tight">
-        {props.tenantName}<span className="text-primary">.</span>
-      </Link>
-      <div className="ml-auto flex items-center gap-1">
-        <Link
-          href="/support"
-          className="relative p-2 rounded-lg hover:bg-secondary transition-colors"
-          aria-label={supportCount > 0 ? `${supportCount} support notification${supportCount !== 1 ? 's' : ''}` : 'Support'}
-        >
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          {supportCount > 0 && (
-            <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-1 leading-none">
-              {supportCount > 99 ? '99+' : supportCount}
-            </span>
-          )}
-        </Link>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent('open-command-palette'))}
-          className="p-2 rounded-lg hover:bg-secondary transition-colors"
-          aria-label="Quick search"
-        >
-          <Search className="h-5 w-5 text-muted-foreground" />
-        </button>
-        <LogoutButton />
-      </div>
-    </header>
   );
 }

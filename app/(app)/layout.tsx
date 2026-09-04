@@ -3,7 +3,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { AuthProvider } from '@/contexts/auth-context'
 import { SubscriptionLockedBanner } from '@/components/subscription-locked-banner'
-import { DesktopSidebar, MobileHeader } from '@/components/sidebar'
+import { AppShell } from '@/components/app-shell'
 import { CommandPalette } from '@/components/command-palette'
 import {
   parseTenantFeatures,
@@ -52,13 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AuthProvider value={{ userId: user.id, role, tenantId }}>
       <CommandPalette role={role} />
       <SubscriptionLockedBanner status={tenant.subscriptionStatus} />
-      <div className="flex min-h-screen">
-        <div className="print:hidden"><DesktopSidebar {...sidebarProps} /></div>
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="print:hidden"><MobileHeader {...sidebarProps} /></div>
-          <main className="flex-1">{children}</main>
-        </div>
-      </div>
+      <AppShell {...sidebarProps}>{children}</AppShell>
     </AuthProvider>
   )
 }

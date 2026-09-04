@@ -2,60 +2,67 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Vibrant deep-navy console theme.
+ *
+ * The app runs dark everywhere (the root layout forces `class="dark"`), so the
+ * two blocks below hold the SAME palette. `:root` exists so server-rendered
+ * markup paints navy before next-themes attaches the class — without it the
+ * first frame flashes white.
+ *
+ * Accents are deliberately two: an electric blue for anything actionable and a
+ * lime for anything affirmative. Data series get their own scale so a chart
+ * never has to borrow the UI's accent and blur the difference between "this is
+ * a control" and "this is a value".
+ */
 @layer base {
-  :root {
-    /* Canvas warm cream palette */
-    --background: 40 33% 96%;
-    --foreground: 20 10% 9%;
-    --card: 0 0% 100%;
-    --card-foreground: 20 10% 9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 20 10% 9%;
-    --primary: 174 84% 32%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 40 27% 94%;
-    --secondary-foreground: 20 10% 9%;
-    --muted: 33 35% 92%;
-    --muted-foreground: 26 16% 43%;
-    --accent: 174 40% 92%;
-    --accent-foreground: 174 84% 22%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 37 25% 86%;
-    --input: 37 25% 86%;
-    --ring: 174 84% 32%;
-    --chart-1: 174 84% 32%;
-    --chart-2: 33 80% 55%;
-    --chart-3: 160 60% 45%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 0 84% 60%;
-    --radius: 0.75rem;
-  }
+  :root,
   .dark {
-    --background: 20 10% 9%;
-    --foreground: 40 27% 94%;
-    --card: 20 10% 13%;
-    --card-foreground: 40 27% 94%;
-    --popover: 20 10% 13%;
-    --popover-foreground: 40 27% 94%;
-    --primary: 174 67% 40%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 20 12% 16%;
-    --secondary-foreground: 40 27% 94%;
-    --muted: 20 12% 16%;
-    --muted-foreground: 25 15% 56%;
-    --accent: 174 30% 18%;
-    --accent-foreground: 174 67% 60%;
-    --destructive: 0 63% 30%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 22 13% 22%;
-    --input: 22 13% 22%;
-    --ring: 174 67% 40%;
-    --chart-1: 174 67% 40%;
-    --chart-2: 33 80% 55%;
-    --chart-3: 160 60% 45%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 0 84% 60%;
+    --background: 222 60% 5%;
+    --foreground: 213 40% 95%;
+
+    /* Panels sit a shade above the canvas with a luminous hairline. */
+    --card: 221 52% 9%;
+    --card-foreground: 213 40% 95%;
+    --popover: 221 54% 8%;
+    --popover-foreground: 213 40% 95%;
+
+    --primary: 214 95% 60%;
+    --primary-foreground: 222 60% 6%;
+
+    --secondary: 220 45% 14%;
+    --secondary-foreground: 213 40% 95%;
+
+    --muted: 220 40% 16%;
+    --muted-foreground: 215 28% 68%;
+
+    /* Accent is the tinted wash behind an icon or an active nav row. */
+    --accent: 214 70% 18%;
+    --accent-foreground: 205 100% 78%;
+
+    --destructive: 0 84% 62%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 84 74% 55%;
+    --success-foreground: 222 60% 6%;
+    --warning: 38 96% 56%;
+    --warning-foreground: 222 60% 6%;
+
+    --border: 218 42% 20%;
+    --input: 218 42% 20%;
+    --ring: 214 95% 60%;
+
+    /* Data series — reads as one system across donut, bars and lines. */
+    --chart-1: 214 95% 62%;  /* electric blue  */
+    --chart-2: 84 74% 55%;   /* lime           */
+    --chart-3: 38 96% 56%;   /* amber          */
+    --chart-4: 265 85% 68%;  /* violet         */
+    --chart-5: 187 92% 52%;  /* cyan           */
+    --chart-6: 330 82% 62%;  /* pink           */
+    --chart-7: 152 70% 48%;  /* emerald        */
+    --chart-8: 18 92% 60%;   /* orange         */
+
+    --radius: 0.9rem;
   }
 }
 
@@ -63,13 +70,131 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-sans, system-ui, sans-serif);
+    /*
+     * Two soft radial pools — one blue top-left, one lime bottom-right — over
+     * the flat navy. Fixed so they stay put while the page scrolls, which reads
+     * as depth rather than as a texture scrolling past.
+     */
+    background-image:
+      radial-gradient(900px 600px at 12% -8%, hsl(214 95% 50% / 0.16), transparent 60%),
+      radial-gradient(760px 520px at 105% 108%, hsl(84 74% 45% / 0.10), transparent 62%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+
+  /* Scrollbars, so they don't punch a light hole in a dark panel. */
+  * {
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(218 42% 24%);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(218 42% 34%); background-clip: content-box; }
+
+  /* Native controls (date pickers, selects) render their glyphs dark-on-dark
+     otherwise, which makes the calendar icon effectively invisible. */
+  input[type='date']::-webkit-calendar-picker-indicator,
+  input[type='month']::-webkit-calendar-picker-indicator,
+  input[type='time']::-webkit-calendar-picker-indicator {
+    filter: invert(1) opacity(0.65);
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /*
+   * The panel look from the reference: a lifted surface with a bright top edge
+   * where light would catch it, and a wide soft shadow beneath.
+   */
+  .panel {
+    @apply rounded-2xl border border-border bg-card;
+    box-shadow:
+      0 1px 0 0 hsl(214 95% 70% / 0.06) inset,
+      0 18px 40px -24px hsl(222 80% 2% / 0.9);
+  }
+
+  .panel-hover {
+    @apply transition-all duration-200;
+  }
+  .panel-hover:hover {
+    border-color: hsl(214 95% 60% / 0.45);
+    box-shadow:
+      0 1px 0 0 hsl(214 95% 70% / 0.12) inset,
+      0 0 0 1px hsl(214 95% 60% / 0.12),
+      0 22px 50px -26px hsl(214 95% 40% / 0.55);
+  }
+
+  /* Icon chip — the vibrant circle/rounded square an icon sits in. */
+  .icon-chip {
+    @apply flex items-center justify-center rounded-2xl border;
+    border-color: hsl(214 95% 60% / 0.35);
+    background: linear-gradient(160deg, hsl(214 95% 60% / 0.18), hsl(214 95% 60% / 0.04));
+    color: hsl(205 100% 76%);
+  }
+  .icon-chip-lime {
+    border-color: hsl(84 74% 55% / 0.38);
+    background: linear-gradient(160deg, hsl(84 74% 55% / 0.18), hsl(84 74% 55% / 0.04));
+    color: hsl(84 74% 62%);
+  }
+  .icon-chip-amber {
+    border-color: hsl(38 96% 56% / 0.38);
+    background: linear-gradient(160deg, hsl(38 96% 56% / 0.18), hsl(38 96% 56% / 0.04));
+    color: hsl(38 96% 62%);
+  }
+  .icon-chip-violet {
+    border-color: hsl(265 85% 68% / 0.38);
+    background: linear-gradient(160deg, hsl(265 85% 68% / 0.18), hsl(265 85% 68% / 0.04));
+    color: hsl(265 85% 76%);
+  }
+  .icon-chip-cyan {
+    border-color: hsl(187 92% 52% / 0.38);
+    background: linear-gradient(160deg, hsl(187 92% 52% / 0.18), hsl(187 92% 52% / 0.04));
+    color: hsl(187 92% 62%);
+  }
+
+  /* The hairline rule under a section heading, as in the reference. */
+  .rule-glow {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(214 95% 60% / 0.5), transparent);
   }
 }
 
 @media print {
+  /*
+   * Reports and vouchers print on white paper, so the whole dark palette is
+   * swapped back to ink-on-paper here. Without this every `bg-card` panel would
+   * lay down a sheet of navy and every `text-foreground` would come out white
+   * on white. The tokens are overridden rather than the utilities, so every
+   * page that themes correctly on screen also prints correctly.
+   */
+  :root, .dark {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 214 90% 35%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 220 9% 25%;
+    --accent: 0 0% 94%;
+    --accent-foreground: 214 90% 30%;
+    --border: 220 9% 46%;
+    --input: 220 9% 46%;
+  }
+
   /* Render backgrounds/colours as designed instead of the browser's
      ink-saving washed-out defaults, so tables and shading print solid. */
   * {
@@ -81,10 +206,33 @@
   }
   body {
     background: white !important;
+    background-image: none !important;
     color: black !important;
   }
   .rounded-lg {
     border-radius: 0 !important;
+  }
+  /* The screen panel treatment would print as a gray smudge. */
+  .panel, .panel-hover {
+    box-shadow: none !important;
+    border-color: #6b7280 !important;
+  }
+  .icon-chip, .icon-chip-lime, .icon-chip-amber, .icon-chip-violet, .icon-chip-cyan {
+    background: none !important;
+    color: #1f2937 !important;
+    border-color: #6b7280 !important;
+  }
+
+  /*
+   * The app is always in dark mode now, so every `dark:text-*` variant wins on
+   * the printed page too — status pills came out pale-amber-on-pale-amber and
+   * badge text vanished. Any colour chosen FOR a dark background is wrong on
+   * paper, so those all resolve to ink. Matching on the class attribute keeps
+   * this to the dark variants only: `text-white` on a deliberately dark
+   * printed table header (the invoice report) is a base utility and untouched.
+   */
+  [class*="dark:text-"] {
+    color: #1f2937 !important;
   }
 
   /* Darker output: faint gray text prints too light on paper, so bump the
@@ -93,14 +241,6 @@
   .text-gray-500, .text-muted-foreground { color: #374151 !important; } /* -> gray-700 */
   .text-gray-600, .text-gray-700 { color: #1f2937 !important; } /* -> gray-800 */
 
-  /* Darken hairline borders so table grids stay visible when printed.
-     The default `border` utility resolves to the light --border token, so we
-     darken the token itself here (leaving explicit border-black lines intact),
-     plus the explicit gray border utilities. */
-  :root {
-    --border: 220 9% 46%; /* ~gray-500 */
-    --input: 220 9% 46%;
-  }
   .border-gray-100, .border-gray-200, .border-gray-300 {
     border-color: #6b7280 !important; /* gray-500 */
   }
