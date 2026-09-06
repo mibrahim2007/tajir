@@ -3,25 +3,79 @@
 @tailwind utilities;
 
 /*
- * Vibrant deep-navy console theme.
+ * Two themes, one system.
  *
- * The app runs dark everywhere (the root layout forces `class="dark"`), so the
- * two blocks below hold the SAME palette. `:root` exists so server-rendered
- * markup paints navy before next-themes attaches the class — without it the
- * first frame flashes white.
+ * Night is the deep-navy operations console; Day is its daylight counterpart —
+ * same structure, same accent roles, re-lit for paper-white. The app switches
+ * between them by toggling `.dark` on <html> (next-themes), so EVERY colour has
+ * to come from a token: a component that hardcodes a navy tile is invisible in
+ * Day and a component that hardcodes a hex chart colour is unreadable in one of
+ * the two.
  *
- * Accents are deliberately two: an electric blue for anything actionable and a
- * lime for anything affirmative. Data series get their own scale so a chart
- * never has to borrow the UI's accent and blur the difference between "this is
- * a control" and "this is a value".
+ * Accent roles are constant across both: primary blue = anything actionable,
+ * success lime/green = anything affirmative, warning amber = anything that
+ * needs attention, and the --chart-* scale = data. Only the LIGHTNESS changes
+ * between themes — Day darkens the accents so they hold contrast on white,
+ * Night brightens them so they glow on navy.
  */
 @layer base {
-  :root,
+  /* ── Day ──────────────────────────────────────────────────── */
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 214 90% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 95%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 214 30% 94%;
+    --muted-foreground: 215 20% 40%;
+
+    --accent: 214 95% 94%;
+    --accent-foreground: 214 90% 32%;
+
+    --destructive: 0 78% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 84 58% 32%;
+    --success-foreground: 0 0% 100%;
+    --warning: 32 95% 42%;
+    --warning-foreground: 0 0% 100%;
+
+    --border: 214 25% 88%;
+    --input: 214 25% 88%;
+    --ring: 214 90% 48%;
+
+    /* Second brand hue — the far end of the logo/CTA gradient. */
+    --brand-2: 187 85% 38%;
+    /* Inset surface: small stat tiles, bar-chart tracks, inner wells. */
+    --tile: 214 35% 97%;
+
+    /* Data series. Darkened against white so no series is a pale ghost. */
+    --chart-1: 214 90% 50%;
+    --chart-2: 84 58% 36%;
+    --chart-3: 32 95% 45%;
+    --chart-4: 265 70% 55%;
+    --chart-5: 187 85% 36%;
+    --chart-6: 330 75% 50%;
+    --chart-7: 152 63% 33%;
+    --chart-8: 18 88% 47%;
+
+    --radius: 0.9rem;
+  }
+
+  /* ── Night ────────────────────────────────────────────────── */
   .dark {
     --background: 222 60% 5%;
     --foreground: 213 40% 95%;
 
-    /* Panels sit a shade above the canvas with a luminous hairline. */
     --card: 221 52% 9%;
     --card-foreground: 213 40% 95%;
     --popover: 221 54% 8%;
@@ -36,7 +90,6 @@
     --muted: 220 40% 16%;
     --muted-foreground: 215 28% 68%;
 
-    /* Accent is the tinted wash behind an icon or an active nav row. */
     --accent: 214 70% 18%;
     --accent-foreground: 205 100% 78%;
 
@@ -52,17 +105,17 @@
     --input: 218 42% 20%;
     --ring: 214 95% 60%;
 
-    /* Data series — reads as one system across donut, bars and lines. */
-    --chart-1: 214 95% 62%;  /* electric blue  */
-    --chart-2: 84 74% 55%;   /* lime           */
-    --chart-3: 38 96% 56%;   /* amber          */
-    --chart-4: 265 85% 68%;  /* violet         */
-    --chart-5: 187 92% 52%;  /* cyan           */
-    --chart-6: 330 82% 62%;  /* pink           */
-    --chart-7: 152 70% 48%;  /* emerald        */
-    --chart-8: 18 92% 60%;   /* orange         */
+    --brand-2: 187 92% 52%;
+    --tile: 220 45% 13%;
 
-    --radius: 0.9rem;
+    --chart-1: 214 95% 62%;
+    --chart-2: 84 74% 55%;
+    --chart-3: 38 96% 56%;
+    --chart-4: 265 85% 68%;
+    --chart-5: 187 92% 52%;
+    --chart-6: 330 82% 62%;
+    --chart-7: 152 70% 48%;
+    --chart-8: 18 92% 60%;
   }
 }
 
@@ -75,36 +128,43 @@
     @apply bg-background text-foreground;
     font-family: var(--font-sans, system-ui, sans-serif);
     /*
-     * Two soft radial pools — one blue top-left, one lime bottom-right — over
-     * the flat navy. Fixed so they stay put while the page scrolls, which reads
-     * as depth rather than as a texture scrolling past.
+     * Two soft radial pools — blue top-left, lime bottom-right. Fixed so they
+     * stay put while the page scrolls, which reads as depth rather than as a
+     * texture scrolling past. Day keeps the same geometry at a fraction of the
+     * strength: on white, anything more becomes a stain.
      */
     background-image:
-      radial-gradient(900px 600px at 12% -8%, hsl(214 95% 50% / 0.16), transparent 60%),
-      radial-gradient(760px 520px at 105% 108%, hsl(84 74% 45% / 0.10), transparent 62%);
+      radial-gradient(900px 600px at 12% -8%, hsl(var(--primary) / 0.07), transparent 60%),
+      radial-gradient(760px 520px at 105% 108%, hsl(var(--chart-2) / 0.05), transparent 62%);
     background-attachment: fixed;
     min-height: 100vh;
   }
 
-  /* Scrollbars, so they don't punch a light hole in a dark panel. */
+  .dark body {
+    background-image:
+      radial-gradient(900px 600px at 12% -8%, hsl(214 95% 50% / 0.16), transparent 60%),
+      radial-gradient(760px 520px at 105% 108%, hsl(84 74% 45% / 0.10), transparent 62%);
+  }
+
+  /* Scrollbars, so they don't punch a hole of the wrong theme into a panel. */
   * {
     scrollbar-color: hsl(var(--border)) transparent;
   }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb {
-    background: hsl(218 42% 24%);
+    background: hsl(var(--border));
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(218 42% 34%); background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); background-clip: content-box; }
 
-  /* Native controls (date pickers, selects) render their glyphs dark-on-dark
-     otherwise, which makes the calendar icon effectively invisible. */
-  input[type='date']::-webkit-calendar-picker-indicator,
-  input[type='month']::-webkit-calendar-picker-indicator,
-  input[type='time']::-webkit-calendar-picker-indicator {
+  /* Native control glyphs (the date picker's calendar) ship dark. That is right
+     on white and invisible on navy, so only Night inverts them. */
+  .dark input[type='date']::-webkit-calendar-picker-indicator,
+  .dark input[type='month']::-webkit-calendar-picker-indicator,
+  .dark input[type='time']::-webkit-calendar-picker-indicator {
     filter: invert(1) opacity(0.65);
     cursor: pointer;
   }
@@ -112,11 +172,17 @@
 
 @layer components {
   /*
-   * The panel look from the reference: a lifted surface with a bright top edge
-   * where light would catch it, and a wide soft shadow beneath.
+   * A lifted surface. Night catches a highlight along the top edge and drops a
+   * wide shadow, the way a panel would under a light above it. Day cannot use
+   * either — a bright inset line on white is invisible and a heavy shadow turns
+   * the page muddy — so it earns its lift from a crisper border and a small,
+   * tight shadow instead.
    */
   .panel {
     @apply rounded-2xl border border-border bg-card;
+    box-shadow: 0 1px 2px 0 hsl(222 47% 11% / 0.05), 0 1px 3px -1px hsl(222 47% 11% / 0.08);
+  }
+  .dark .panel {
     box-shadow:
       0 1px 0 0 hsl(214 95% 70% / 0.06) inset,
       0 18px 40px -24px hsl(222 80% 2% / 0.9);
@@ -126,55 +192,72 @@
     @apply transition-all duration-200;
   }
   .panel-hover:hover {
-    border-color: hsl(214 95% 60% / 0.45);
+    border-color: hsl(var(--primary) / 0.45);
+    box-shadow: 0 2px 8px -2px hsl(var(--primary) / 0.25);
+  }
+  .dark .panel-hover:hover {
     box-shadow:
       0 1px 0 0 hsl(214 95% 70% / 0.12) inset,
       0 0 0 1px hsl(214 95% 60% / 0.12),
       0 22px 50px -26px hsl(214 95% 40% / 0.55);
   }
 
-  /* Icon chip — the vibrant circle/rounded square an icon sits in. */
+  /*
+   * Icon chip — the vibrant tinted circle or rounded square an icon sits in.
+   * Each tone is driven by one hue variable so both themes share the recipe and
+   * only the underlying token shifts.
+   */
   .icon-chip {
     @apply flex items-center justify-center rounded-2xl border;
-    border-color: hsl(214 95% 60% / 0.35);
-    background: linear-gradient(160deg, hsl(214 95% 60% / 0.18), hsl(214 95% 60% / 0.04));
-    color: hsl(205 100% 76%);
+    --chip: var(--primary);
+    border-color: hsl(var(--chip) / 0.4);
+    background: linear-gradient(160deg, hsl(var(--chip) / 0.18), hsl(var(--chip) / 0.07));
+    color: hsl(var(--chip));
   }
-  .icon-chip-lime {
-    border-color: hsl(84 74% 55% / 0.38);
-    background: linear-gradient(160deg, hsl(84 74% 55% / 0.18), hsl(84 74% 55% / 0.04));
-    color: hsl(84 74% 62%);
-  }
-  .icon-chip-amber {
-    border-color: hsl(38 96% 56% / 0.38);
-    background: linear-gradient(160deg, hsl(38 96% 56% / 0.18), hsl(38 96% 56% / 0.04));
-    color: hsl(38 96% 62%);
-  }
-  .icon-chip-violet {
-    border-color: hsl(265 85% 68% / 0.38);
-    background: linear-gradient(160deg, hsl(265 85% 68% / 0.18), hsl(265 85% 68% / 0.04));
-    color: hsl(265 85% 76%);
-  }
-  .icon-chip-cyan {
-    border-color: hsl(187 92% 52% / 0.38);
-    background: linear-gradient(160deg, hsl(187 92% 52% / 0.18), hsl(187 92% 52% / 0.04));
-    color: hsl(187 92% 62%);
+  .icon-chip-lime   { --chip: var(--chart-2); }
+  .icon-chip-amber  { --chip: var(--chart-3); }
+  .icon-chip-violet { --chip: var(--chart-4); }
+  .icon-chip-cyan   { --chip: var(--chart-5); }
+  /* Night sits on navy, where a bright hue needs far less wash to register. */
+  .dark .icon-chip {
+    border-color: hsl(var(--chip) / 0.35);
+    background: linear-gradient(160deg, hsl(var(--chip) / 0.16), hsl(var(--chip) / 0.04));
+    color: hsl(var(--chip) / 0.95);
   }
 
-  /* The hairline rule under a section heading, as in the reference. */
+  /* A hairline rule that fades out at both ends. */
   .rule-glow {
     height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.35), transparent);
+  }
+  .dark .rule-glow {
     background: linear-gradient(90deg, transparent, hsl(214 95% 60% / 0.5), transparent);
   }
+
+  /*
+   * Glow. A halo around a bright object is how Night says "this is live"; on
+   * white the same halo reads as a printing error, so Day simply omits it.
+   * Every glow in the app goes through these, never through a raw box-shadow.
+   */
+  .glow-primary { box-shadow: none; }
+  .dark .glow-primary { box-shadow: 0 0 20px hsl(var(--primary) / 0.45); }
+
+  .glow-primary-sm { box-shadow: none; }
+  .dark .glow-primary-sm { box-shadow: 0 0 16px hsl(var(--primary) / 0.35); }
+
+  .glow-danger { box-shadow: none; }
+  .dark .glow-danger { box-shadow: 0 0 10px hsl(var(--destructive) / 0.7); }
+
+  .glow-rail { box-shadow: none; }
+  .dark .glow-rail { box-shadow: 0 0 10px hsl(var(--primary) / 0.9); }
 }
 
 @media print {
   /*
-   * Reports and vouchers print on white paper, so the whole dark palette is
-   * swapped back to ink-on-paper here. Without this every `bg-card` panel would
-   * lay down a sheet of navy and every `text-foreground` would come out white
-   * on white. The tokens are overridden rather than the utilities, so every
-   * page that themes correctly on screen also prints correctly.
+   * Reports and vouchers print on white paper. Night's tokens are swapped back
+   * to ink here, so a page that themes correctly on screen also prints
+   * correctly — in either theme, without the reader having to switch to Day
+   * first.
    */
   :root, .dark {
     --background: 0 0% 100%;
@@ -193,6 +276,7 @@
     --accent-foreground: 214 90% 30%;
     --border: 220 9% 46%;
     --input: 220 9% 46%;
+    --tile: 0 0% 97%;
   }
 
   /* Render backgrounds/colours as designed instead of the browser's
@@ -228,6 +312,7 @@
   [data-radix-popper-content-wrapper] {
     display: none !important;
   }
+
   body {
     background: white !important;
     background-image: none !important;
@@ -241,21 +326,24 @@
     box-shadow: none !important;
     border-color: #6b7280 !important;
   }
-  .icon-chip, .icon-chip-lime, .icon-chip-amber, .icon-chip-violet, .icon-chip-cyan {
+  .icon-chip {
     background: none !important;
     color: #1f2937 !important;
     border-color: #6b7280 !important;
   }
+  .glow-primary, .glow-primary-sm, .glow-danger, .glow-rail {
+    box-shadow: none !important;
+  }
 
   /*
-   * The app is always in dark mode now, so every `dark:text-*` variant wins on
-   * the printed page too — status pills came out pale-amber-on-pale-amber and
-   * badge text vanished. Any colour chosen FOR a dark background is wrong on
-   * paper, so those all resolve to ink. Matching on the class attribute keeps
-   * this to the dark variants only: `text-white` on a deliberately dark
-   * printed table header (the invoice report) is a base utility and untouched.
+   * Night keeps `dark:` variants applied while printing, so every colour chosen
+   * FOR a dark background lands on paper — status pills came out
+   * pale-amber-on-pale-amber. Any such colour is wrong on paper, so they all
+   * resolve to ink. Matching on the class attribute keeps this to the dark
+   * variants only: `text-white` on a deliberately dark printed table header
+   * (the invoice report) is a base utility and untouched.
    */
-  [class*="dark:text-"] {
+  .dark [class*="dark:text-"] {
     color: #1f2937 !important;
   }
 

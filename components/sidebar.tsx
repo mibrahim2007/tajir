@@ -105,12 +105,12 @@ function NavItems({ groups, onNavigate, supportCount = 0 }: { groups: NavGroup[]
                 className={cn(
                   "relative flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13.5px] font-medium transition-all mb-0.5 min-h-[40px]",
                   active
-                    ? "bg-accent text-accent-foreground font-semibold shadow-[0_0_0_1px_hsl(214_95%_60%/0.25)]"
+                    ? "bg-accent text-accent-foreground font-semibold ring-1 ring-primary/25"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
                 {active && (
-                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary shadow-[0_0_10px_hsl(214_95%_60%/0.9)]" />
+                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full bg-primary glow-rail" />
                 )}
                 <link.icon className={cn("h-[18px] w-[18px] shrink-0", active ? "opacity-100" : "opacity-70")} />
                 <span className="truncate flex-1">{link.label}</span>
@@ -146,12 +146,12 @@ export function SidebarContent({
       {/* Brand */}
       <div className="px-4 py-5 shrink-0">
         <Link href="/dashboard" onClick={onNavigate} className="flex items-center gap-2.5">
-          <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary to-[hsl(187_92%_52%)] shadow-[0_0_20px_hsl(214_95%_60%/0.45)]">
+          <div className="h-9 w-9 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary to-brand2 glow-primary">
             <span className="text-primary-foreground text-sm font-black">T</span>
           </div>
           <div className="min-w-0">
             <p className="font-extrabold text-[15px] leading-tight tracking-tight truncate text-foreground">
-              {tenantName}<span className="text-[hsl(84_74%_55%)]">.</span>
+              {tenantName}<span className="text-success">.</span>
             </p>
             <p className="text-[11px] text-muted-foreground capitalize">{role}</p>
           </div>

@@ -31,15 +31,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  // `dark` is set on <html> here too, not only by next-themes on mount, so the
-  // very first server-rendered frame is already navy instead of flashing white.
+  // No theme class is baked in here any more: next-themes injects the stored
+  // choice onto <html> before first paint, so hardcoding one would make every
+  // Day user watch the page flash navy before it corrects itself.
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className={`${sora.variable} ${spaceGrotesk.variable} antialiased`} suppressHydrationWarning>
-        {/* The console theme is dark by design, and hundreds of `dark:` variants
-            across the app key off this class — letting it be toggled off would
-            leave light-mode utilities stranded on a navy background. */}
-        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
+        {/* Night is the default for anyone who has not chosen; the toggle in the
+            top bar writes the choice and next-themes remembers it. */}
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           {children}
         </ThemeProvider>
         <Analytics />

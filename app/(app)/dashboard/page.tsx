@@ -12,7 +12,7 @@ import { formatPKTDate } from '@/lib/utils/dates'
 import { buildReceivablesAging, buildPayablesAging, sumBuckets } from '@/lib/reports/aging'
 import { DashboardPeriodTabs } from './period-tabs'
 import {
-  CHART_COLORS, shortPKR, Panel, MiniStat, TrackBars, AgingCard,
+  CHART_VARS, shortPKR, Panel, MiniStat, TrackBars, AgingCard,
   RevenueChart, DonutChart, FeedRow, OptionTile, ActionTile,
 } from './dash-parts'
 
@@ -228,7 +228,7 @@ export default async function DashboardPage({
   })
   const categoryData = [...catMap.values()]
     .sort((a, b) => b.qty - a.qty)
-    .map(c => ({ label: c.name, value: Math.round(c.qty), color: CHART_COLORS[c.ci % CHART_COLORS.length] }))
+    .map(c => ({ label: c.name, value: Math.round(c.qty), v: CHART_VARS[c.ci % CHART_VARS.length] }))
 
   /* ── Owner: Sales charts ── */
   const lotNameMap = new Map((inventoryData ?? []).map(l => [l.id as string, l.name as string]))
@@ -318,7 +318,7 @@ export default async function DashboardPage({
         </div>
         <Link
           href="/sales/new"
-          className="inline-flex items-center gap-2 text-[13px] font-bold px-4 py-2.5 rounded-xl text-primary-foreground bg-gradient-to-r from-primary to-[hsl(187_92%_52%)] shadow-[0_0_24px_hsl(214_95%_60%/0.45)] hover:opacity-90 transition-opacity"
+          className="inline-flex items-center gap-2 text-[13px] font-bold px-4 py-2.5 rounded-xl text-primary-foreground bg-gradient-to-r from-primary to-brand2 glow-primary hover:opacity-90 transition-opacity"
         >
           <ShoppingBag className="h-4 w-4" /> New Sale
         </Link>
@@ -328,15 +328,15 @@ export default async function DashboardPage({
       {supportCount > 0 && (
         <Link
           href="/support"
-          className="flex items-center gap-3 rounded-xl px-4 py-3 border border-[hsl(38_96%_56%/0.4)] bg-[hsl(38_96%_56%/0.1)] hover:bg-[hsl(38_96%_56%/0.16)] transition-colors"
+          className="flex items-center gap-3 rounded-xl px-4 py-3 border border-warning/40 bg-warning/10 hover:bg-warning/20 transition-colors"
         >
-          <Bell className="h-4 w-4 text-[hsl(38_96%_62%)] shrink-0" />
-          <p className="text-[13px] font-semibold text-[hsl(38_96%_72%)] flex-1">
+          <Bell className="h-4 w-4 text-warning shrink-0" />
+          <p className="text-[13px] font-semibold text-warning flex-1">
             {supportCount === 1
               ? 'You have 1 open support ticket'
               : `You have ${supportCount} open support tickets`}
           </p>
-          <span className="text-[11px] font-bold text-[hsl(38_96%_62%)] shrink-0">View →</span>
+          <span className="text-[11px] font-bold text-warning shrink-0">View →</span>
         </Link>
       )}
 
@@ -370,7 +370,7 @@ export default async function DashboardPage({
         >
           <TrackBars
             data={topProducts}
-            colors={CHART_COLORS}
+            vars={CHART_VARS}
             emptyMsg={isOwner ? 'No sales in this period' : 'Owner access required'}
           />
         </Panel>
@@ -401,7 +401,7 @@ export default async function DashboardPage({
               {transactions.slice(0, 6).map((txn) => (
                 <FeedRow
                   key={`${txn.type}-${txn.id}`}
-                  tone={txn.type === 'Sale' ? '#a3e635' : '#f59e0b'}
+                  v={txn.type === 'Sale' ? '--chart-2' : '--chart-3'}
                   title={txn.party}
                   meta={`${formatPKTDate(txn.date)} · ${txn.type}`}
                   right={formatPKR(txn.amount)}
@@ -418,10 +418,10 @@ export default async function DashboardPage({
           action={
             <div className="flex gap-3 text-[10px] font-semibold text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3b82f6]" />Revenue
+                <span className="h-1.5 w-1.5 rounded-full bg-chart-1" />Revenue
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#a3e635]" />Purchases
+                <span className="h-1.5 w-1.5 rounded-full bg-chart-2" />Purchases
               </span>
             </div>
           }
@@ -451,7 +451,7 @@ export default async function DashboardPage({
         <Panel title="Sales by Party" subtitle={`Top customers · ${periodLabel}`}>
           <TrackBars
             data={topParties}
-            colors={['#a855f7', '#06b6d4', '#ec4899', '#3b82f6', '#a3e635', '#f59e0b', '#22c55e']}
+            vars={['--chart-4', '--chart-5', '--chart-6', '--chart-1', '--chart-2', '--chart-3', '--chart-7']}
             emptyMsg="No sales in this period"
           />
         </Panel>

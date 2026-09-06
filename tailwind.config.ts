@@ -54,6 +54,10 @@ export default {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        // Second brand hue (logo/CTA gradient) and the inset surface used by
+        // stat tiles and chart tracks. Both flip with the theme.
+        brand2: "hsl(var(--brand-2))",
+        tile: "hsl(var(--tile))",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

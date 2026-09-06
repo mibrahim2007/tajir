@@ -7,6 +7,7 @@ import { Bell, MoreVertical, Search, LogOut, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { SidebarContent, type SidebarBaseProps } from "./sidebar";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "tajir:nav-open";
@@ -86,7 +87,7 @@ export function AppShell({
   return (
     <div className="min-h-screen">
       {/* ── Top bar ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 h-14 flex items-center gap-2 px-3 sm:px-4 border-b border-border bg-[hsl(221_54%_8%/0.85)] backdrop-blur-xl print:hidden">
+      <header className="sticky top-0 z-40 h-14 flex items-center gap-2 px-3 sm:px-4 border-b border-border bg-card/85 backdrop-blur-xl print:hidden">
         <button
           onClick={toggle}
           aria-label={open ? "Hide menu" : "Show menu"}
@@ -94,7 +95,7 @@ export function AppShell({
           className={cn(
             "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border transition-all",
             open
-              ? "border-primary/50 bg-accent text-accent-foreground shadow-[0_0_16px_hsl(214_95%_60%/0.35)]"
+              ? "border-primary/50 bg-accent text-accent-foreground glow-primary-sm"
               : "border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-secondary"
           )}
         >
@@ -102,12 +103,12 @@ export function AppShell({
         </button>
 
         <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
-          <span className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary to-[hsl(187_92%_52%)] shadow-[0_0_18px_hsl(214_95%_60%/0.45)]">
+          <span className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0 bg-gradient-to-br from-primary to-brand2 glow-primary">
             <span className="text-primary-foreground text-[13px] font-black">T</span>
           </span>
           <span className="font-extrabold text-[14px] tracking-tight truncate hidden sm:block">
             {nav.tenantName}
-            <span className="text-[hsl(84_74%_55%)]">.</span>
+            <span className="text-success">.</span>
           </span>
         </Link>
 
@@ -120,6 +121,8 @@ export function AppShell({
             <Search className="h-[17px] w-[17px]" />
           </button>
 
+          <ThemeToggle />
+
           <Link
             href="/support"
             className="relative h-9 w-9 rounded-xl flex items-center justify-center border border-border text-muted-foreground hover:text-foreground hover:border-primary/40 hover:bg-secondary transition-all"
@@ -127,7 +130,7 @@ export function AppShell({
           >
             <Bell className="h-[17px] w-[17px]" />
             {supportCount > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-1 leading-none shadow-[0_0_10px_hsl(0_84%_62%/0.7)]">
+              <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] rounded-full bg-destructive text-destructive-foreground text-[9px] font-bold flex items-center justify-center px-1 leading-none glow-danger">
                 {supportCount > 99 ? "99+" : supportCount}
               </span>
             )}
@@ -135,7 +138,7 @@ export function AppShell({
 
           {/* User region — name, email, sign out */}
           <div className="flex items-center gap-2.5 pl-1.5 sm:pl-2.5 sm:ml-1 sm:border-l border-border">
-            <span className="h-9 w-9 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 bg-gradient-to-br from-[hsl(214_95%_60%/0.25)] to-[hsl(84_74%_55%/0.2)] border border-primary/40 text-[hsl(205_100%_80%)]">
+            <span className="h-9 w-9 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 bg-gradient-to-br from-primary/25 to-success/20 border border-primary/40 text-accent-foreground">
               {ini}
             </span>
             <div className="min-w-0 hidden md:block leading-tight">
@@ -161,7 +164,7 @@ export function AppShell({
         onClick={() => setOpen(false)}
         aria-hidden
         className={cn(
-          "fixed inset-0 top-14 z-30 bg-[hsl(222_60%_3%/0.6)] backdrop-blur-[2px] print:hidden",
+          "fixed inset-0 top-14 z-30 bg-foreground/25 backdrop-blur-[2px] print:hidden",
           ready && open ? "opacity-100" : "pointer-events-none opacity-0",
           ready && "transition-opacity duration-200"
         )}
@@ -169,7 +172,7 @@ export function AppShell({
       <aside
         className={cn(
           "fixed left-0 top-14 bottom-0 z-30 w-[264px] border-r border-border print:hidden",
-          "shadow-[8px_0_40px_-12px_hsl(222_80%_2%/0.9)]",
+          "shadow-[8px_0_24px_-12px_hsl(var(--foreground)/0.25)]",
           ready && open ? "translate-x-0" : "-translate-x-full",
           ready && "transition-transform duration-200 ease-out"
         )}

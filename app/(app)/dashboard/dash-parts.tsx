@@ -16,10 +16,20 @@ import { type AgingBuckets } from '@/lib/reports/aging'
  * page looks clickable that isn't.
  */
 
-export const CHART_COLORS = [
-  '#3b82f6', '#a3e635', '#f59e0b', '#a855f7',
-  '#06b6d4', '#ec4899', '#22c55e', '#f97316',
-]
+/*
+ * Series identity is a token, not a hex value. A literal #a3e635 is a bright
+ * lime on navy and an unreadable smear on white, so every chart colour below is
+ * a --chart-* reference that the active theme resolves. `tone()` builds the
+ * same reference at an alpha, for fills and glows.
+ */
+export const CHART_VARS = [
+  '--chart-1', '--chart-2', '--chart-3', '--chart-4',
+  '--chart-5', '--chart-6', '--chart-7', '--chart-8',
+] as const
+
+export function tone(v: string, alpha?: number) {
+  return alpha === undefined ? `hsl(var(${v}))` : `hsl(var(${v}) / ${alpha})`
+}
 
 export function shortPKR(n: number): string {
   if (n >= 1_00_00_000) return `Rs ${(n / 1_00_00_000).toFixed(1)}Cr`
@@ -72,14 +82,14 @@ export function MiniStat({
   className?: string
 }) {
   return (
-    <div className={`rounded-xl border border-border/80 bg-[hsl(220_45%_13%/0.55)] px-3 py-2.5 min-w-0 ${className}`}>
+    <div className={`rounded-xl border border-border/80 bg-tile/60 px-3 py-2.5 min-w-0 ${className}`}>
       <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground truncate">{label}</p>
       <p className="font-mono font-extrabold text-[17px] tracking-tight mt-1.5 leading-none text-foreground truncate">
         {value}
       </p>
       {sub && (
         <p className={`text-[10px] mt-1.5 flex items-center gap-0.5 font-semibold truncate ${
-          up === true ? 'text-[hsl(84_74%_58%)]' : up === false ? 'text-destructive' : 'text-muted-foreground'
+          up === true ? 'text-success' : up === false ? 'text-destructive' : 'text-muted-foreground'
         }`}>
           {up === true && <ArrowUpRight className="h-2.5 w-2.5 shrink-0" />}
           {up === false && <ArrowDownRight className="h-2.5 w-2.5 shrink-0" />}
@@ -100,10 +110,11 @@ export function MiniStat({
  * honest while keeping the same shape on the page.
  */
 export function TrackBars({
-  data, colors, emptyMsg,
+  data, vars, emptyMsg,
 }: {
   data: { label: string; value: number }[]
-  colors: string[]
+  /** Series tokens, cycled across the rows. */
+  vars: readonly string[]
   emptyMsg: string
 }) {
   if (data.length === 0) {
@@ -128,11 +139,11 @@ export function TrackBars({
       <div className="space-y-2">
         {data.map((d, i) => {
           const pct = Math.max((d.value / max) * 100, 3)
-          const color = colors[i % colors.length]
+          const v = vars[i % vars.length]
           return (
             <div key={i} className="grid items-center gap-3" style={{ gridTemplateColumns: '104px 1fr 58px' }}>
               <p className="text-[11px] text-muted-foreground truncate" title={d.label}>{d.label}</p>
-              <div className="relative h-[22px] rounded-lg bg-[hsl(220_40%_16%/0.65)] border border-border/50 overflow-hidden">
+              <div className="relative h-[22px] rounded-lg bg-tile border border-border/50 overflow-hidden">
                 {[25, 50, 75].map((g) => (
                   <span key={g} className="absolute inset-y-0 w-px bg-border/50" style={{ left: `${g}%` }} />
                 ))}
@@ -140,8 +151,8 @@ export function TrackBars({
                   className="absolute inset-y-[3px] left-[3px] rounded-md"
                   style={{
                     width: `calc(${pct}% - 6px)`,
-                    background: `linear-gradient(90deg, ${color}bb, ${color})`,
-                    boxShadow: `0 0 14px ${color}66`,
+                    background: `linear-gradient(90deg, ${tone(v, 0.75)}, ${tone(v)})`,
+                    boxShadow: `0 0 14px ${tone(v, 0.35)}`,
                   }}
                 />
               </div>
@@ -159,10 +170,10 @@ export function TrackBars({
 /* ── Aging ────────────────────────────────────────────────────── */
 
 const AGING_BANDS = [
-  { key: 'bucket0_30',   label: '0–30',  color: '#a3e635' },
-  { key: 'bucket31_60',  label: '31–60', color: '#f59e0b' },
-  { key: 'bucket61_90',  label: '61–90', color: '#f97316' },
-  { key: 'bucket90plus', label: '90+',   color: '#ef4444' },
+  { key: 'bucket0_30',   label: '0–30',  v: '--chart-2' },
+  { key: 'bucket31_60',  label: '31–60', v: '--chart-3' },
+  { key: 'bucket61_90',  label: '61–90', v: '--chart-8' },
+  { key: 'bucket90plus', label: '90+',   v: '--destructive' },
 ] as const
 
 export function AgingCard({ title, href, buckets, emptyMsg }: {
@@ -183,7 +194,7 @@ export function AgingCard({ title, href, buckets, emptyMsg }: {
         <p className="py-6 text-center text-sm text-muted-foreground">{emptyMsg}</p>
       ) : (
         <>
-          <div className="flex h-2.5 rounded-full overflow-hidden mb-4 bg-[hsl(220_40%_16%)]">
+          <div className="flex h-2.5 rounded-full overflow-hidden mb-4 bg-tile">
             {AGING_BANDS.map((b) => {
               const v = buckets[b.key]
               if (v <= 0) return null
@@ -193,8 +204,8 @@ export function AgingCard({ title, href, buckets, emptyMsg }: {
                   title={`${b.label} days · ${formatPKR(v)}`}
                   style={{
                     width: `${(v / buckets.total) * 100}%`,
-                    backgroundColor: b.color,
-                    boxShadow: `0 0 12px ${b.color}77`,
+                    backgroundColor: tone(b.v),
+                    boxShadow: `0 0 12px ${tone(b.v, 0.4)}`,
                   }}
                 />
               )
@@ -205,7 +216,7 @@ export function AgingCard({ title, href, buckets, emptyMsg }: {
             {AGING_BANDS.map((b) => (
               <div key={b.key} className="min-w-0">
                 <p className="text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                  <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: b.color }} />
+                  <span className="h-2 w-2 rounded-sm shrink-0" style={{ backgroundColor: tone(b.v) }} />
                   {b.label}
                 </p>
                 <p className="text-[13px] font-bold font-mono text-foreground mt-1 truncate">
@@ -253,8 +264,8 @@ export function RevenueChart({ months, revenue, purchases }: {
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 170 }} aria-hidden="true">
       <defs>
         <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0.01" />
+          <stop offset="0%" stopColor="hsl(var(--chart-1))" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="hsl(var(--chart-1))" stopOpacity="0.01" />
         </linearGradient>
       </defs>
 
@@ -269,13 +280,13 @@ export function RevenueChart({ months, revenue, purchases }: {
       ))}
 
       <path d={revArea} fill="url(#revGrad)" />
-      <path d={purPts} fill="none" stroke="#a3e635" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
-      <path d={revPts} fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={purPts} fill="none" stroke="hsl(var(--chart-2))" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" opacity="0.95" />
+      <path d={revPts} fill="none" stroke="hsl(var(--chart-1))" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
       {months.map((m, i) => (
         <g key={m}>
-          <circle cx={x(i)} cy={y(purchases[i])} r="3" fill="#a3e635" />
-          <circle cx={x(i)} cy={y(revenue[i])} r="3.5" fill="#3b82f6" stroke="hsl(var(--card))" strokeWidth="1.5" />
+          <circle cx={x(i)} cy={y(purchases[i])} r="3" fill="hsl(var(--chart-2))" />
+          <circle cx={x(i)} cy={y(revenue[i])} r="3.5" fill="hsl(var(--chart-1))" stroke="hsl(var(--card))" strokeWidth="1.5" />
           <text
             x={x(i)} y={H - 6} textAnchor="middle" fontSize="10"
             style={{ fill: 'hsl(var(--muted-foreground))', fontFamily: 'inherit' }}
@@ -290,7 +301,7 @@ export function RevenueChart({ months, revenue, purchases }: {
 
 /* ── Donut ────────────────────────────────────────────────────── */
 
-export function DonutChart({ data }: { data: { label: string; value: number; color: string }[] }) {
+export function DonutChart({ data }: { data: { label: string; value: number; v: string }[] }) {
   const filtered = [...data].filter((d) => d.value > 0).sort((a, b) => b.value - a.value)
   if (filtered.length === 0) {
     return <p className="py-10 text-center text-sm text-muted-foreground">No stock in categories</p>
@@ -306,7 +317,7 @@ export function DonutChart({ data }: { data: { label: string; value: number; col
   if (filtered.length === 1) {
     /* Single segment — render as two semicircles */
     paths.push({
-      color: filtered[0].color,
+      color: tone(filtered[0].v),
       d: [
         `M${f(cx + R)},${f(cy)}`,
         `A${R},${R} 0 0,1 ${f(cx - R)},${f(cy)}`,
@@ -328,7 +339,7 @@ export function DonutChart({ data }: { data: { label: string; value: number; col
       const ix1 = cx + ir * Math.cos(ea),   iy1 = cy + ir * Math.sin(ea)
       const ix2 = cx + ir * Math.cos(angle), iy2 = cy + ir * Math.sin(angle)
       paths.push({
-        color: seg.color,
+        color: tone(seg.v),
         d: `M${f(ox1)},${f(oy1)} A${R},${R} 0 ${lg},1 ${f(ox2)},${f(oy2)} L${f(ix1)},${f(iy1)} A${ir},${ir} 0 ${lg},0 ${f(ix2)},${f(iy2)} Z`,
       })
       angle = ea
@@ -361,7 +372,7 @@ export function DonutChart({ data }: { data: { label: string; value: number; col
           <div key={i} className="flex items-center gap-2 min-w-0">
             <span
               className="h-2.5 w-2.5 rounded-full shrink-0"
-              style={{ backgroundColor: seg.color, boxShadow: `0 0 8px ${seg.color}99` }}
+              style={{ backgroundColor: tone(seg.v), boxShadow: `0 0 8px ${tone(seg.v, 0.5)}` }}
             />
             <span className="text-[11.5px] text-muted-foreground truncate flex-1">{seg.label}</span>
             <span className="text-[11px] font-mono font-semibold text-foreground shrink-0 tabular-nums">
@@ -379,8 +390,9 @@ export function DonutChart({ data }: { data: { label: string; value: number; col
 
 /* ── Activity feed ────────────────────────────────────────────── */
 
-export function FeedRow({ tone, title, meta, right }: {
-  tone: string
+export function FeedRow({ v, title, meta, right }: {
+  /** Series token for the status dot. */
+  v: string
   title: string
   meta: string
   right: string
@@ -389,7 +401,7 @@ export function FeedRow({ tone, title, meta, right }: {
     <div className="flex items-center gap-3 py-2.5 min-w-0">
       <span
         className="h-2 w-2 rounded-full shrink-0"
-        style={{ backgroundColor: tone, boxShadow: `0 0 8px ${tone}` }}
+        style={{ backgroundColor: tone(v), boxShadow: `0 0 8px ${tone(v, 0.6)}` }}
       />
       <div className="min-w-0 flex-1">
         <p className="text-[12.5px] font-semibold text-foreground truncate">{title}</p>
@@ -402,8 +414,8 @@ export function FeedRow({ tone, title, meta, right }: {
 
 /* ── Option tiles ─────────────────────────────────────────────── */
 
-const CHIP_TONES = ['icon-chip', 'icon-chip-lime', 'icon-chip-cyan', 'icon-chip-violet', 'icon-chip-amber'] as const
-const UNDERLINE = ['#3b82f6', '#a3e635', '#06b6d4', '#a855f7', '#f59e0b']
+const CHIP_TONES = ['', 'icon-chip-lime', 'icon-chip-cyan', 'icon-chip-violet', 'icon-chip-amber'] as const
+const UNDERLINE = ['--chart-1', '--chart-2', '--chart-5', '--chart-4', '--chart-3']
 
 /**
  * The icon-above-label option from the reference's feature strip: an outlined
@@ -416,21 +428,21 @@ export function OptionTile({ href, label, icon: Icon, index }: {
   icon: React.ElementType
   index: number
 }) {
-  const tone = CHIP_TONES[index % CHIP_TONES.length]
+  const chip = CHIP_TONES[index % CHIP_TONES.length]
   const rule = UNDERLINE[index % UNDERLINE.length]
 
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center text-center gap-2.5 px-2 py-4 rounded-2xl transition-all hover:bg-[hsl(220_45%_14%/0.6)]"
+      className="group flex flex-col items-center text-center gap-2.5 px-2 py-4 rounded-2xl transition-all hover:bg-secondary/60"
     >
-      <span className={`${tone} h-14 w-14 rounded-full border-2 transition-transform group-hover:scale-105`}>
+      <span className={`icon-chip ${chip} h-14 w-14 rounded-full border-2 transition-transform group-hover:scale-105`}>
         <Icon className="h-6 w-6" />
       </span>
       <span className="text-[12px] font-bold text-foreground leading-tight">{label}</span>
       <span
         className="h-[2px] w-7 rounded-full opacity-70 group-hover:opacity-100 group-hover:w-10 transition-all"
-        style={{ backgroundColor: rule, boxShadow: `0 0 8px ${rule}` }}
+        style={{ backgroundColor: tone(rule), boxShadow: `0 0 8px ${tone(rule, 0.6)}` }}
       />
     </Link>
   )
@@ -443,13 +455,13 @@ export function ActionTile({ href, label, icon: Icon, index }: {
   icon: React.ElementType
   index: number
 }) {
-  const tone = CHIP_TONES[index % CHIP_TONES.length]
+  const chip = CHIP_TONES[index % CHIP_TONES.length]
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center text-center gap-2 px-2 py-3 rounded-xl border border-border/70 bg-[hsl(220_45%_13%/0.45)] transition-all hover:border-primary/40 hover:bg-[hsl(220_45%_16%/0.7)]"
+      className="group flex flex-col items-center text-center gap-2 px-2 py-3 rounded-xl border border-border/70 bg-tile/60 transition-all hover:border-primary/40 hover:bg-secondary"
     >
-      <span className={`${tone} h-9 w-9 rounded-xl transition-transform group-hover:scale-110`}>
+      <span className={`icon-chip ${chip} h-9 w-9 rounded-xl transition-transform group-hover:scale-110`}>
         <Icon className="h-[17px] w-[17px]" />
       </span>
       <span className="text-[10.5px] font-semibold text-muted-foreground group-hover:text-foreground leading-tight transition-colors">
