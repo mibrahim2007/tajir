@@ -72,7 +72,7 @@ export default async function EmployeeLedgerPage({ params }: Props) {
           <h1 className="text-2xl font-extrabold tracking-tight">{employeeRow.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Employee Loan Ledger{employeeRow.designation ? ` · ${employeeRow.designation}` : ''}</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
+        <div className="flex gap-2 flex-wrap justify-end print:hidden">
           <PrintButton />
           <RecordRepaymentForm employeeId={id} today={today} nextSerial={nextRepaymentSerial} banks={banks} loans={loanOptions} />
           <RoleGate allowedRoles={['owner']}>

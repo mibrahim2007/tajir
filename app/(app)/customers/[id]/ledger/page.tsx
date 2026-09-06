@@ -169,7 +169,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
           </div>
           <p className="text-sm text-muted-foreground mt-1">Customer Ledger</p>
         </div>
-        <div className="flex gap-2 flex-wrap justify-end">
+        <div className="flex gap-2 flex-wrap justify-end print:hidden">
           <PrintButton />
           <ExportButton href={`/api/export/customer-ledger/${id}`} label="Export" />
           {runningBalance < 0 && (

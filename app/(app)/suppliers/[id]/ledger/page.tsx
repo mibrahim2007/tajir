@@ -165,7 +165,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
           <h1 className="text-2xl font-extrabold tracking-tight">{supplierRow.name}</h1>
           <p className="text-sm text-muted-foreground mt-1">Supplier Ledger</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap print:hidden">
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
           <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} banks={banks} />

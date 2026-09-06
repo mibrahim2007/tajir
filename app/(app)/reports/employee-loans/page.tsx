@@ -99,7 +99,7 @@ export default async function EmployeeLoansReportPage() {
                       {r.overdue > 0 ? <span className="text-red-600 dark:text-red-400 font-medium">{formatPKR(r.overdue)}</span> : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <Link href={`/employees/${r.id}/ledger`} className="text-xs underline underline-offset-4 text-muted-foreground hover:text-foreground">Ledger</Link>
+                      <Link href={`/employees/${r.id}/ledger`} className="text-xs underline underline-offset-4 text-muted-foreground hover:text-foreground print:hidden">Ledger</Link>
                     </td>
                   </tr>
                 ))}

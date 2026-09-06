@@ -161,7 +161,7 @@ export function PdcRegisterTable({
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-xs text-muted-foreground print:hidden">
         Clearing posts the amount between Post-Dated Cheques (1112) and the cash account.
         Bouncing reverses the original tender, so the party&rsquo;s balance comes back.
       </p>

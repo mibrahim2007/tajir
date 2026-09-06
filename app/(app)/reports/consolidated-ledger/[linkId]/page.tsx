@@ -55,7 +55,7 @@ export default async function ConsolidatedLedgerDetailPage({ params }: Props) {
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Consolidated Ledger</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap print:hidden">
           <PrintButton />
           <ExportButton href={`/api/export/consolidated-ledger/${linkId}`} label="Export CSV" />
         </div>

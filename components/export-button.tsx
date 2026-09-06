@@ -7,7 +7,7 @@ export function ExportButton({ href, label = 'Export Excel' }: { href: string; l
   return (
     <Button
       variant="outline"
-      className="min-h-[44px]"
+      className="min-h-[44px] print:hidden"
       onClick={() => { window.location.href = href }}
     >
       <Download className="h-4 w-4 mr-2" />

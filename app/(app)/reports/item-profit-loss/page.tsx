@@ -163,7 +163,7 @@ export default async function ItemProfitLossPage({ searchParams }: { searchParam
       {/* Toolbar */}
       <div className="print:hidden flex items-center gap-3 px-6 py-4 border-b sticky top-0 bg-background z-10">
         <div className="flex-1">
-          <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground">← Reports</Link>
+          <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground print:hidden">← Reports</Link>
           <h1 className="text-xl font-extrabold tracking-tight mt-0.5">Item Profit & Loss</h1>
         </div>
         <PrintButton />

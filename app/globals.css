@@ -204,6 +204,30 @@
   header, [data-print-hide] {
     display: none !important;
   }
+
+  /*
+   * Only the report itself goes on the paper.
+   *
+   * Printing used to depend on every page remembering to mark its own toolbar
+   * `print:hidden`, and pages kept forgetting — the customer ledger printed its
+   * Export and Record Receipt buttons across the top of the statement. A
+   * control is meaningless on paper by definition, so rather than chase them
+   * page by page, none of them print. Dialog triggers, filter selects, date
+   * inputs and any portalled menu left open are all covered, including on
+   * pages written later that never think about printing.
+   *
+   * Pages still mark their toolbars `print:hidden` where an empty wrapper would
+   * otherwise leave a gap, or where a control is an anchor styled as a button
+   * (`<Button asChild>`) rather than a real <button>.
+   */
+  button,
+  [role="button"],
+  input:not([type="hidden"]),
+  select,
+  textarea,
+  [data-radix-popper-content-wrapper] {
+    display: none !important;
+  }
   body {
     background: white !important;
     background-image: none !important;

@@ -131,7 +131,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
       <div className="min-h-screen bg-background">
         <div className="print:hidden flex items-center gap-3 px-6 py-4 border-b sticky top-0 bg-background z-10">
           <div className="flex-1">
-            <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground">← Reports</Link>
+            <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground print:hidden">← Reports</Link>
             <h1 className="text-xl font-extrabold tracking-tight mt-0.5">Customer P&L</h1>
           </div>
           <PrintButton />
@@ -317,7 +317,7 @@ export default async function CustomerProfitLossPage({ searchParams }: { searchP
     <div className="min-h-screen bg-background">
       <div className="print:hidden flex items-center gap-3 px-6 py-4 border-b sticky top-0 bg-background z-10">
         <div className="flex-1">
-          <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground">← Reports</Link>
+          <Link href="/reports" className="text-xs text-muted-foreground hover:text-foreground print:hidden">← Reports</Link>
           <h1 className="text-xl font-extrabold tracking-tight mt-0.5">Customer Profit & Loss</h1>
         </div>
         <PrintButton />

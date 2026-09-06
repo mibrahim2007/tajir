@@ -29,7 +29,7 @@ export function SubscriptionLockedBanner({ status }: Props) {
 
   return (
     <div
-      className={`w-full px-4 py-2 flex items-center gap-2 text-sm ${
+      className={`w-full px-4 py-2 flex items-center gap-2 text-sm print:hidden ${
         status === 'locked' || status === 'cancelled'
           ? 'bg-destructive text-destructive-foreground'
           : 'bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200'
