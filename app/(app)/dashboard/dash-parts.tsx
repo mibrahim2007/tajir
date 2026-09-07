@@ -459,12 +459,12 @@ export function ActionTile({ href, label, icon: Icon, index }: {
   return (
     <Link
       href={href}
-      className="group flex flex-col items-center text-center gap-2 px-2 py-3 rounded-xl border border-border/70 bg-tile/60 transition-all hover:border-primary/40 hover:bg-secondary"
+      className="group flex flex-col items-center text-center gap-1.5 px-1 py-2.5 rounded-xl border border-border/70 bg-tile/60 transition-all hover:border-primary/40 hover:bg-secondary"
     >
       <span className={`icon-chip ${chip} h-9 w-9 rounded-xl transition-transform group-hover:scale-110`}>
         <Icon className="h-[17px] w-[17px]" />
       </span>
-      <span className="text-[10.5px] font-semibold text-muted-foreground group-hover:text-foreground leading-tight transition-colors">
+      <span className="text-[10px] font-semibold text-muted-foreground group-hover:text-foreground leading-tight transition-colors truncate w-full">
         {label}
       </span>
     </Link>

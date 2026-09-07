@@ -341,6 +341,18 @@ export default async function DashboardPage({
       )}
 
       {/*
+        Actions first. This used to sit at the bottom, under four screens of
+        charts, which put the things people open the dashboard to DO behind
+        everything they might want to read. One dense row keeps it from
+        pushing the numbers off the fold.
+      */}
+      <Panel title="Start here" subtitle="Record a document or jump to a list">
+        <div className="grid grid-cols-4 sm:grid-cols-7 lg:grid-cols-[repeat(13,minmax(0,1fr))] gap-2">
+          {quickActions.map((a, i) => <ActionTile key={a.href} {...a} index={i} />)}
+        </div>
+      </Panel>
+
+      {/*
         First row: the numbers stay a compact cluster on the left instead of a
         full-width band of cards, so the bar chart on the right gets the space
         that actually needs it.
@@ -456,13 +468,6 @@ export default async function DashboardPage({
           />
         </Panel>
       )}
-
-      {/* Quick actions — icon above label */}
-      <Panel title="Quick Actions" subtitle="Common operations">
-        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2.5">
-          {quickActions.map((a, i) => <ActionTile key={a.href} {...a} index={i} />)}
-        </div>
-      </Panel>
 
       {/* Closing strip: vibrant icon on top, label beneath, coloured rule */}
       <div className="panel px-2 py-2">
