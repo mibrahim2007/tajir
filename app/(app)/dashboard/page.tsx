@@ -253,18 +253,18 @@ export default async function DashboardPage({
   const grossMarginPct = mtdSales > 0 ? ((mtdSales - mtdPurchases) / mtdSales) * 100 : 0
 
   const quickActions = [
-    { href: '/sales/new',      label: 'New Sale',     icon: ShoppingBag },
-    { href: '/purchases/new',  label: 'New Purchase', icon: ShoppingCart },
-    { href: '/receipts/new',   label: 'New Receipt',  icon: ArrowDownLeft },
-    { href: '/payments/new',   label: 'New Payment',  icon: ArrowUpRight },
-    { href: '/gatepasses/new', label: 'New Gatepass', icon: ClipboardList },
-    { href: '/expenses/new',   label: 'New Expense',  icon: Receipt },
+    { href: '/sales/new',      label: 'Sale',         icon: ShoppingBag },
+    { href: '/purchases/new',  label: 'Purchase',     icon: ShoppingCart },
+    { href: '/receipts/new',   label: 'Receipt',      icon: ArrowDownLeft },
+    { href: '/payments/new',   label: 'Payment',      icon: ArrowUpRight },
+    { href: '/gatepasses/new', label: 'Gatepass',     icon: ClipboardList },
+    { href: '/expenses/new',   label: 'Expense',      icon: Receipt },
     { href: '/inventory',      label: 'Inventory',    icon: Package },
     { href: '/reports',        label: 'Reports',      icon: BarChart2 },
     { href: '/support',        label: 'Support',      icon: LifeBuoy },
     { href: '/help',           label: 'Help Videos',  icon: Video },
     { href: '/user-guide',     label: 'User Guide',   icon: BookOpen },
-    ...(isOwner ? [{ href: '/vouchers/new', label: 'New Voucher', icon: PenLine }] : []),
+    ...(isOwner ? [{ href: '/vouchers/new', label: 'Voucher', icon: PenLine }] : []),
     ...(isOwner ? [{ href: '/playground', label: 'Demo Playground', icon: FlaskConical }] : []),
   ]
 
@@ -320,7 +320,7 @@ export default async function DashboardPage({
           href="/sales/new"
           className="inline-flex items-center gap-2 text-[13px] font-bold px-4 py-2.5 rounded-xl text-primary-foreground bg-gradient-to-r from-primary to-brand2 glow-primary hover:opacity-90 transition-opacity"
         >
-          <ShoppingBag className="h-4 w-4" /> New Sale
+          <ShoppingBag className="h-4 w-4" /> Sale
         </Link>
       </div>
 
