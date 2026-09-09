@@ -1,10 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Search, Check, Package, ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
+import { focusNextControl } from '@/lib/focus-next'
 
 export type PickerItem = {
   id: string
@@ -38,6 +39,10 @@ export function ItemPickerDialog({
   const [open, setOpen]   = useState(false)
   const [search, setSearch] = useState('')
   const [mode, setMode]   = useState<'list' | 'create'>('list')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // Only a committed value advances the cursor. Escaping or clicking away is a
+  // change of mind, and should hand focus back to the trigger as usual.
+  const advance = useRef(false)
 
   const selected = items.find((i) => i.id === value)
 
@@ -51,6 +56,7 @@ export function ItemPickerDialog({
   function pick(id: string) {
     const item = items.find((i) => i.id === id)
     if (item?.disabled) return
+    advance.current = true
     onSelect(id)
     close()
   }
@@ -62,6 +68,7 @@ export function ItemPickerDialog({
   }
 
   function handleCreated(item: PickerItem) {
+    advance.current = true
     onCreateSuccess?.(item)
     onSelect(item.id)
     close()
@@ -72,6 +79,7 @@ export function ItemPickerDialog({
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => setOpen(true)}
@@ -99,7 +107,24 @@ export function ItemPickerDialog({
       </button>
 
       <Dialog open={open} onOpenChange={(o) => { if (!o) close(); else setOpen(true) }}>
-        <DialogContent className="max-w-lg p-0 gap-0">
+        <DialogContent
+          className="max-w-lg p-0 gap-0"
+          /*
+           * Radix hands focus back to the trigger when the dialog closes. After
+           * a selection that is a step backwards — the operator has finished
+           * with this column — so intercept it and move on to the next field
+           * instead. A frame's delay lets the parent's onSelect re-render land
+           * first: picking a polyester item, for instance, adds two columns
+           * that then become the next field.
+           */
+          onCloseAutoFocus={(e) => {
+            if (!advance.current) return
+            advance.current = false
+            e.preventDefault()
+            const trigger = triggerRef.current
+            requestAnimationFrame(() => focusNextControl(trigger))
+          }}
+        >
           <DialogHeader className="px-4 pt-4 pb-3 border-b">
             <DialogTitle>
               {mode === 'create' && createLabel ? `Create ${createLabel}` : title}

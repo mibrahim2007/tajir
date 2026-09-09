@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Search } from 'lucide-react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { focusNextControl } from '@/lib/focus-next'
 import { filterCheques } from '@/lib/pdc/search'
 import { formatPKR } from '@/lib/utils/currency'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,9 @@ export function ChequePicker({
   const [activeIdx, setActiveIdx] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // Set only on a committed choice, so Escape still returns to the trigger.
+  const advance = useRef(false)
 
   const showSearch = cheques.length >= SEARCH_THRESHOLD
 
@@ -80,6 +84,7 @@ export function ChequePicker({
   }, [activeIdx])
 
   const commit = (key: string) => {
+    advance.current = true
     onValueChange(key)
     setOpen(false)
   }
@@ -93,6 +98,7 @@ export function ChequePicker({
   return (
     <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
@@ -104,7 +110,17 @@ export function ChequePicker({
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg overflow-hidden p-0" showCloseButton={false}>
+        <DialogContent
+          className="max-w-lg overflow-hidden p-0"
+          showCloseButton={false}
+          onCloseAutoFocus={(e) => {
+            if (!advance.current) return
+            advance.current = false
+            e.preventDefault()
+            const trigger = triggerRef.current
+            requestAnimationFrame(() => focusNextControl(trigger))
+          }}
+        >
           <DialogTitle className="sr-only">Choose a cheque</DialogTitle>
 
           {showSearch && (
