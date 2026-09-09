@@ -105,7 +105,7 @@ export function BanksClient({ banks: initial }: { banks: Bank[] }) {
         <Card>
           <CardContent className="pt-6">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="line-table w-full text-sm">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left pb-2 font-medium">Name</th>

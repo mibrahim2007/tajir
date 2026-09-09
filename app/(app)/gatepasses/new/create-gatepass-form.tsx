@@ -195,7 +195,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 ) : (
                   <>
                     <div className="overflow-x-auto -mx-5">
-                      <table className="w-full text-sm">
+                      <table className="line-table w-full text-sm">
                         <thead>
                           <tr className="border-b">
                             <th className="w-8 px-3 py-2 text-left text-xs text-muted-foreground font-medium" />

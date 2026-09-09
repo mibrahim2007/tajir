@@ -159,7 +159,7 @@ export function EditGatepassForm({ id, gpNumber, type, defaultValues, purchaseOr
               </CardHeader>
               <CardContent className="px-5 pb-5">
                 <div className="overflow-x-auto -mx-5">
-                  <table className="w-full text-sm">
+                  <table className="line-table w-full text-sm">
                     <thead>
                       <tr className="border-b">
                         <th className="w-8 px-3 py-2 text-left text-xs text-muted-foreground font-medium" />

@@ -225,6 +225,36 @@
     color: hsl(var(--chip) / 0.95);
   }
 
+  /*
+   * Every data-entry table: sale, purchase, both returns, voucher, gatepass
+   * (new and edit), banks, and the customer/supplier opening balances.
+   *
+   * Each is `w-full` inside an `overflow-x-auto` wrapper. On a phone that is a
+   * trap: `w-full` tells the browser to make the table fit the viewport, so
+   * rather than letting the wrapper scroll it squeezes every column — and the
+   * Qty and Rate inputs collapsed to a few pixels, hiding the number being
+   * typed into them.
+   *
+   * Giving the numeric cells a floor is what makes the wrapper do its job: the
+   * table now exceeds a narrow viewport and scrolls sideways, while the figure
+   * stays readable.
+   *
+   * Matching on the input rather than on a per-cell class keeps every column
+   * covered — including the polyester-only Nos Carton and Weight columns, which
+   * appear on some rows and not others.
+   *
+   * Scoped to narrow viewports on purpose. Disc % asks for only 5rem, so an
+   * unconditional floor would widen the table on a desktop that had no problem
+   * to begin with; above this width the original layout is left untouched.
+   */
+  @media (max-width: 1023px) {
+    .line-table td:has(input[type="number"]) {
+      /* 8rem fits a six-figure rate with decimals plus the number spinner,
+         which eats about a sixth of the field. */
+      min-width: 8rem;
+    }
+  }
+
   /* A hairline rule that fades out at both ends. */
   .rule-glow {
     height: 1px;

@@ -44,7 +44,8 @@ export function CustomerBalanceTable({ customers }: { customers: Customer[] }) {
 
   return (
     <div className="rounded-lg border overflow-hidden">
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="line-table w-full text-sm">
         <thead className="bg-muted/50 border-b">
           <tr>
             <th className="text-left px-4 py-3 font-medium">Customer</th>
@@ -105,6 +106,7 @@ export function CustomerBalanceTable({ customers }: { customers: Customer[] }) {
           ))}
         </tbody>
       </table>
+      </div>
       {error && <p className="text-sm text-destructive px-4 py-2 border-t">{error}</p>}
     </div>
   )
