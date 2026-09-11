@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Sparkles, Search, Lock, Landmark, BookOpen, Video, Layers,
   LifeBuoy, Settings, Building2, UserCog, FlaskConical, UsersRound, Wallet,
   Package, ShoppingCart, ShoppingBag, ClipboardList, ArrowDownLeft, ArrowUpRight,
-  Receipt, PenLine, BarChart2, HandCoins, Banknote, Handshake, Tag, Users, Truck,
+  Receipt, PenLine, BarChart2, HandCoins, Banknote, Handshake, Tag, Users, Truck, Wand2,
   RefreshCcw, Undo2, FileMinus, FilePlus, MapPin, ArrowLeftRight, Coins, Boxes,
 } from 'lucide-react'
 import { type ModuleKey } from './modules'
@@ -189,6 +189,7 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: Settings,
     ownerOnly: true,
     items: [
+      { href: '/settings/setup',            label: 'Setup Wizard',     icon: Wand2 },
       { href: '/settings/business',         label: 'Business',         icon: Building2 },
       { href: '/settings/team',             label: 'Team',             icon: UsersRound },
       { href: '/settings/modules',          label: 'Modules',          icon: Settings },
