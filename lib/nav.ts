@@ -3,7 +3,7 @@ import {
   LifeBuoy, Settings, Building2, UserCog, FlaskConical, UsersRound, Wallet,
   Package, ShoppingCart, ShoppingBag, ClipboardList, ArrowDownLeft, ArrowUpRight,
   Receipt, PenLine, BarChart2, HandCoins, Banknote, Handshake, Tag, Users, Truck, Wand2,
-  RefreshCcw, Undo2, FileMinus, FilePlus, MapPin, ArrowLeftRight, Coins, Boxes,
+  RefreshCcw, Undo2, FileMinus, FilePlus, MapPin, ArrowLeftRight, Coins, Boxes, KeyRound,
 } from 'lucide-react'
 import { type ModuleKey } from './modules'
 
@@ -198,6 +198,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/banks',                     label: 'Banks',            icon: Landmark },
       { href: '/settings/opening-balances', label: 'Opening Balances', icon: Wallet },
       { href: '/settings/period-lock',      label: 'Close the Books',  icon: Lock },
+      { href: '/settings/api-keys',         label: 'API Keys',         icon: KeyRound },
       { href: '/audit',                     label: 'Audit Log',        icon: Search },
       { href: '/playground',                label: 'Demo Playground',  icon: FlaskConical },
     ],

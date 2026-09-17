@@ -51,7 +51,10 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute = pathname.startsWith("/auth");
   // "/i/<token>" = public, tokenized sale-invoice share links (no login required)
-  const isPublicRoute = pathname === "/" || pathname.startsWith("/i/");
+  // "/api/v1/"   = third-party integration API; authenticates itself with a
+  //                bearer API key (lib/api-keys/require-api-key.ts), no cookie
+  const isPublicRoute =
+    pathname === "/" || pathname.startsWith("/i/") || pathname.startsWith("/api/v1/");
 
   const mustChangePassword = (user as { app_metadata?: { must_change_password?: boolean } } | undefined)
     ?.app_metadata?.must_change_password === true;
