@@ -8,6 +8,19 @@ import { formatPKTDateTime } from '@/lib/utils/dates'
 import { ApiKeyForm } from './api-key-form'
 import { ApiKeyTable } from './api-key-table'
 
+// Keep in step with app/api/v1/**.
+const ENDPOINTS = [
+  { path: '/api/v1/customers',                    scope: 'customers:read', filters: 'created_since, limit, offset' },
+  { path: '/api/v1/customers/{id}/ledger',        scope: 'ledger:read',    filters: 'from, to' },
+  { path: '/api/v1/suppliers',                    scope: 'suppliers:read', filters: 'created_since, limit, offset' },
+  { path: '/api/v1/suppliers/{id}/ledger',        scope: 'ledger:read',    filters: 'from, to' },
+  { path: '/api/v1/sales',                        scope: 'sales:read',     filters: 'from, to, customer_id, created_since, limit, offset' },
+  { path: '/api/v1/purchases',                    scope: 'purchases:read', filters: 'from, to, supplier_id, created_since, limit, offset' },
+  { path: '/api/v1/inventory',                    scope: 'inventory:read', filters: 'type, count, fiber, lot, limit, offset' },
+  { path: '/api/v1/reports/receivables-aging',    scope: 'reports:read',   filters: '—' },
+  { path: '/api/v1/reports/payables-aging',       scope: 'reports:read',   filters: '—' },
+]
+
 export default async function ApiKeysPage() {
   const { role, tenantId } = await requireAuth()
   if (role !== 'owner') redirect('/dashboard')
@@ -93,6 +106,31 @@ export default async function ApiKeysPage() {
           </table>
         </div>
       )}
+
+      <div className="mt-6 bg-card rounded-2xl border shadow-sm overflow-hidden">
+        <div className="px-4 py-3 border-b">
+          <p className="font-medium">What the other application can call</p>
+          <p className="text-xs text-muted-foreground">Give this list to whoever is building the integration. Each needs the scope shown.</p>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="text-left px-4 py-2">Endpoint</th>
+              <th className="text-left px-4 py-2">Scope</th>
+              <th className="text-left px-4 py-2 hidden sm:table-cell">Filters</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ENDPOINTS.map((e) => (
+              <tr key={e.path} className="border-t">
+                <td className="px-4 py-2 font-mono text-xs break-all">GET {e.path}</td>
+                <td className="px-4 py-2 font-mono text-xs whitespace-nowrap">{e.scope}</td>
+                <td className="px-4 py-2 font-mono text-xs text-muted-foreground hidden sm:table-cell">{e.filters}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <div className="mt-6 rounded-lg border bg-muted/30 px-4 py-3 text-sm space-y-2">
         <p className="font-medium">How the other application uses a key</p>
