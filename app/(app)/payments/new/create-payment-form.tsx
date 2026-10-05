@@ -132,7 +132,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -142,79 +142,52 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-4">
 
-                {nextSerial && !isEdit && (
-                  <div className="space-y-1">
-                    <Label>Serial No.</Label>
-                    <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                    <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-                  </div>
-                )}
-
-                {/* Supplier */}
-                <div className="space-y-1">
-                  <Label>Supplier <span className="text-destructive">*</span></Label>
-                  {isEdit ? (
-                    <Input value={selectedSupplier?.name ?? '—'} disabled readOnly className="min-h-[44px]" />
-                  ) : (
-                    <Controller
-                      control={form.control}
-                      name="supplierId"
-                      render={({ field, fieldState }) => (
-                        <>
-                          <ItemPickerDialog
-                            items={supplierPickerItems}
-                            value={field.value}
-                            onSelect={field.onChange}
-                            placeholder="Select supplier…"
-                            title="Select Supplier"
-                            createLabel="New Supplier"
-                            onCreateSuccess={(item) => setSupplierFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
-                            quickCreate={(onSuccess, onCancel) => (
-                              <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
-                            )}
-                          />
-                          {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
-                        </>
-                      )}
-                    />
-                  )}
-                </div>
-
-                {/* Outstanding reference */}
-                {selectedSupplier && !isEdit && (
-                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Outstanding balance</span>
-                      <span className={`font-semibold tabular-nums ${selectedSupplier.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatPKR(selectedSupplier.outstanding)}
-                      </span>
+                {/* Serial · Supplier · Date · Currency share one row on wide screens. */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                  {nextSerial && !isEdit && (
+                    <div className="space-y-1 md:col-span-3">
+                      <Label>Serial No.</Label>
+                      <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                      <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
                     </div>
-                    {supplierPurchases.length > 0 && (
-                      <>
-                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
-                        <div className="space-y-1">
-                          {supplierPurchases.map((p) => (
-                            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{formatPKTDate(p.date + 'T00:00:00')} · {p.itemName} × {p.qty}</span>
-                              <span className="tabular-nums">
-                                {formatPKR(p.pkrEquivalent - p.advancePaid)}
-                                {p.advancePaid > 0 && <span className="ml-1 text-green-600">(adv. {formatPKR(p.advancePaid)})</span>}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                  )}
+
+                  {/* Supplier */}
+                  <div className={`space-y-1 ${nextSerial && !isEdit ? 'md:col-span-5' : 'md:col-span-8'}`}>
+                    <Label>Supplier <span className="text-destructive">*</span></Label>
+                    {isEdit ? (
+                      <Input value={selectedSupplier?.name ?? '—'} disabled readOnly className="min-h-[44px]" />
+                    ) : (
+                      <Controller
+                        control={form.control}
+                        name="supplierId"
+                        render={({ field, fieldState }) => (
+                          <>
+                            <ItemPickerDialog
+                              items={supplierPickerItems}
+                              value={field.value}
+                              onSelect={field.onChange}
+                              placeholder="Select supplier…"
+                              title="Select Supplier"
+                              createLabel="New Supplier"
+                              onCreateSuccess={(item) => setSupplierFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
+                              quickCreate={(onSuccess, onCancel) => (
+                                <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
+                              )}
+                            />
+                            {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
+                          </>
+                        )}
+                      />
                     )}
                   </div>
-                )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:col-span-2">
                     <Label>Date <span className="text-destructive">*</span></Label>
                     <Input type="date" {...form.register('date')} className="min-h-[44px]" />
                     {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:col-span-2">
                     <Label>Currency</Label>
                     <Controller
                       control={form.control}
@@ -232,8 +205,36 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
                   </div>
                 </div>
 
+                {/* Outstanding reference */}
+                {selectedSupplier && !isEdit && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Outstanding balance</span>
+                      <span className={`font-semibold tabular-nums ${selectedSupplier.outstanding > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatPKR(selectedSupplier.outstanding)}
+                      </span>
+                    </div>
+                    {supplierPurchases.length > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-8 gap-y-1">
+                          {supplierPurchases.map((p) => (
+                            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatPKTDate(p.date + 'T00:00:00')} · {p.itemName} × {p.qty}</span>
+                              <span className="tabular-nums">
+                                {formatPKR(p.pkrEquivalent - p.advancePaid)}
+                                {p.advancePaid > 0 && <span className="ml-1 text-green-600">(adv. {formatPKR(p.advancePaid)})</span>}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {watchedCurrency === 'USD' && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:max-w-xs">
                     <Label>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></Label>
                     <Input type="number" step="0.01" min="1" {...form.register('exchangeRate', { valueAsNumber: true })} className="min-h-[44px]" />
                   </div>
@@ -241,7 +242,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
 
                 <Separator />
 
-                <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} />
+                <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} layout="wide" />
 
                 <div className="space-y-1">
                   <Label>Note</Label>
@@ -252,7 +253,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
           </div>
 
           {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
-          <div className="lg:sticky lg:top-6 space-y-4">
+          <div className="xl:sticky xl:top-6 space-y-4">
             {selectedSupplier && !isEdit && (
               <PartyTransactionHistory items={supplierHistory} />
             )}

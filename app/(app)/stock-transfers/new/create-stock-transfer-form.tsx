@@ -108,9 +108,10 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
           <CardHeader className="pb-4 pt-5 px-5">
             <CardTitle className="text-base">Transfer Details</CardTitle>
           </CardHeader>
-          <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+          {/* Date · From · To, then Stock Item · Quantity share rows on wide screens. */}
+          <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-4">
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="date" {...field} /></FormControl>
                 <FormMessage />
@@ -118,7 +119,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="fromLocationId" render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-4">
                 <FormLabel>From Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={handleFromChange}>
                   <FormControl>
@@ -133,7 +134,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="toLocationId" render={({ field }) => (
-              <FormItem>
+              <FormItem className="md:col-span-4">
                 <FormLabel>To Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>
@@ -148,7 +149,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="stockItemId" render={({ field }) => (
-              <FormItem className="sm:col-span-2">
+              <FormItem className="md:col-span-9">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <ItemPickerDialog
@@ -172,7 +173,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="quantity" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-3">
                 <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <NumericInput min={0.001} step="0.001" placeholder=""
@@ -183,7 +184,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem className="sm:col-span-2">
+              <FormItem className="md:col-span-12">
                 <FormLabel>Notes</FormLabel>
                 <FormControl><Textarea placeholder="Optional notes…" rows={2} {...field} /></FormControl>
                 <FormMessage />

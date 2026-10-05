@@ -104,7 +104,7 @@ export default async function NewPaymentPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <PeriodLockBanner className="mb-4" />
       <PendingChequesPanel direction="out" className="mb-4" />
       <div className="mb-6">

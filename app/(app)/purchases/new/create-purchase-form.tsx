@@ -248,79 +248,80 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
               <CardHeader className="pb-3 pt-5 px-5">
                 <CardTitle className="text-base">Purchase Details</CardTitle>
               </CardHeader>
-              <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+              <CardContent className="px-5 pb-5 space-y-4">
 
-                <FormField control={form.control} name="supplierId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
-                    <FormControl>
-                      <ItemPickerDialog
-                        items={supplierPickerItems}
-                        value={field.value}
-                        onSelect={field.onChange}
-                        placeholder="Select supplier…"
-                        title="Select Supplier"
-                        createLabel="New Supplier"
-                        onCreateSuccess={(item) => setSupplierList((prev) => [...prev, item])}
-                        quickCreate={(onSuccess, onCancel) => (
-                          <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
-                        )}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="supplierInvoiceNo" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supplier Invoice No.</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Bill no. printed on the supplier's invoice"
-                        className="min-h-[44px]"
-                        {...field}
-                        value={field.value ?? ''}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <FormField control={form.control} name="locationId" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Receive At <span className="text-destructive">*</span></FormLabel>
-                    <Select
-                      value={field.value || ''}
-                      onValueChange={field.onChange}
-                      disabled={locations.length === 0}
-                    >
+                {/* Supplier · Invoice No. · Date · Receive At · Currency share one row on wide screens. */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                  <FormField control={form.control} name="supplierId" render={({ field }) => (
+                    <FormItem className="md:col-span-4">
+                      <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <SelectTrigger className="min-h-[44px]">
-                          <SelectValue placeholder={locations.length === 0 ? 'No locations defined' : 'Select location…'} />
-                        </SelectTrigger>
+                        <ItemPickerDialog
+                          items={supplierPickerItems}
+                          value={field.value}
+                          onSelect={field.onChange}
+                          placeholder="Select supplier…"
+                          title="Select Supplier"
+                          createLabel="New Supplier"
+                          onCreateSuccess={(item) => setSupplierList((prev) => [...prev, item])}
+                          quickCreate={(onSuccess, onCancel) => (
+                            <QuickCreateSupplier onSuccess={onSuccess} onCancel={onCancel} />
+                          )}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {locations.length === 0 && (
-                      <p className="text-xs text-muted-foreground">Add locations in Settings → Locations</p>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )} />
+                      <FormMessage />
+                    </FormItem>
+                  )} />
 
-                <div className="flex gap-2 items-end">
+                  <FormField control={form.control} name="supplierInvoiceNo" render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Supplier Invoice No.</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Bill no. printed on the supplier's invoice"
+                          className="min-h-[44px]"
+                          {...field}
+                          value={field.value ?? ''}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="date" render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
+                  <FormField control={form.control} name="locationId" render={({ field }) => (
+                    <FormItem className="md:col-span-2">
+                      <FormLabel>Receive At <span className="text-destructive">*</span></FormLabel>
+                      <Select
+                        value={field.value || ''}
+                        onValueChange={field.onChange}
+                        disabled={locations.length === 0}
+                      >
+                        <FormControl>
+                          <SelectTrigger className="min-h-[44px]">
+                            <SelectValue placeholder={locations.length === 0 ? 'No locations defined' : 'Select location…'} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {locations.length === 0 && (
+                        <p className="text-xs text-muted-foreground">Add locations in Settings → Locations</p>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+
                   <FormField control={form.control} name="currencyCode" render={({ field }) => (
-                    <FormItem className="w-28">
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
@@ -333,23 +334,24 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                       </Select>
                     </FormItem>
                   )} />
-                  {watchedCurrency === 'USD' && (
-                    <FormField control={form.control} name="exchangeRate" render={() => (
-                      <FormItem className="flex-1">
-                        <FormLabel>Rate (1 USD = ? PKR) <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" min="1" placeholder="e.g. 278.50"
-                            {...form.register('exchangeRate', { valueAsNumber: true })} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                  )}
                 </div>
 
-                {/* Agent + commission preview, spanning both grid columns.
-                    Renders nothing when no agents are enrolled. */}
-                <div className="sm:col-span-2">
+                {watchedCurrency === 'USD' && (
+                  <FormField control={form.control} name="exchangeRate" render={() => (
+                    <FormItem className="md:max-w-xs">
+                      <FormLabel>Rate (1 USD = ? PKR) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="1" placeholder="e.g. 278.50"
+                          {...form.register('exchangeRate', { valueAsNumber: true })} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+
+                {/* Agent + commission preview, capped so it doesn't stretch across
+                    the full width. Renders nothing when no agents are enrolled. */}
+                <div className="md:max-w-xl">
                   <AgentCommissionField
                     agents={agents}
                     side="purchase"
@@ -401,7 +403,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                             <React.Fragment key={field.id}>
                             <tr className="align-middle">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
-                              <td className="px-3 py-3 min-w-[180px]">
+                              <td className="px-3 py-3 min-w-[260px]">
                                 <Controller
                                   control={form.control}
                                   name={`lines.${index}.stockItemId`}

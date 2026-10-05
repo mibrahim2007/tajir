@@ -27,7 +27,7 @@ export default async function NewCreditNotePage() {
   }))
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Credit Note</h1>

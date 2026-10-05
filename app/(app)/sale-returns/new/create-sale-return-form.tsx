@@ -183,7 +183,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -193,8 +193,10 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
               <CardHeader className="pb-3 pt-5 px-5">
                 <CardTitle className="text-base">Return Details</CardTitle>
               </CardHeader>
-              <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
-                <FormItem className="sm:col-span-2">
+              {/* Sale Order · Customer · Date share one row on wide screens; Reason ·
+                  Location · Currency fill the second. */}
+              <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <FormItem className="md:col-span-4">
                   <FormLabel>Against Sale Order (optional)</FormLabel>
                   <div className="flex gap-2 items-center">
                     <div className="flex-1">
@@ -221,7 +223,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                 </FormItem>
 
                 <FormField control={form.control} name="customerId" render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
+                  <FormItem className="md:col-span-5">
                     <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <ItemPickerDialog
@@ -242,7 +244,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                 )} />
 
                 <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel>Return Date <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input type="date" {...field} /></FormControl>
                     <FormMessage />
@@ -250,7 +252,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                 )} />
 
                 <FormField control={form.control} name="reason" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className={locations.length > 0 ? 'md:col-span-5' : 'md:col-span-8'}>
                     <FormLabel>Reason</FormLabel>
                     <FormControl><Input placeholder="e.g. Damaged, wrong item…" {...field} className="min-h-[44px]" /></FormControl>
                     <FormMessage />
@@ -259,7 +261,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
 
                 {locations.length > 0 && (
                   <FormField control={form.control} name="locationId" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-3">
                       <FormLabel>Location</FormLabel>
                       <Select
                         value={field.value || '_none_'}
@@ -278,7 +280,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                   )} />
                 )}
 
-                <div className="flex gap-2 items-end">
+                <div className="flex gap-2 items-end md:col-span-4">
                   <FormField control={form.control} name="currencyCode" render={({ field }) => (
                     <FormItem className="w-28">
                       <FormLabel>Currency</FormLabel>
@@ -324,7 +326,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Qty</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-20">Disc %</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-24">Disc %</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Amount</th>
                           <th className="w-10" />
                         </tr>
@@ -338,7 +340,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                             <React.Fragment key={field.id}>
                             <tr className="align-top">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
-                              <td className="px-3 py-2 min-w-[180px]">
+                              <td className="px-3 py-2 min-w-[240px]">
                                 <Controller
                                   control={form.control}
                                   name={`lines.${index}.stockItemId`}
@@ -416,7 +418,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
           </div>
 
           {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6 space-y-4">
+          <div className="xl:sticky xl:top-6 space-y-4">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Return Summary</p>

@@ -255,7 +255,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
           </div>
 
           {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
-          <div className="lg:sticky lg:top-6 space-y-4">
+          <div className="xl:sticky xl:top-6 space-y-4">
             {selectedCustomer && !isEdit && (
               <PartyTransactionHistory items={customerHistory} />
             )}

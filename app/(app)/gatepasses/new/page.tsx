@@ -76,7 +76,7 @@ export default async function NewGatepassPage() {
     .filter(o => o.balance > 0)
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Gatepass</h1>
         <p className="text-sm text-muted-foreground mt-1">Select orders with pending balance to receive or dispatch.</p>

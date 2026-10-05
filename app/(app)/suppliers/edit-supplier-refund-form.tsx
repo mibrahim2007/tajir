@@ -80,18 +80,18 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
         <Card>
           <CardHeader className="pb-3 pt-5 px-5"><CardTitle className="text-base">Refund Details</CardTitle></CardHeader>
           <CardContent className="px-5 pb-5 space-y-4">
-            <div className="space-y-1">
-              <Label>Supplier</Label>
-              <Input value={supplierName} disabled readOnly className="min-h-[44px]" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+            {/* Supplier · Date · Currency share one row on wide screens. */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              <div className="space-y-1 md:col-span-6">
+                <Label>Supplier</Label>
+                <Input value={supplierName} disabled readOnly className="min-h-[44px]" />
+              </div>
+              <div className="space-y-1 md:col-span-3">
                 <Label>Date <span className="text-destructive">*</span></Label>
                 <Input type="date" {...form.register('date')} className="min-h-[44px]" />
                 {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-3">
                 <Label>Currency</Label>
                 <Controller control={form.control} name="currencyCode" render={({ field }) => (
                   <Select value={field.value} onValueChange={field.onChange}>
@@ -106,7 +106,7 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
             </div>
 
             {watchedCurrency === 'USD' && (
-              <div className="space-y-1">
+              <div className="space-y-1 md:max-w-xs">
                 <Label>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></Label>
                 <Input type="number" step="0.01" min="1" {...form.register('exchangeRate', { valueAsNumber: true })} className="min-h-[44px]" />
               </div>
@@ -114,7 +114,7 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
 
             <Separator />
 
-            <TenderLinesField banks={banks} currency={watchedCurrency} />
+            <TenderLinesField banks={banks} currency={watchedCurrency} layout="wide" />
 
             <div className="space-y-1">
               <Label>Notes</Label>

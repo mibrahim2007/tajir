@@ -50,6 +50,16 @@ type Props = {
 
 const TYPE_ORDER = ['asset', 'liability', 'equity', 'revenue', 'expense']
 
+// Journal-line columns: Account | Description | Debit | Credit | remove.
+// minmax(0,…) lets the text columns shrink so a long account name never
+// pushes the grid past the card. Below lg each line stacks as its own card.
+const LINE_COLS = 'lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.6fr)_170px_170px_36px]'
+
+// Per-field label shown only while lines stack (the heading row is hidden).
+function CellLabel({ children }: { children: React.ReactNode }) {
+  return <span className="lg:hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{children}</span>
+}
+
 export function CreateVoucherForm({ today, accounts, banks }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -100,7 +110,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -110,9 +120,10 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
               <CardHeader className="pb-3 pt-5 px-5">
                 <CardTitle className="text-base">Voucher Details</CardTitle>
               </CardHeader>
-              <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+              {/* Date · Reference · Bank share one row on wide screens; Narration runs full width. */}
+              <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                 <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -120,7 +131,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                 )} />
 
                 <FormField control={form.control} name="reference" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className={banks.length > 0 ? 'md:col-span-4' : 'md:col-span-9'}>
                     <FormLabel>Reference</FormLabel>
                     <FormControl><Input placeholder="Cheque no., bill no.…" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -129,7 +140,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
 
                 {banks.length > 0 && (
                   <FormField control={form.control} name="bankId" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-5">
                       <FormLabel>Bank (optional)</FormLabel>
                       <Select onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)} value={field.value || '__none__'}>
                         <FormControl>
@@ -148,7 +159,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                 )}
 
                 <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
+                  <FormItem className="md:col-span-12">
                     <FormLabel>Narration <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input placeholder="Being…" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -169,102 +180,103 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                 </div>
               </CardHeader>
               <CardContent className="px-5 pb-5">
-                <div className="rounded-lg border overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="line-table w-full text-sm">
-                      <thead className="bg-muted/50 border-b">
-                        <tr>
-                          <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Account</th>
-                          <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Description</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Debit</th>
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Credit</th>
-                          <th className="px-2 py-2.5 w-10" />
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {fields.map((field, index) => (
-                          <tr key={field.id}>
-                            <td className="px-2 py-1.5 min-w-[180px]">
-                              <FormField control={form.control} name={`lines.${index}.accountId`} render={({ field: f, fieldState }) => (
-                                <div>
-                                  <Select onValueChange={f.onChange} value={f.value}>
-                                    <SelectTrigger className={`min-h-[40px] text-xs ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}>
-                                      <SelectValue placeholder="Select account… *" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {grouped.map((g) => (
-                                        <div key={g.type}>
-                                          <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
-                                          {g.items.map((a) => (
-                                            <SelectItem key={a.id} value={a.id} className="text-xs">
-                                              <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
-                                            </SelectItem>
-                                          ))}
-                                        </div>
+                <div className="lg:rounded-lg lg:border lg:overflow-hidden">
+                  {/* Column headings — hidden while lines stack */}
+                  <div className={`hidden lg:grid ${LINE_COLS} gap-2 items-center bg-muted/50 border-b px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground`}>
+                    <span>Account</span>
+                    <span>Description</span>
+                    <span className="text-right">Debit</span>
+                    <span className="text-right">Credit</span>
+                    <span />
+                  </div>
+
+                  <div className="space-y-3 lg:space-y-0 lg:divide-y">
+                    {fields.map((field, index) => (
+                      <div key={field.id} className={`grid grid-cols-2 gap-2 rounded-lg border p-3 lg:rounded-none lg:border-0 lg:px-3 lg:py-1.5 lg:items-start ${LINE_COLS}`}>
+                        <div className="col-span-2 lg:col-span-1 space-y-1">
+                          <CellLabel>Account</CellLabel>
+                          <FormField control={form.control} name={`lines.${index}.accountId`} render={({ field: f, fieldState }) => (
+                            <div>
+                              <Select onValueChange={f.onChange} value={f.value}>
+                                <SelectTrigger className={`min-h-[40px] text-xs ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}>
+                                  <SelectValue placeholder="Select account… *" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {grouped.map((g) => (
+                                    <div key={g.type}>
+                                      <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
+                                      {g.items.map((a) => (
+                                        <SelectItem key={a.id} value={a.id} className="text-xs">
+                                          <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
+                                        </SelectItem>
                                       ))}
-                                    </SelectContent>
-                                  </Select>
-                                  {fieldState.error && (
-                                    <p className="text-xs text-destructive mt-0.5">{fieldState.error.message}</p>
-                                  )}
-                                </div>
-                              )} />
-                            </td>
-                            <td className="px-2 py-1.5 min-w-[140px]">
-                              <Input placeholder="Details…" className="min-h-[40px] text-xs"
-                                {...form.register(`lines.${index}.description`)} />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Input type="number" step="0.01" min="0"
-                                className={`min-h-[40px] text-right tabular-nums text-xs ${form.formState.errors.lines?.[index]?.debit ? 'border-destructive' : ''}`}
-                                {...form.register(`lines.${index}.debit`, {
-                                  valueAsNumber: true,
-                                  onChange: (e) => {
-                                    if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.credit`, 0)
-                                  },
-                                })}
-                              />
-                              {form.formState.errors.lines?.[index]?.debit && (
-                                <p className="text-xs text-destructive mt-0.5 whitespace-nowrap">
-                                  {form.formState.errors.lines[index].debit.message}
-                                </p>
+                                    </div>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {fieldState.error && (
+                                <p className="text-xs text-destructive mt-0.5">{fieldState.error.message}</p>
                               )}
-                            </td>
-                            <td className="px-2 py-1.5">
-                              <Input type="number" step="0.01" min="0"
-                                className="min-h-[40px] text-right tabular-nums text-xs"
-                                {...form.register(`lines.${index}.credit`, {
-                                  valueAsNumber: true,
-                                  onChange: (e) => {
-                                    if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.debit`, 0)
-                                  },
-                                })}
-                              />
-                            </td>
-                            <td className="px-2 py-1.5">
-                              {fields.length > 2 && (
-                                <button type="button" onClick={() => remove(index)}
-                                  className="text-muted-foreground hover:text-destructive text-lg leading-none px-1">
-                                  ×
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="border-t bg-muted/30">
-                        <tr>
-                          <td className="px-3 py-2 font-semibold text-xs" colSpan={2}>Total</td>
-                          <td className={`px-3 py-2 text-right font-semibold tabular-nums text-xs ${!isBalanced && totalDebit > 0 ? 'text-destructive' : ''}`}>
-                            {fmt(totalDebit)}
-                          </td>
-                          <td className={`px-3 py-2 text-right font-semibold tabular-nums text-xs ${!isBalanced && totalCredit > 0 ? 'text-destructive' : ''}`}>
-                            {fmt(totalCredit)}
-                          </td>
-                          <td />
-                        </tr>
-                      </tfoot>
-                    </table>
+                            </div>
+                          )} />
+                        </div>
+                        <div className="col-span-2 lg:col-span-1 space-y-1">
+                          <CellLabel>Description</CellLabel>
+                          <Input placeholder="Details…" className="min-h-[40px] text-xs"
+                            {...form.register(`lines.${index}.description`)} />
+                        </div>
+                        <div className="space-y-1">
+                          <CellLabel>Debit</CellLabel>
+                          <Input type="number" step="0.01" min="0"
+                            className={`min-h-[40px] text-right tabular-nums text-xs ${form.formState.errors.lines?.[index]?.debit ? 'border-destructive' : ''}`}
+                            {...form.register(`lines.${index}.debit`, {
+                              valueAsNumber: true,
+                              onChange: (e) => {
+                                if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.credit`, 0)
+                              },
+                            })}
+                          />
+                          {form.formState.errors.lines?.[index]?.debit && (
+                            <p className="text-xs text-destructive mt-0.5 whitespace-nowrap">
+                              {form.formState.errors.lines[index].debit.message}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1">
+                          <CellLabel>Credit</CellLabel>
+                          <Input type="number" step="0.01" min="0"
+                            className="min-h-[40px] text-right tabular-nums text-xs"
+                            {...form.register(`lines.${index}.credit`, {
+                              valueAsNumber: true,
+                              onChange: (e) => {
+                                if (parseFloat(e.target.value) > 0) form.setValue(`lines.${index}.debit`, 0)
+                              },
+                            })}
+                          />
+                        </div>
+                        {/* Remove — the cell collapses on a stacked line that has no button */}
+                        <div className={`col-span-2 lg:col-span-1 items-center justify-end lg:justify-center lg:min-h-[40px] ${fields.length > 2 ? 'flex' : 'hidden lg:flex'}`}>
+                          {fields.length > 2 && (
+                            <button type="button" onClick={() => remove(index)}
+                              className="text-muted-foreground hover:text-destructive text-lg leading-none px-1">
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Totals */}
+                  <div className={`mt-3 grid grid-cols-2 gap-2 rounded-lg border bg-muted/30 px-3 py-2 text-xs lg:mt-0 lg:rounded-none lg:border-0 lg:border-t ${LINE_COLS}`}>
+                    <span className="col-span-2 font-semibold">Total</span>
+                    <span className={`text-right font-semibold tabular-nums ${!isBalanced && totalDebit > 0 ? 'text-destructive' : ''}`}>
+                      <CellLabel>Dr </CellLabel>{fmt(totalDebit)}
+                    </span>
+                    <span className={`text-right font-semibold tabular-nums ${!isBalanced && totalCredit > 0 ? 'text-destructive' : ''}`}>
+                      <CellLabel>Cr </CellLabel>{fmt(totalCredit)}
+                    </span>
+                    <span className="hidden lg:block" />
                   </div>
                 </div>
                 {totalDebit > 0 && !isBalanced && (
@@ -277,7 +289,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
           </div>
 
           {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6">
+          <div className="xl:sticky xl:top-6">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Voucher Summary</p>

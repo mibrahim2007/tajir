@@ -97,7 +97,7 @@ export default async function EditGatepassPage({ params }: { params: Promise<{ i
   const allSalesOrders    = salesOrders.filter(o => o.balance > 0 || existingOrderIds.has(o.id))
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">
           Edit Gatepass <span className="text-muted-foreground font-mono text-lg">{gatepass.gatepass_number}</span>

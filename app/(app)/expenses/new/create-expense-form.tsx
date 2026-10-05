@@ -94,7 +94,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
         {/* ── LEFT COLUMN ── */}
         <div className="space-y-5">
@@ -109,94 +109,97 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
             <CardHeader className="pb-3 pt-5 px-5">
               <CardTitle className="text-base">Expense Details</CardTitle>
             </CardHeader>
-            <CardContent className="px-5 pb-5 space-y-4">
+            <CardContent className="px-5 pb-5">
 
-              {/* Expense Account */}
-              <div className="space-y-1">
-                <Label>Expense Account <span className="text-destructive">*</span></Label>
-                <Controller
-                  control={form.control}
-                  name="expenseAccountId"
-                  render={({ field, fieldState }) => (
-                    <>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger className="min-h-[44px]">
-                          <SelectValue placeholder="Select account…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {grouped.map((g) => (
-                            <div key={g.label}>
-                              <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
-                              {g.items.map((a) => (
-                                <SelectItem key={a.id} value={a.id} className="text-xs">
-                                  <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
-                                </SelectItem>
-                              ))}
-                            </div>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
-                    </>
-                  )}
-                />
-              </div>
+              {/* Account · Description, then Amount · Date · Bank share rows on
+                  wide screens. With no banks set up, Note moves up beside Date. */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
-              {/* Description */}
-              <div className="space-y-1">
-                <Label>Description <span className="text-destructive">*</span></Label>
-                <Input placeholder="e.g. Office rent, Electricity bill…" {...form.register('description')} className="min-h-[44px]" />
-                {form.formState.errors.description && <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>}
-              </div>
+                {/* Expense Account */}
+                <div className="space-y-1 md:col-span-5">
+                  <Label>Expense Account <span className="text-destructive">*</span></Label>
+                  <Controller
+                    control={form.control}
+                    name="expenseAccountId"
+                    render={({ field, fieldState }) => (
+                      <>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <SelectTrigger className="min-h-[44px]">
+                            <SelectValue placeholder="Select account…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {grouped.map((g) => (
+                              <div key={g.label}>
+                                <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase tracking-wide">{g.label}</div>
+                                {g.items.map((a) => (
+                                  <SelectItem key={a.id} value={a.id} className="text-xs">
+                                    <span className="font-mono text-muted-foreground mr-2">{a.code}</span>{a.name}
+                                  </SelectItem>
+                                ))}
+                              </div>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
+                      </>
+                    )}
+                  />
+                </div>
 
-              {/* Amount + Date */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
+                {/* Description */}
+                <div className="space-y-1 md:col-span-7">
+                  <Label>Description <span className="text-destructive">*</span></Label>
+                  <Input placeholder="e.g. Office rent, Electricity bill…" {...form.register('description')} className="min-h-[44px]" />
+                  {form.formState.errors.description && <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>}
+                </div>
+
+                {/* Amount + Date */}
+                <div className="space-y-1 md:col-span-3">
                   <Label>Amount (PKR) <span className="text-destructive">*</span></Label>
                   <Input type="number" step="0.01" min="0" placeholder="0.00"
                     {...form.register('amount', { valueAsNumber: true })} className="min-h-[44px]" />
                   {form.formState.errors.amount && <p className="text-xs text-destructive">{form.formState.errors.amount.message}</p>}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 md:col-span-3">
                   <Label>Date <span className="text-destructive">*</span></Label>
                   <Input type="date" {...form.register('date')} className="min-h-[44px]" />
                   {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                 </div>
-              </div>
 
-              {/* Note */}
-              <div className="space-y-1">
-                <Label>Note (optional)</Label>
-                <Input placeholder="e.g. Payee name, invoice number…" {...form.register('note')} className="min-h-[44px]" />
-              </div>
+                {/* Bank */}
+                {banks.length > 0 && (
+                  <div className="space-y-1 md:col-span-6">
+                    <Label>Bank (optional)</Label>
+                    <Controller
+                      control={form.control}
+                      name="bankId"
+                      render={({ field }) => (
+                        <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
+                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Cash / no bank</SelectItem>
+                            {banks.map((b) => (
+                              <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+                )}
 
-              {/* Bank */}
-              {banks.length > 0 && (
-                <div className="space-y-1">
-                  <Label>Bank (optional)</Label>
-                  <Controller
-                    control={form.control}
-                    name="bankId"
-                    render={({ field }) => (
-                      <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
-                        <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">Cash / no bank</SelectItem>
-                          {banks.map((b) => (
-                            <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                {/* Note */}
+                <div className={`space-y-1 ${banks.length > 0 ? 'md:col-span-12' : 'md:col-span-6'}`}>
+                  <Label>Note (optional)</Label>
+                  <Input placeholder="e.g. Payee name, invoice number…" {...form.register('note')} className="min-h-[44px]" />
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>
 
         {/* ── RIGHT COLUMN — sticky summary ── */}
-        <div className="lg:sticky lg:top-6">
+        <div className="xl:sticky xl:top-6">
           <Card>
             <CardContent className="px-5 pt-5 pb-5">
               <p className="font-extrabold text-[15px] tracking-tight mb-4">Expense Summary</p>

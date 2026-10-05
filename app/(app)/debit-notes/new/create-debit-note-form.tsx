@@ -83,7 +83,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -91,10 +91,12 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
               <CardHeader className="pb-3 pt-5 px-5">
                 <CardTitle className="text-base">Debit Note Details</CardTitle>
               </CardHeader>
-              <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+              {/* Supplier · Purchase Order · Date share one row on wide screens, then Reference ·
+                  Reason, then Currency · Amount. */}
+              <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
                 <FormField control={form.control} name="supplierId" render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
+                  <FormItem className="md:col-span-5">
                     <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <ItemPickerDialog
@@ -109,7 +111,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                   </FormItem>
                 )} />
 
-                <FormItem className="sm:col-span-2">
+                <FormItem className="md:col-span-4">
                   <FormLabel>Against Purchase Order (optional)</FormLabel>
                   <Select
                     value={form.watch('purchaseOrderId') || '_none_'}
@@ -141,7 +143,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                 </FormItem>
 
                 <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -149,7 +151,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                 )} />
 
                 <FormField control={form.control} name="reference" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-4">
                     <FormLabel>Reference (optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. invoice no., DN-001…" className="min-h-[44px]" {...field} />
@@ -159,7 +161,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                 )} />
 
                 <FormField control={form.control} name="reason" render={({ field }) => (
-                  <FormItem className="sm:col-span-2">
+                  <FormItem className="md:col-span-8">
                     <FormLabel>Reason</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. Weight shortage, quality claim, price difference…" className="min-h-[44px]" {...field} />
@@ -168,7 +170,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                   </FormItem>
                 )} />
 
-                <div className="flex gap-2 items-end">
+                <div className="flex gap-2 items-end md:col-span-6">
                   <FormField control={form.control} name="currencyCode" render={({ field }) => (
                     <FormItem className="w-28">
                       <FormLabel>Currency</FormLabel>
@@ -198,7 +200,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                 </div>
 
                 <FormField control={form.control} name="amount" render={() => (
-                  <FormItem>
+                  <FormItem className="md:col-span-6">
                     <FormLabel>Amount ({watchedCurrency}) <span className="text-destructive">*</span></FormLabel>
                     <FormControl>
                       <NumericInput
@@ -214,7 +216,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
           </div>
 
           {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6 space-y-4">
+          <div className="xl:sticky xl:top-6 space-y-4">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Summary</p>

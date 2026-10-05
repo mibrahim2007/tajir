@@ -108,7 +108,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -118,9 +118,10 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
               <CardHeader className="pb-3 pt-5 px-5">
                 <CardTitle className="text-base">Gatepass Details</CardTitle>
               </CardHeader>
-              <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+              {/* No. · Type · Date · Vehicle · Driver share one row on wide screens. */}
+              <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 md:col-span-2">
                   <span className="text-sm font-medium">Gatepass No.</span>
                   <div className="min-h-[44px] flex items-center px-3 rounded-md border bg-muted/50 font-mono text-sm font-semibold tracking-wide text-foreground">
                     {nextGpNumber}
@@ -129,7 +130,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 </div>
 
                 <FormField control={form.control} name="type" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
                     <Select value={field.value} onValueChange={handleTypeChange}>
                       <FormControl>
@@ -145,7 +146,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 )} />
 
                 <FormField control={form.control} name="date" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-2">
                     <FormLabel>Gatepass Date <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -153,7 +154,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 )} />
 
                 <FormField control={form.control} name="vehicleNumber" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-2">
                     <FormLabel>Vehicle Number</FormLabel>
                     <FormControl><Input placeholder="e.g. ABC-1234" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -161,7 +162,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 )} />
 
                 <FormField control={form.control} name="driverName" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-3">
                     <FormLabel>Driver Name</FormLabel>
                     <FormControl><Input placeholder="Driver's full name" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -169,7 +170,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                 )} />
 
                 <FormField control={form.control} name="remarks" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="md:col-span-12">
                     <FormLabel>Remarks</FormLabel>
                     <FormControl><Input placeholder="Optional notes…" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
@@ -200,7 +201,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                           <tr className="border-b">
                             <th className="w-8 px-3 py-2 text-left text-xs text-muted-foreground font-medium" />
                             <th className="px-3 py-2 text-left text-xs text-muted-foreground font-medium">Order</th>
-                            <th className="px-3 py-2 text-right text-xs text-muted-foreground font-medium w-36">
+                            <th className="px-3 py-2 text-right text-xs text-muted-foreground font-medium w-44">
                               Qty <span className="text-muted-foreground/60">(Balance)</span>
                             </th>
                             <th className="w-10" />
@@ -247,7 +248,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                                     )}
                                   />
                                 </td>
-                                <td className="px-3 py-2 w-36">
+                                <td className="px-3 py-2 w-44">
                                   <Input
                                     type="number"
                                     min={0}
@@ -302,7 +303,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
           </div>
 
           {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="lg:sticky lg:top-6">
+          <div className="xl:sticky xl:top-6">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Gatepass Summary</p>

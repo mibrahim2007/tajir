@@ -47,7 +47,7 @@ export default async function EditSupplierRefundPage({ params }: { params: Promi
     : [{ transactionType: fallbackType, chequeNumber: '', chequeDueDate: '', bankId: '', amount: Number(refund.amount) }]
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-6 max-w-6xl mx-auto">
       <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">Edit Supplier Refund</h1>

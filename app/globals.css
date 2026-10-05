@@ -226,8 +226,9 @@
   }
 
   /*
-   * Every data-entry table: sale, purchase, both returns, voucher, gatepass
-   * (new and edit), banks, and the customer/supplier opening balances.
+   * Every data-entry table: sale, purchase, both returns, gatepass (new and
+   * edit), banks, and the customer/supplier opening balances. (The voucher's
+   * lines are a CSS grid now, so they don't use this.)
    *
    * Each is `w-full` inside an `overflow-x-auto` wrapper. On a phone that is a
    * trap: `w-full` tells the browser to make the table fit the viewport, so
