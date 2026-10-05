@@ -12,6 +12,7 @@ import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { buildReceivablesAging, buildPayablesAging, sumBuckets } from '@/lib/reports/aging'
 import { DashboardPeriodTabs } from './period-tabs'
+import { fetchDirectPayments } from '@/lib/ledger/direct-payments'
 import {
   CHART_VARS, shortPKR, Panel, MiniStat, TrackBars, AgingCard,
   RevenueChart, DonutChart, FeedRow, OptionTile, ActionTile,
@@ -91,6 +92,7 @@ export default async function DashboardPage({
     { count: rawSupportCount },
     receivablesAging,
     payablesAging,
+    directPayments,
   ] = await Promise.all([
     admin.from('sales_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
     admin.from('purchase_orders').select('pkr_equivalent').eq('tenant_id', tenantId).gte('date', monthStart),
@@ -118,6 +120,7 @@ export default async function DashboardPage({
     supportQ,
     buildReceivablesAging(tenantId),
     buildPayablesAging(tenantId),
+    fetchDirectPayments(admin, tenantId),
   ])
   const supportCount = rawSupportCount ?? 0
 
@@ -180,9 +183,11 @@ export default async function DashboardPage({
   const purchaseReturns = sumPkr(allPurchaseReturnsData)
   const debitNotes      = sumPkr(allDebitNotesData)
   const supplierRefunds = sumPkr(allSupplierRefundsData)
+  // Customers who paid our suppliers directly (receipt Direct Payment lines).
+  const paidByCustomers = directPayments.reduce((s, d) => s + d.amount, 0)
   const payables = Math.max(
     0,
-    supplierOpeningBal + totalPurchased - totalPaid - purchaseReturns - debitNotes + supplierRefunds,
+    supplierOpeningBal + totalPurchased - totalPaid - paidByCustomers - purchaseReturns - debitNotes + supplierRefunds,
   )
 
   /* 6-month revenue chart */

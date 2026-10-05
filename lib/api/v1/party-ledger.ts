@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { round2 } from './params'
+import { fetchDirectPayments, supplierSideDescription } from '@/lib/ledger/direct-payments'
 
 // One ledger builder for customers and suppliers. The Excel exports under
 // app/api/export/{customer,supplier}-ledger carry the same event rules; keep
@@ -12,6 +13,8 @@ export type LedgerLineType =
   | 'opening_balance'
   | 'sale' | 'receipt' | 'sale_return' | 'credit_note'
   | 'purchase' | 'payment' | 'purchase_return' | 'debit_note'
+  // A customer paid this supplier on our behalf; id is the customer receipt.
+  | 'direct_payment'
 
 export type LedgerLine = {
   date: string
@@ -122,13 +125,14 @@ export async function buildCustomerLedger(
 export async function buildSupplierLedger(
   admin: Admin, tenantId: string, supplierId: string, from: string | null, to: string | null,
 ): Promise<PartyLedger | null> {
-  const [{ data: supplier }, { data: purchases }, { data: payments }, { data: returns }, { data: debitNotes }, { data: lots }] = await Promise.all([
+  const [{ data: supplier }, { data: purchases }, { data: payments }, { data: returns }, { data: debitNotes }, { data: lots }, directPayments] = await Promise.all([
     admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('id', supplierId).eq('tenant_id', tenantId).single(),
     admin.from('purchase_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('ap_payments').select('id, date, pkr_equivalent, payment_method_note').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('purchase_returns').select('id, date, stock_item_id, quantity, pkr_equivalent, reason').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('debit_notes').select('id, date, pkr_equivalent, reason, reference').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    fetchDirectPayments(admin, tenantId, { supplierId }),
   ])
   if (!supplier) return null
 
@@ -150,6 +154,10 @@ export async function buildSupplierLedger(
     ...(debitNotes ?? []).map((e): LedgerEvent => ({
       date: e.date, type: 'debit_note', id: e.id, amount: e.pkr_equivalent, sign: -1,
       description: `Debit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`,
+    })),
+    ...directPayments.map((d): LedgerEvent => ({
+      date: d.date, type: 'direct_payment', id: d.receiptId, amount: d.amount, sign: -1,
+      description: supplierSideDescription(d),
     })),
   ]
   return assemble(supplier, events, from, to)

@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ChequePicker, NEW_CHEQUE, chequeKey } from '@/components/cheque-picker'
-import { TENDER_TYPES } from '@/lib/constants/tender-types'
+import { ItemPickerDialog } from '@/components/item-picker-dialog'
+import { TENDER_TYPES, DIRECT_TENDER } from '@/lib/constants/tender-types'
 import { formatPKR } from '@/lib/utils/currency'
 
 export type TenderLine = {
@@ -21,7 +22,20 @@ export type TenderLine = {
   endorsedFromLineId?: string
 }
 
+/**
+ * A customer-receipt line: a TenderLine that may also be a Direct Payment.
+ * Kept separate so the other money forms never see the 'direct' type.
+ */
+export type ReceiptTenderLine = Omit<TenderLine, 'transactionType'> & {
+  transactionType: TenderLine['transactionType'] | 'direct'
+  /** The supplier the customer paid on our behalf. */
+  supplierId?: string
+  /** Free-text hawala / slip reference. */
+  hawalaRemarks?: string
+}
+
 type Bank = { id: string; name: string; account_number: string | null }
+type Supplier = { id: string; name: string }
 
 /** A received cheque that can be handed on instead of writing a new one. */
 export type EndorsableCheque = {
@@ -47,20 +61,29 @@ export function TenderLinesField({
   banks,
   currency = 'PKR',
   endorsableCheques = [],
+  suppliers,
 }: {
   banks: Bank[]
   currency?: string
+  /**
+   * Customer receipts only. Passing this offers a "Direct Payment" type: the
+   * customer paid one of these suppliers on our behalf. On such a row the
+   * cheque cell becomes the supplier and the bank cell the Hawala remarks.
+   */
+  suppliers?: Supplier[]
   /** Received cheques in hand. Passing any turns PDC's Cheque No. into a picker. */
   endorsableCheques?: EndorsableCheque[]
 }) {
-  const { control, register, watch, setValue, formState } = useFormContext<{ lines: TenderLine[] }>()
+  const { control, register, watch, setValue, formState } = useFormContext<{ lines: ReceiptTenderLine[] }>()
+  const allowDirect = !!suppliers
+  const supplierItems = (suppliers ?? []).map((sp) => ({ id: sp.id, name: sp.name }))
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
 
   const lines = watch('lines') ?? []
   const total = lines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const linesError = formState.errors.lines as
     | ({ message?: string; root?: { message?: string } } & Array<
-        { chequeNumber?: { message?: string }; chequeDueDate?: { message?: string } } | undefined
+        { chequeNumber?: { message?: string }; chequeDueDate?: { message?: string }; supplierId?: { message?: string } } | undefined
       >)
     | undefined
   const rootError = linesError?.message ?? linesError?.root?.message
@@ -68,6 +91,7 @@ export function TenderLinesField({
   // (e.g. cheque required for a PDC) would have blocked submit invisibly.
   const chequeError = (i: number) => linesError?.[i]?.chequeNumber?.message
   const dueDateError = (i: number) => linesError?.[i]?.chequeDueDate?.message
+  const supplierError = (i: number) => linesError?.[i]?.supplierId?.message
 
   // Handing on a received cheque only makes sense in the base currency: the
   // cheque is written for a fixed number of rupees, so it can't settle a line
@@ -101,7 +125,7 @@ export function TenderLinesField({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <Label>Tender Breakdown <span className="text-destructive">*</span></Label>
-        <span className="text-xs text-muted-foreground">{currency !== 'PKR' ? `Amounts in ${currency}` : 'Cash · PDC · Online'}</span>
+        <span className="text-xs text-muted-foreground">{currency !== 'PKR' ? `Amounts in ${currency}` : allowDirect ? 'Cash · PDC · Online · Direct' : 'Cash · PDC · Online'}</span>
       </div>
 
       {/* Column headers (wide screens only). minmax(0,…) lets columns shrink so
@@ -109,8 +133,8 @@ export function TenderLinesField({
           most relative width since its text is longest. */}
       <div className="hidden sm:grid grid-cols-[110px_minmax(0,1fr)_minmax(0,1.6fr)_110px_36px] gap-2 px-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
         <span>Type</span>
-        <span>Cheque No.</span>
-        <span>Bank</span>
+        <span>{allowDirect ? 'Cheque No. / Supplier' : 'Cheque No.'}</span>
+        <span>{allowDirect ? 'Bank / Hawala Remarks' : 'Bank'}</span>
         <span className="text-right">Amount</span>
         <span />
       </div>
@@ -118,6 +142,8 @@ export function TenderLinesField({
       <div className="space-y-3 sm:space-y-2">
         {fields.map((field, i) => {
           const type = lines[i]?.transactionType ?? 'cash'
+          const isDirect = type === 'direct'
+          const supplierErr = supplierError(i)
           const chequeDisabled = type === 'cash'
           const bankDisabled   = type === 'cash'
           // A PDC is a specific physical cheque — without its number the row
@@ -156,79 +182,119 @@ export function TenderLinesField({
                         {TENDER_TYPES.map((t) => (
                           <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                         ))}
+                        {allowDirect && (
+                          <SelectItem value={DIRECT_TENDER.value}>{DIRECT_TENDER.label}</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   )}
                 />
               </div>
 
-              <div className="min-w-0 space-y-1">
-                <FieldLabel>Cheque No.{chequeRequired && <span className="text-destructive"> *</span>}</FieldLabel>
-
-                {/* With cheques in hand, a PDC can either hand one of them on or
-                    write a new one — so the number becomes a picker with an
-                    explicit "write a new cheque" escape. */}
-                {chequeRequired && canEndorse && (
-                  <ChequePicker
-                    value={endorsedKey}
-                    onValueChange={(v) => pickCheque(i, v)}
-                    cheques={options}
-                  />
-                )}
-
-                {/* An endorsed line's number and date belong to the cheque, so
-                    they are shown read-only rather than edited here. */}
-                <Input
-                  placeholder={chequeDisabled ? '—' : chequeRequired ? 'Cheque No. (required)' : 'Cheque No.'}
-                  disabled={chequeDisabled}
-                  readOnly={isEndorsed}
-                  aria-invalid={!!chequeErr}
-                  className={`min-h-[44px] sm:min-h-[40px] min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${chequeErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                  {...register(`lines.${i}.chequeNumber`)}
-                />
-                {chequeErr && <p className="text-xs text-destructive">{chequeErr}</p>}
-                {/* Only a PDC has a maturity date — it drives the pending-cheque
-                    list and the overdue flag on the register. */}
-                {chequeRequired && (
-                  <>
-                    <Input
-                      type="date"
-                      title={isEndorsed ? "The cheque's own due date" : 'Cheque due date (required)'}
-                      aria-label="Cheque due date"
-                      aria-invalid={!!dueErr}
-                      readOnly={isEndorsed}
-                      className={`min-h-[36px] text-xs min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${dueErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
-                      {...register(`lines.${i}.chequeDueDate`)}
+              {isDirect ? (
+                <>
+                  {/* Direct Payment: who the customer paid on our behalf. This
+                      supplier's payable drops by the line amount. */}
+                  <div className="min-w-0 space-y-1">
+                    <FieldLabel>Supplier<span className="text-destructive"> *</span></FieldLabel>
+                    <Controller
+                      control={control}
+                      name={`lines.${i}.supplierId`}
+                      render={({ field: f }) => (
+                        <ItemPickerDialog
+                          items={supplierItems}
+                          value={f.value ?? ''}
+                          onSelect={(v) => f.onChange(v)}
+                          placeholder="Select supplier…"
+                          title="Supplier paid by the customer"
+                        />
+                      )}
                     />
-                    {dueErr && <p className="text-xs text-destructive">{dueErr}</p>}
-                    {isEndorsed && (
-                      <p className="text-[11px] text-muted-foreground">Handed on — amount fixed by the cheque</p>
-                    )}
-                  </>
-                )}
-              </div>
+                    {supplierErr && <p className="text-xs text-destructive">{supplierErr}</p>}
+                  </div>
 
-              <div className="min-w-0 space-y-1">
-                <FieldLabel>Bank</FieldLabel>
-                <Controller
-                  control={control}
-                  name={`lines.${i}.bankId`}
-                  render={({ field: f }) => (
-                    <Select value={f.value || '__none__'} onValueChange={(v) => f.onChange(v === '__none__' ? '' : v)} disabled={bankDisabled}>
-                      {/* w-full overrides the trigger's default w-fit so a long bank
-                          name can't grow the trigger past its column; the value span
-                          is forced to a truncating block. */}
-                      <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate"><SelectValue placeholder="Bank" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">No bank</SelectItem>
-                        {banks.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
+                  <div className="min-w-0 space-y-1">
+                    <FieldLabel>Hawala Remarks</FieldLabel>
+                    <Input
+                      placeholder="Hawala / slip reference"
+                      maxLength={500}
+                      className="min-h-[44px] sm:min-h-[40px] min-w-0"
+                      {...register(`lines.${i}.hawalaRemarks`)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="min-w-0 space-y-1">
+                    <FieldLabel>Cheque No.{chequeRequired && <span className="text-destructive"> *</span>}</FieldLabel>
+
+                    {/* With cheques in hand, a PDC can either hand one of them on or
+                        write a new one — so the number becomes a picker with an
+                        explicit "write a new cheque" escape. */}
+                    {chequeRequired && canEndorse && (
+                      <ChequePicker
+                        value={endorsedKey}
+                        onValueChange={(v) => pickCheque(i, v)}
+                        cheques={options}
+                      />
+                    )}
+
+                    {/* An endorsed line's number and date belong to the cheque, so
+                        they are shown read-only rather than edited here. */}
+                    <Input
+                      placeholder={chequeDisabled ? '—' : chequeRequired ? 'Cheque No. (required)' : 'Cheque No.'}
+                      disabled={chequeDisabled}
+                      readOnly={isEndorsed}
+                      aria-invalid={!!chequeErr}
+                      className={`min-h-[44px] sm:min-h-[40px] min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${chequeErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                      {...register(`lines.${i}.chequeNumber`)}
+                    />
+                    {chequeErr && <p className="text-xs text-destructive">{chequeErr}</p>}
+                    {/* Only a PDC has a maturity date — it drives the pending-cheque
+                        list and the overdue flag on the register. */}
+                    {chequeRequired && (
+                      <>
+                        <Input
+                          type="date"
+                          title={isEndorsed ? "The cheque's own due date" : 'Cheque due date (required)'}
+                          aria-label="Cheque due date"
+                          aria-invalid={!!dueErr}
+                          readOnly={isEndorsed}
+                          className={`min-h-[36px] text-xs min-w-0 ${isEndorsed ? 'bg-muted text-muted-foreground' : ''} ${dueErr ? 'border-destructive focus-visible:ring-destructive' : ''}`}
+                          {...register(`lines.${i}.chequeDueDate`)}
+                        />
+                        {dueErr && <p className="text-xs text-destructive">{dueErr}</p>}
+                        {isEndorsed && (
+                          <p className="text-[11px] text-muted-foreground">Handed on — amount fixed by the cheque</p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 space-y-1">
+                    <FieldLabel>Bank</FieldLabel>
+                    <Controller
+                      control={control}
+                      name={`lines.${i}.bankId`}
+                      render={({ field: f }) => (
+                        <Select value={f.value || '__none__'} onValueChange={(v) => f.onChange(v === '__none__' ? '' : v)} disabled={bankDisabled}>
+                          {/* w-full overrides the trigger's default w-fit so a long bank
+                              name can't grow the trigger past its column; the value span
+                              is forced to a truncating block. */}
+                          <SelectTrigger className="min-h-[44px] sm:min-h-[40px] w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate"><SelectValue placeholder="Bank" /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">No bank</SelectItem>
+                            {banks.map((b) => (
+                              <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+
+                </>
+              )}
 
               <div className="min-w-0 space-y-1">
                 <FieldLabel>Amount</FieldLabel>

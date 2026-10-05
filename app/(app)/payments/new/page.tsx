@@ -5,13 +5,14 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { CreatePaymentForm } from './create-payment-form'
+import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
 
 export default async function NewPaymentPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }, directPayments] = await Promise.all([
     admin.from('suppliers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -36,6 +37,7 @@ export default async function NewPaymentPage() {
       .select('id, name')
       .eq('tenant_id', tenantId),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
+    fetchDirectPayments(admin, tenantId),
   ])
 
   // Cheques received from customers that could be handed on to this supplier
@@ -57,6 +59,8 @@ export default async function NewPaymentPage() {
   // − returns − debit notes + supplier refunds. A refund received from the
   // supplier settles our debit balance with them, pulling the balance back up
   // toward zero; omitting it makes a fully-settled supplier read as negative.
+  // Customer receipts that paid a supplier for us count as payments.
+  const directBySupplier = sumBySupplier(directPayments)
   const supplierList = suppliers.map((s) => {
     const opening = s.opening_balance_pkr_equivalent  ?? 0
     const purchased = purchases.filter((p) => p.supplier_id === s.id).reduce((sum, p) => sum + p.pkr_equivalent - p.advance_paid, 0)
@@ -64,7 +68,8 @@ export default async function NewPaymentPage() {
     const returned = returns.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
     const debited = debitNotes.filter((n) => n.supplier_id === s.id).reduce((sum, n) => sum + n.pkr_equivalent, 0)
     const refunded = refunds.filter((r) => r.supplier_id === s.id).reduce((sum, r) => sum + r.pkr_equivalent, 0)
-    return { id: s.id, name: s.name, outstanding: opening + purchased - paid - returned - debited + refunded }
+    const paidByCustomers = directBySupplier.get(s.id) ?? 0
+    return { id: s.id, name: s.name, outstanding: opening + purchased - paid - paidByCustomers - returned - debited + refunded }
   })
 
   // Group purchases by supplier (most recent first, last 5 per supplier)
@@ -92,6 +97,7 @@ export default async function NewPaymentPage() {
   for (const p of purchases)  pushHistory(p.supplier_id, { id: `pur-${p.id}`,  date: p.date, type: 'Purchase', amount: p.pkr_equivalent, direction: 'up' })
   for (const pm of payments)  pushHistory(pm.supplier_id, { id: `pay-${pm.id}`, date: pm.date, type: 'Payment',  amount: pm.pkr_equivalent, direction: 'down' })
   for (const rt of returns)   pushHistory(rt.supplier_id, { id: `ret-${rt.id}`, date: rt.date, type: 'Return',   amount: rt.pkr_equivalent, direction: 'down' })
+  for (const dp of directPayments) pushHistory(dp.supplierId, { id: `dir-${dp.lineId}`, date: dp.date, type: 'Paid by customer', amount: dp.amount, direction: 'down' })
   for (const sid of Object.keys(historyBySupplier)) {
     historyBySupplier[sid].sort((a, b) => b.date.localeCompare(a.date) || a.id.localeCompare(b.id))
     historyBySupplier[sid] = historyBySupplier[sid].slice(0, 15)

@@ -11,6 +11,7 @@ import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { toCustomerStatus, CUSTOMER_STATUS_LABELS, CUSTOMER_STATUS_BADGE } from '@/lib/customer-status'
+import { fetchDirectPayments, customerSideSuffix } from '@/lib/ledger/direct-payments'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -37,7 +38,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
     peekNextDocumentSerial(admin, tenantId, 'customer_refund', today),
   ])
 
-  const [{ data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }] = await Promise.all([
+  const [{ data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, directPayments] = await Promise.all([
     admin.from('sales_orders')
       .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent')
       .eq('customer_id', id)
@@ -64,9 +65,14 @@ export default async function CustomerLedgerPage({ params }: Props) {
       .eq('tenant_id', tenantId)
       .order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    // Receipt lines where this customer paid one of our suppliers directly.
+    fetchDirectPayments(admin, tenantId, { customerId: id }),
   ])
 
-  const { data: rawBanks } = await admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name')
+  const [{ data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
+    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+  ])
   const banks = rawBanks ?? []
 
   const sales = rawSales ?? []
@@ -86,6 +92,9 @@ export default async function CustomerLedgerPage({ params }: Props) {
     balance: number
     rawReceipt?: { id: string; amount: number; currencyCode: string; pkrEquivalent: number; date: string; paymentMethodNote: string | null }
   }
+
+  const directByReceipt = new Map<string, typeof directPayments>()
+  for (const d of directPayments) directByReceipt.set(d.receiptId, [...(directByReceipt.get(d.receiptId) ?? []), d])
 
   const rows: LedgerRow[] = []
   let runningBalance = 0
@@ -141,7 +150,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
         id: item.entry.id,
         kind: 'receipt',
         date: item.date,
-        description: `${item.entry.serial_number ? `${item.entry.serial_number} · ` : ''}Receipt${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}`,
+        description: `${item.entry.serial_number ? `${item.entry.serial_number} · ` : ''}Receipt${item.entry.payment_method_note ? ` — ${item.entry.payment_method_note}` : ''}${customerSideSuffix(directByReceipt.get(item.entry.id) ?? [])}`,
         debit: 0,
         credit: amount,
         balance: runningBalance,
@@ -177,7 +186,7 @@ export default async function CustomerLedgerPage({ params }: Props) {
               <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} banks={banks} />
             </RoleGate>
           )}
-          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} banks={banks} />
+          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} banks={banks} suppliers={rawSuppliers ?? []} />
         </div>
       </div>
 

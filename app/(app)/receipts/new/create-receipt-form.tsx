@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useForm, FormProvider, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { tenderLineFormSchema } from '@/lib/constants/tender-types'
+import { receiptTenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
-import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type ReceiptTenderLine } from '@/components/tender-lines-field'
 import { PartyTransactionHistory, type TxnHistoryItem } from '@/components/party-transaction-history'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { editArReceiptAction } from '@/app/actions/edit-ar-receipt'
@@ -26,12 +26,15 @@ import { formatPKTDate } from '@/lib/utils/dates'
 type Customer = { id: string; name: string; outstanding: number }
 type Sale      = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number }
 type Bank      = { id: string; name: string; account_number: string | null }
+type Supplier  = { id: string; name: string }
 
 type Props = {
   today:           string
   customers:       Customer[]
   salesByCustomer: Record<string, Sale[]>
   banks:           Bank[]
+  /** For Direct Payment lines: suppliers the customer may have paid for us. */
+  suppliers:       Supplier[]
   nextSerial?:     string | null
   historyByCustomer?: Record<string, TxnHistoryItem[]>
   mode?:           'create' | 'edit'
@@ -42,7 +45,7 @@ type Props = {
     exchangeRate:      number
     date:              string
     paymentMethodNote: string
-    lines:             TenderLine[]
+    lines:             ReceiptTenderLine[]
   }
 }
 
@@ -53,7 +56,7 @@ const schema = z.object({
   exchangeRate:      z.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
-  lines:             z.array(tenderLineFormSchema).min(1, 'Add at least one tender line'),
+  lines:             z.array(receiptTenderLineFormSchema).min(1, 'Add at least one tender line'),
 }).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
   message: 'Enter a positive amount for at least one tender line',
   path: ['lines'],
@@ -61,9 +64,9 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 }
+const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '' }
 
-export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
+export function ReceiptForm({ today, customers, salesByCustomer, banks, suppliers, nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
@@ -110,6 +113,8 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSeri
           chequeNumber: l.chequeNumber || undefined,
           chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
+          supplierId: l.transactionType === 'direct' ? (l.supplierId || undefined) : undefined,
+          hawalaRemarks: l.transactionType === 'direct' ? (l.hawalaRemarks || undefined) : undefined,
           amount: l.amount,
         })),
       }
@@ -235,7 +240,10 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, nextSeri
 
                 <Separator />
 
-                <TenderLinesField banks={banks} currency={watchedCurrency} />
+                <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} />
+                {watchedCurrency !== 'PKR' && (watchedLines ?? []).some((l) => l.transactionType === 'direct') && (
+                  <p className="text-xs text-destructive">A direct payment to a supplier must be in PKR.</p>
+                )}
 
                 <div className="space-y-1">
                   <Label>Note</Label>

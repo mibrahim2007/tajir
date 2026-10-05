@@ -3,7 +3,7 @@ import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ReceiptForm } from '@/app/(app)/receipts/new/create-receipt-form'
-import type { TenderLine } from '@/components/tender-lines-field'
+import type { ReceiptTenderLine } from '@/components/tender-lines-field'
 
 export default async function EditReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -15,14 +15,15 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: receipt }, { data: rawLines }, { data: rawBanks }] = await Promise.all([
+  const [{ data: receipt }, { data: rawLines }, { data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
     admin.from('ar_receipts')
       .select('id, customer_id, amount, currency_code, pkr_equivalent, payment_method_note, date, cheque_number, bank_id')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('ar_receipt_lines')
-      .select('transaction_type, cheque_number, cheque_due_date, bank_id, amount, line_no')
+      .select('transaction_type, cheque_number, cheque_due_date, bank_id, supplier_id, hawala_remarks, amount, line_no')
       .eq('receipt_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
+    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
   if (!receipt) notFound()
@@ -35,12 +36,14 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
   const exchangeRate = currency === 'USD' && receipt.amount > 0 ? receipt.pkr_equivalent / receipt.amount : 1
 
   // Existing tender lines, or synthesize one from the legacy header fields.
-  const lines: TenderLine[] = (rawLines && rawLines.length > 0)
+  const lines: ReceiptTenderLine[] = (rawLines && rawLines.length > 0)
     ? rawLines.map((l) => ({
-        transactionType: l.transaction_type as TenderLine['transactionType'],
+        transactionType: l.transaction_type as ReceiptTenderLine['transactionType'],
         chequeNumber: l.cheque_number ?? '',
         chequeDueDate: l.cheque_due_date ?? '',
         bankId: l.bank_id ?? '',
+        supplierId: l.supplier_id ?? '',
+        hawalaRemarks: l.hawala_remarks ?? '',
         amount: Number(l.amount),
       }))
     : [{
@@ -81,6 +84,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
         customers={customer ? [{ id: customer.id, name: customer.name, outstanding: 0 }] : []}
         salesByCustomer={{}}
         banks={banks}
+        suppliers={rawSuppliers ?? []}
         mode="edit"
         receiptId={receipt.id}
         initial={{

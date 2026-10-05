@@ -9,6 +9,7 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
+import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
 
 export function ageDays(dateStr: string): number {
   const today = new Date()
@@ -234,6 +235,7 @@ export async function buildPayablesAging(tenantId: string): Promise<AgingRow[]> 
     { data: rawReturns },
     { data: rawDebitNotes },
     { data: rawRefunds },
+    directPayments,
   ] = await Promise.all([
     admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
     admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
@@ -241,9 +243,12 @@ export async function buildPayablesAging(tenantId: string): Promise<AgingRow[]> 
     admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('debit_notes').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('supplier_refunds').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
+    fetchDirectPayments(admin, tenantId),
   ])
 
   const purchases = rawPurchases ?? []
+  // A customer who paid the supplier for us settles the oldest bills, same as a payment.
+  const directBySupplier = sumBySupplier(directPayments)
   const rows: AgingRow[] = []
 
   for (const s of rawSuppliers ?? []) {
@@ -251,6 +256,7 @@ export async function buildPayablesAging(tenantId: string): Promise<AgingRow[]> 
     // credit we were holding against them.
     const credits =
       sumBy(rawPayments ?? [], (p) => p.supplier_id === s.id, (p) => p.pkr_equivalent) +
+      (directBySupplier.get(s.id) ?? 0) +
       sumBy(rawReturns ?? [], (r) => r.supplier_id === s.id, (r) => r.pkr_equivalent) +
       sumBy(rawDebitNotes ?? [], (n) => n.supplier_id === s.id, (n) => n.pkr_equivalent) -
       sumBy(rawRefunds ?? [], (r) => r.supplier_id === s.id, (r) => r.pkr_equivalent)

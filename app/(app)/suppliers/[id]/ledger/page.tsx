@@ -13,6 +13,7 @@ import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { fetchDirectPayments, supplierSideDescription } from '@/lib/ledger/direct-payments'
 
 type Props = { params: Promise<{ id: string }> }
 
@@ -44,6 +45,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     { data: rawDebitNotes },
     { data: rawRefunds },
     { data: rawLots },
+    directPayments,
   ] = await Promise.all([
     admin.from('purchase_orders')
       .select('id, date, supplier_id, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid')
@@ -61,6 +63,8 @@ export default async function SupplierLedgerPage({ params }: Props) {
       .select('id, date, supplier_id, amount, currency_code, pkr_equivalent, payment_method, notes, serial_number')
       .eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    // Customer receipts that paid this supplier for us (Direct Payment lines).
+    fetchDirectPayments(admin, tenantId, { supplierId: id }),
   ])
 
   const { data: rawBanks } = await admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name')
@@ -75,7 +79,9 @@ export default async function SupplierLedgerPage({ params }: Props) {
 
   type LedgerRow = {
     id: string
-    kind: 'opening' | 'purchase' | 'payment' | 'purchase_return' | 'debit_note' | 'supplier_refund'
+    kind: 'opening' | 'purchase' | 'payment' | 'purchase_return' | 'debit_note' | 'supplier_refund' | 'direct_payment'
+    /** Direct payments link to the customer receipt that carries them. */
+    receiptId?: string
     date: string
     description: string
     debit: number
@@ -99,6 +105,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     | { kind: 'purchase_return'; date: string; entry: typeof purchaseReturns[0] }
     | { kind: 'debit_note';      date: string; entry: typeof debitNotes[0] }
     | { kind: 'supplier_refund'; date: string; entry: typeof refunds[0] }
+    | { kind: 'direct_payment';  date: string; entry: typeof directPayments[0] }
 
   const entries: RawEntry[] = [
     ...purchases.map((e)       => ({ kind: 'purchase'        as const, date: e.date, entry: e })),
@@ -106,6 +113,7 @@ export default async function SupplierLedgerPage({ params }: Props) {
     ...purchaseReturns.map((e) => ({ kind: 'purchase_return' as const, date: e.date, entry: e })),
     ...debitNotes.map((e)      => ({ kind: 'debit_note'      as const, date: e.date, entry: e })),
     ...refunds.map((e)         => ({ kind: 'supplier_refund' as const, date: e.date, entry: e })),
+    ...directPayments.map((e)  => ({ kind: 'direct_payment'  as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -132,6 +140,11 @@ export default async function SupplierLedgerPage({ params }: Props) {
       const ref = item.entry.serial_number ? `${item.entry.serial_number} · ` : ''
       const desc = `${ref}Payment Received${item.entry.notes ? ` — ${item.entry.notes}` : ''} (${method})`
       rows.push({ id: item.entry.id, kind: 'supplier_refund', date: item.date, description: desc, debit: amount, credit: 0, balance: runningBalance })
+    } else if (item.kind === 'direct_payment') {
+      // A customer paid this supplier on our behalf — settles our payable
+      // exactly like a payment we made ourselves.
+      runningBalance -= item.entry.amount
+      rows.push({ id: `direct-${item.entry.lineId}`, kind: 'direct_payment', receiptId: item.entry.receiptId, date: item.date, description: supplierSideDescription(item.entry), debit: 0, credit: item.entry.amount, balance: runningBalance })
     } else {
       const paid = item.entry.pkr_equivalent
       runningBalance -= paid
@@ -223,6 +236,15 @@ export default async function SupplierLedgerPage({ params }: Props) {
                       {row.kind === 'payment' && row.rawPayment && (
                         <RoleGate allowedRoles={['owner']}>
                           <EditApPaymentForm payment={row.rawPayment} />
+                        </RoleGate>
+                      )}
+                      {row.kind === 'direct_payment' && row.receiptId && (
+                        <RoleGate allowedRoles={['owner']}>
+                          <Link href={`/receipts/${row.receiptId}/edit`}>
+                            <Button variant="ghost" size="sm" className="min-h-[44px]" title="Edit the customer receipt">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </Link>
                         </RoleGate>
                       )}
                       {row.kind === 'supplier_refund' && (

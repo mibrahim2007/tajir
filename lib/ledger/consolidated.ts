@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchDirectPayments, supplierSideDescription } from '@/lib/ledger/direct-payments'
 
 // A single consolidated statement for a mapped customer↔supplier pair.
 //
@@ -65,6 +66,7 @@ export async function buildConsolidatedLedger(
     { data: rawDebitNotes },
     { data: rawSupplierRefunds },
     { data: rawLots },
+    directPayments,
   ] = await Promise.all([
     admin.from('tajir_customers').select('opening_balance_pkr_equivalent, created_at').eq('id', customerId).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('suppliers').select('opening_balance_pkr_equivalent, created_at').eq('id', supplierId).eq('tenant_id', tenantId).maybeSingle(),
@@ -79,6 +81,7 @@ export async function buildConsolidatedLedger(
     admin.from('debit_notes').select('id, date, pkr_equivalent, reason, reference').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     admin.from('supplier_refunds').select('id, date, pkr_equivalent, payment_method, notes, serial_number').eq('supplier_id', supplierId).eq('tenant_id', tenantId),
     preloadedLots ? Promise.resolve({ data: null }) : admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    fetchDirectPayments(admin, tenantId, { supplierId }),
   ])
 
   const lotMap = preloadedLots ?? new Map((rawLots ?? []).map((l) => [l.id, l.name]))
@@ -127,6 +130,11 @@ export async function buildConsolidatedLedger(
   }
   for (const e of rawSupplierRefunds ?? []) {
     entries.push({ id: e.id, side: 'supplier', kind: 'supplier_refund', date: e.date, description: `${e.serial_number ? `${e.serial_number} · ` : ''}Payment Received from Supplier — ${e.payment_method === 'bank_transfer' ? 'Bank Transfer' : e.payment_method === 'cash' ? 'Cash' : 'Mixed'}${e.notes ? ` (${e.notes})` : ''}`, debit: e.pkr_equivalent, credit: 0 })
+  }
+
+  // A customer paid this supplier on our behalf: settles our payable like a payment.
+  for (const d of directPayments) {
+    entries.push({ id: `direct-${d.lineId}`, side: 'supplier', kind: 'direct_payment', date: d.date, description: supplierSideDescription(d), debit: 0, credit: d.amount })
   }
 
   // Component balances in each party's own frame.

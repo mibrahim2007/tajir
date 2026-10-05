@@ -485,12 +485,14 @@ export type Database = {
           cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
+          hawala_remarks: string | null
           id: string
           line_no: number
           pdc_status: string
           receipt_id: string
           settled_at: string | null
           settled_bank_id: string | null
+          supplier_id: string | null
           tenant_id: string
           transaction_type: string
         }
@@ -500,12 +502,14 @@ export type Database = {
           cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          hawala_remarks?: string | null
           id?: string
           line_no?: number
           pdc_status?: string
           receipt_id: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          supplier_id?: string | null
           tenant_id: string
           transaction_type: string
         }
@@ -515,12 +519,14 @@ export type Database = {
           cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
+          hawala_remarks?: string | null
           id?: string
           line_no?: number
           pdc_status?: string
           receipt_id?: string
           settled_at?: string | null
           settled_bank_id?: string | null
+          supplier_id?: string | null
           tenant_id?: string
           transaction_type?: string
         }
@@ -544,6 +550,13 @@ export type Database = {
             columns: ["settled_bank_id"]
             isOneToOne: false
             referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_lines_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
             referencedColumns: ["id"]
           },
           {

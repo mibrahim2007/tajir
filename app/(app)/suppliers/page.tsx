@@ -3,18 +3,20 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { CreateSupplierForm } from './create-supplier-form'
 import { SuppliersList } from './suppliers-list'
 import { SupplierGuide } from './supplier-guide'
+import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
 
 export default async function SuppliersPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }, { data: allRefunds }] = await Promise.all([
+  const [{ data: allSuppliers }, { data: allPurchases }, { data: allPayments }, { data: allReturns }, { data: allDebitNotes }, { data: allRefunds }, directPayments] = await Promise.all([
     admin.from('suppliers').select('id, name, email, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid').eq('tenant_id', tenantId),
     admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('debit_notes').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('supplier_refunds').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
+    fetchDirectPayments(admin, tenantId),
   ])
 
   const suppliers  = allSuppliers ?? []
@@ -23,6 +25,9 @@ export default async function SuppliersPage() {
   const returns    = allReturns   ?? []
   const debitNotes = allDebitNotes ?? []
   const refunds    = allRefunds   ?? []
+
+  // Paid to the supplier by a customer on our behalf (receipt Direct Payment).
+  const directBySupplier = sumBySupplier(directPayments)
 
   const outstandingBySupplier = new Map<string, number>()
   for (const s of suppliers) {
@@ -42,7 +47,8 @@ export default async function SuppliersPage() {
     const refunded = refunds
       .filter((r) => r.supplier_id === s.id)
       .reduce((sum, r) => sum + r.pkr_equivalent, 0)
-    outstandingBySupplier.set(s.id, openingBalance + purchased - paid - returned - debited + refunded)
+    const paidByCustomers = directBySupplier.get(s.id) ?? 0
+    outstandingBySupplier.set(s.id, openingBalance + purchased - paid - paidByCustomers - returned - debited + refunded)
   }
 
   const supplierItems = suppliers.map((s) => ({

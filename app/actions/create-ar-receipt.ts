@@ -7,7 +7,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
+import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
+import { checkDirectLines, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
@@ -22,7 +23,7 @@ const schema = z.object({
   chequeNumber:      z.string().optional(),
   bankId:            z.string().uuid().optional(),
   moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
-  lines:             z.array(tenderLineSchema).optional(),
+  lines:             z.array(receiptTenderLineSchema).optional(),
 })
 
 export async function createArReceiptAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -48,6 +49,10 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   const pkrEquivalent = amount * rate
 
   const admin = createAdminClient()
+  if (hasLines) {
+    const directError = await checkDirectLines(admin, tenantId, lines!, currencyCode)
+    if (directError) return { success: false, error: directError, code: 'VALIDATION_ERROR' }
+  }
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'ar_receipt', date)
   const { data: receipt, error } = await admin
     .from('ar_receipts')
@@ -73,16 +78,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
 
   // Persist tender detail lines
   if (hasLines) {
-    const lineRows = lines!.map((l, i) => ({
-      tenant_id:        tenantId,
-      receipt_id:       receipt.id,
-      line_no:          i + 1,
-      transaction_type: l.transactionType,
-      cheque_number:    l.chequeNumber || null,
-    cheque_due_date:  l.chequeDueDate || null,
-      bank_id:          l.bankId ?? null,
-      amount:           l.amount,
-    }))
+    const lineRows = receiptLineRows(tenantId, receipt.id, lines!)
     const { error: linesError } = await admin.from('ar_receipt_lines').insert(lineRows)
     if (linesError) {
       await admin.from('ar_receipts').delete().eq('id', receipt.id)
@@ -90,17 +86,19 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     }
   }
 
-  // Auto-post GL: DR each money account (per tender type), CR Accounts Receivable.
-  const moneyLegs = hasLines
-    ? aggregateMoneyLegs(lines!.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'in')
-    : [{ accountSystemKey: moneyAccount, pkr: pkrEquivalent }]
+  // Auto-post GL: DR each money account (per tender type) or, for a direct
+  // line, DR Accounts Payable for the supplier the customer paid; CR Accounts
+  // Receivable for the customer. See lib/accounting/receipt-gl.ts.
+  const journalLines = hasLines
+    ? receiptJournalLines(lines!, rate, customerId, pkrEquivalent)
+    : [
+        { accountSystemKey: moneyAccount, debit: pkrEquivalent, credit: 0 },
+        { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId },
+      ]
 
   const posted = await postJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: serialNumber, sourceType: 'ar_receipt', sourceId: receipt.id, prefix: 'RC',
-    lines: [
-      ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),
-      { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId },
-    ],
+    lines: journalLines,
   })
   if (!posted.ok) {
     await admin.from("ar_receipts").delete().eq("id", receipt.id)

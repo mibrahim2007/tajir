@@ -6,7 +6,8 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
-import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/constants/tender-types'
+import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
+import { checkDirectLines, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
@@ -17,7 +18,7 @@ const schema = z.object({
   exchangeRate:      z.coerce.number().positive().default(1),
   date:              z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   paymentMethodNote: z.string().optional(),
-  lines:             z.array(tenderLineSchema).min(1, 'Add at least one tender line'),
+  lines:             z.array(receiptTenderLineSchema).min(1, 'Add at least one tender line'),
 })
 
 export async function editArReceiptAction(input: unknown): Promise<ActionResult<void>> {
@@ -36,6 +37,9 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   const pkrEquivalent = amount * rate
 
   const admin = createAdminClient()
+
+  const directError = await checkDirectLines(admin, tenantId, lines, currencyCode)
+  if (directError) return { success: false, error: directError, code: 'VALIDATION_ERROR' }
 
   const { data: existing } = await admin
     .from('ar_receipts')
@@ -56,28 +60,16 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   // Replace tender lines
   await admin.from('ar_receipt_lines').delete().eq('receipt_id', id).eq('tenant_id', tenantId)
-  const lineRows = lines.map((l, i) => ({
-    tenant_id: tenantId, receipt_id: id, line_no: i + 1,
-    transaction_type: l.transactionType, cheque_number: l.chequeNumber || null,
-    // Must be written on EDIT as well as create. Omitting it here silently
-    // nulled the due date every time a receipt was saved — the form collects
-    // it and validation demands it for a PDC, so the loss was invisible. A PDC
-    // with no due date never becomes overdue and sorts last forever, so it also
-    // drops out of the pending-cheques panel it exists to appear on.
-    cheque_due_date: l.chequeDueDate || null,
-    bank_id: l.bankId ?? null, amount: l.amount,
-  }))
+  // Built by the shared helper so edit writes every column create does —
+  // including cheque_due_date (see 0062) and the direct-payment supplier.
+  const lineRows = receiptLineRows(tenantId, id, lines)
   await admin.from('ar_receipt_lines').insert(lineRows)
 
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
-  const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount })), rate, 'in')
   const posted = await repostJournalEntry({
     tenantId, date, description: `Customer Receipt — ${paymentMethodNote ?? ''}`, reference: existing.serial_number ?? undefined, sourceType: 'ar_receipt', sourceId: id, prefix: 'RC',
-    lines: [
-      ...moneyLegs.map((leg) => ({ accountSystemKey: leg.accountSystemKey, debit: leg.pkr, credit: 0 })),
-      { accountSystemKey: 'accounts_receivable', debit: 0, credit: pkrEquivalent, customerId: existing.customer_id },
-    ],
+    lines: receiptJournalLines(lines, rate, existing.customer_id, pkrEquivalent),
   })
   if (!posted.ok) return glEditFailed(posted.message)
 

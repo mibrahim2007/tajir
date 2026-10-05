@@ -3,6 +3,7 @@ export const runtime = 'nodejs'
 import ExcelJS from 'exceljs'
 import { requireAuthRoute } from '@/lib/auth/require-auth-route'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchDirectPayments, supplierSideDescription, type DirectPayment } from '@/lib/ledger/direct-payments'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAuthRoute()
@@ -14,13 +15,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const admin = createAdminClient()
 
-  const [{ data: supplier }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawLots }] = await Promise.all([
+  const [{ data: supplier }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawLots }, directPayments] = await Promise.all([
     admin.from('suppliers').select('name, opening_balance_pkr_equivalent, created_at').eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('purchase_orders').select('id, date, stock_item_id, quantity, rate, currency_code, pkr_equivalent, advance_paid').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('ap_payments').select('id, date, pkr_equivalent, payment_method_note').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('purchase_returns').select('id, date, stock_item_id, quantity, pkr_equivalent, reason').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('debit_notes').select('id, date, pkr_equivalent, reason, reference').eq('supplier_id', id).eq('tenant_id', tenantId).order('date', { ascending: true }),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    fetchDirectPayments(admin, tenantId, { supplierId: id }),
   ])
 
   if (!supplier) return new Response('Not Found', { status: 404 })
@@ -51,12 +53,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     | { kind: 'payment'; date: string; entry: NonNullable<typeof rawPayments>[0] }
     | { kind: 'purchase_return'; date: string; entry: NonNullable<typeof rawReturns>[0] }
     | { kind: 'debit_note'; date: string; entry: NonNullable<typeof rawDebitNotes>[0] }
+    | { kind: 'direct_payment'; date: string; entry: DirectPayment }
 
   const entries: Entry[] = [
     ...(rawPurchases ?? []).map((e) => ({ kind: 'purchase' as const, date: e.date, entry: e })),
     ...(rawPayments ?? []).map((e) => ({ kind: 'payment' as const, date: e.date, entry: e })),
     ...(rawReturns ?? []).map((e) => ({ kind: 'purchase_return' as const, date: e.date, entry: e })),
     ...(rawDebitNotes ?? []).map((e) => ({ kind: 'debit_note' as const, date: e.date, entry: e })),
+    ...directPayments.map((e) => ({ kind: 'direct_payment' as const, date: e.date, entry: e })),
   ].sort((a, b) => a.date.localeCompare(b.date))
 
   for (const item of entries) {
@@ -77,6 +81,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       balance -= amt
       const desc = `Debit Note${e.reason ? ` — ${e.reason}` : ''}${e.reference ? ` (Ref: ${e.reference})` : ''}`
       sheet.addRow({ date: item.date, desc, debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
+    } else if (item.kind === 'direct_payment') {
+      // A customer paid this supplier on our behalf — same effect as a payment.
+      const amt = item.entry.amount
+      balance -= amt
+      sheet.addRow({ date: item.date, desc: supplierSideDescription(item.entry), debit: '', credit: Math.round(amt * 100) / 100, balance: Math.round(balance * 100) / 100 })
     } else {
       const e = item.entry as NonNullable<typeof rawPayments>[0]
       const amt = e.pkr_equivalent

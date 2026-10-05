@@ -7,6 +7,7 @@ import { PrintVoucherHeader } from '@/components/print-voucher-header'
 import { Button } from '@/components/ui/button'
 import { PrintButton } from './print-button'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
+import { receiptTenderLabel } from '@/lib/constants/tender-types'
 
 function fmt(n: number) {
   return n.toLocaleString('en-PK', { maximumFractionDigits: 2 })
@@ -45,20 +46,25 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
       .eq('source_type', 'ar_receipt')
       .single(),
     admin.from('ar_receipt_lines')
-      .select('transaction_type, cheque_number, bank_id, amount, line_no')
+      .select('transaction_type, cheque_number, bank_id, supplier_id, hawala_remarks, amount, line_no, suppliers(name)')
       .eq('receipt_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const bankMap = new Map((allBanks ?? []).map((b) => [b.id, b.name]))
-  const TENDER_LABELS: Record<string, string> = { cash: 'Cash', pdc: 'PDC', online: 'Online' }
-  const lines = (rawLines ?? []).map((l) => ({
-    type: TENDER_LABELS[l.transaction_type] ?? l.transaction_type,
-    cheque: l.cheque_number ?? '',
-    bank: l.bank_id ? (bankMap.get(l.bank_id) ?? '—') : '',
-    amount: Number(l.amount),
-  }))
+  const lines = (rawLines ?? []).map((l) => {
+    // A direct line was paid by the customer straight to our supplier, so the
+    // cheque/bank columns carry the supplier and the hawala reference instead.
+    const direct = l.transaction_type === 'direct'
+    return {
+      type: receiptTenderLabel(l.transaction_type),
+      cheque: direct ? (l.suppliers?.name ?? '—') : (l.cheque_number ?? ''),
+      bank: direct ? (l.hawala_remarks ?? '') : (l.bank_id ? (bankMap.get(l.bank_id) ?? '—') : ''),
+      amount: Number(l.amount),
+    }
+  })
   const hasLines = lines.length > 0
+  const hasDirect = (rawLines ?? []).some((l) => l.transaction_type === 'direct')
 
   const amount     = receipt.amount
   const pkrAmount  = receipt.pkr_equivalent
@@ -166,8 +172,8 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
             <thead className="bg-gray-100 print:bg-gray-100">
               <tr>
                 <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-24">Type</th>
-                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Cheque No.</th>
-                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">Bank</th>
+                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">{hasDirect ? 'Cheque No. / Paid To' : 'Cheque No.'}</th>
+                <th className="text-left px-4 py-2 border-b border-r border-gray-300 font-semibold text-[11px] uppercase tracking-wide">{hasDirect ? 'Bank / Hawala' : 'Bank'}</th>
                 <th className="text-right px-4 py-2 border-b border-gray-300 font-semibold text-[11px] uppercase tracking-wide w-32">Amount</th>
               </tr>
             </thead>

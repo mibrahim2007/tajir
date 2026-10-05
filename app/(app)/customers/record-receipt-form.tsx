@@ -5,14 +5,14 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { tenderLineFormSchema } from '@/lib/constants/tender-types'
+import { receiptTenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type ReceiptTenderLine } from '@/components/tender-lines-field'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
@@ -24,7 +24,7 @@ const schema = z.object({
   exchangeRate: z.number().positive().default(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   paymentMethodNote: z.string().optional(),
-  lines: z.array(tenderLineFormSchema).min(1, 'Add at least one tender line'),
+  lines: z.array(receiptTenderLineFormSchema).min(1, 'Add at least one tender line'),
 }).refine((v) => v.lines.some((l) => (Number(l.amount) || 0) > 0), {
   message: 'Enter a positive amount for at least one tender line',
   path: ['lines'],
@@ -32,12 +32,12 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 }
+const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '' }
 const freshDefaults = (today: string): FormValues => ({
   currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', lines: [{ ...emptyLine }],
 })
 
-export function RecordReceiptForm({ customerId, today, nextSerial, banks = [] }: { customerId: string; today: string; nextSerial?: string | null; banks?: Bank[] }) {
+export function RecordReceiptForm({ customerId, today, nextSerial, banks = [], suppliers = [] }: { customerId: string; today: string; nextSerial?: string | null; banks?: Bank[]; suppliers?: { id: string; name: string }[] }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -65,6 +65,8 @@ export function RecordReceiptForm({ customerId, today, nextSerial, banks = [] }:
           chequeNumber: l.chequeNumber || undefined,
           chequeDueDate: l.chequeDueDate || undefined,
           bankId: l.bankId || undefined,
+          supplierId: l.transactionType === 'direct' ? (l.supplierId || undefined) : undefined,
+          hawalaRemarks: l.transactionType === 'direct' ? (l.hawalaRemarks || undefined) : undefined,
           amount: l.amount,
         })),
       })
@@ -128,7 +130,7 @@ export function RecordReceiptForm({ customerId, today, nextSerial, banks = [] }:
 
             <Separator />
 
-            <TenderLinesField banks={banks} currency={watchedCurrency} />
+            <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} />
 
             <FormField control={form.control} name="paymentMethodNote" render={({ field }) => (
               <FormItem>

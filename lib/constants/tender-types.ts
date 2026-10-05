@@ -46,6 +46,11 @@ export const TENDER_LABEL: Record<TenderType, string> = {
   pdc:    'PDC',
 }
 
+/** Display label for any receipt line type, including Direct Payment. */
+export function receiptTenderLabel(type: string): string {
+  return type === DIRECT_TENDER.value ? DIRECT_TENDER.label : (TENDER_LABEL[type as TenderType] ?? type)
+}
+
 // ── Shared tender-line validation ───────────────────────────────────
 // A PDC is a specific physical cheque; without its number the row is unusable
 // for reconciling against the bank later. The rule lives here because the same
@@ -96,45 +101,91 @@ function requirePdcForEndorsement(
   }
 }
 
+const tenderLineObject = z.object({
+  transactionType: z.enum(['cash', 'pdc', 'online']),
+  chequeNumber:    z.string().trim().optional().nullable(),
+  chequeDueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal("")),
+  bankId:          z.string().uuid().optional().nullable(),
+  amount:          z.coerce.number().positive('Line amount must be positive'),
+  // Set when this line hands on a cheque received from a party rather than
+  // writing a new one. The server re-reads the cheque and copies its amount,
+  // so these are a reference, not trusted data.
+  endorsedFromSource: z.string().optional().nullable(),
+  endorsedFromLineId: z.string().uuid().optional().nullable(),
+})
+
 /** Server-side shape: amounts must already be positive. */
-export const tenderLineSchema = z
-  .object({
-    transactionType: z.enum(['cash', 'pdc', 'online']),
-    chequeNumber:    z.string().trim().optional().nullable(),
-    chequeDueDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable().or(z.literal("")),
-    bankId:          z.string().uuid().optional().nullable(),
-    amount:          z.coerce.number().positive('Line amount must be positive'),
-    // Set when this line hands on a cheque received from a party rather than
-    // writing a new one. The server re-reads the cheque and copies its amount,
-    // so these are a reference, not trusted data.
-    endorsedFromSource: z.string().optional().nullable(),
-    endorsedFromLineId: z.string().uuid().optional().nullable(),
+export const tenderLineSchema = tenderLineObject
+  .superRefine(requireChequeForPdc)
+  .superRefine(requirePdcForEndorsement)
+
+// ── Direct payment (customer receipts only) ─────────────────────────
+// The customer pays one of OUR suppliers on our behalf, so no money reaches
+// cash or bank: the line's debit goes to Accounts Payable for that supplier
+// instead (see create-ar-receipt). It is deliberately NOT in TENDER_TYPES —
+// those feed every money document, and a supplier payment or loan with a
+// 'direct' line would post to an account that means nothing for it.
+
+export const DIRECT_TENDER = { value: 'direct', label: 'Direct Payment' } as const
+export type ReceiptTenderType = TenderType | typeof DIRECT_TENDER.value
+
+export const DIRECT_SUPPLIER_REQUIRED = 'Select the supplier the customer paid'
+export const DIRECT_PKR_ONLY = 'A direct payment to a supplier must be in PKR'
+
+function requireSupplierForDirect(
+  line: { transactionType: string; supplierId?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (line.transactionType === 'direct' && !line.supplierId?.trim()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['supplierId'], message: DIRECT_SUPPLIER_REQUIRED })
+  }
+}
+
+/** Server-side receipt line: the shared tender line plus Direct Payment. */
+export const receiptTenderLineSchema = tenderLineObject
+  .extend({
+    transactionType: z.enum(['cash', 'pdc', 'online', 'direct']),
+    supplierId:      z.string().uuid().optional().nullable().or(z.literal('')),
+    hawalaRemarks:   z.string().trim().max(500).optional().nullable(),
   })
   .superRefine(requireChequeForPdc)
   .superRefine(requirePdcForEndorsement)
+  .superRefine(requireSupplierForDirect)
 
 /**
  * Client-side shape: blank/NaN amounts collapse to 0 so an untouched spare row
  * doesn't block submit — those rows are dropped before the action is called.
  * The cheque rule still applies to any row the user actually set to PDC.
  */
-export const tenderLineFormSchema = z
-  .object({
-    transactionType: z.enum(['cash', 'pdc', 'online']),
-    chequeNumber:    z.string().optional().default(''),
-    chequeDueDate:   z.string().optional().default(''),
-    bankId:          z.string().optional().default(''),
-    amount:          z.preprocess(
-      (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
-      z.coerce.number().min(0),
-    ),
-    // Optional rather than defaulted: a defaulted field infers as a required
-    // string, which every existing `emptyLine` in the ten forms would fail.
-    endorsedFromSource: z.string().optional(),
-    endorsedFromLineId: z.string().optional(),
+const tenderLineFormObject = z.object({
+  transactionType: z.enum(['cash', 'pdc', 'online']),
+  chequeNumber:    z.string().optional().default(''),
+  chequeDueDate:   z.string().optional().default(''),
+  bankId:          z.string().optional().default(''),
+  amount:          z.preprocess(
+    (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? 0 : v),
+    z.coerce.number().min(0),
+  ),
+  // Optional rather than defaulted: a defaulted field infers as a required
+  // string, which every existing `emptyLine` in the ten forms would fail.
+  endorsedFromSource: z.string().optional(),
+  endorsedFromLineId: z.string().optional(),
+})
+
+export const tenderLineFormSchema = tenderLineFormObject
+  .superRefine(requireChequeForPdc)
+  .superRefine(requirePdcForEndorsement)
+
+/** Client-side receipt line: adds Direct Payment's supplier and Hawala remarks. */
+export const receiptTenderLineFormSchema = tenderLineFormObject
+  .extend({
+    transactionType: z.enum(['cash', 'pdc', 'online', 'direct']),
+    supplierId:      z.string().optional(),
+    hawalaRemarks:   z.string().optional(),
   })
   .superRefine(requireChequeForPdc)
   .superRefine(requirePdcForEndorsement)
+  .superRefine(requireSupplierForDirect)
 
 // Aggregate tender lines into GL money legs, summing PKR by target account so a
 // receipt/payment with several lines of the same type posts one clean GL line.
