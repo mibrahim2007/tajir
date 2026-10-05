@@ -61,7 +61,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
   const undatedPdc = lines.filter((l) => l.transactionType === 'pdc' && !l.chequeDueDate)
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">Edit Receipt</h1>

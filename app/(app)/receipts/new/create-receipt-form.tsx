@@ -134,7 +134,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext}>
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
           {/* ── LEFT COLUMN ── */}
           <div className="space-y-5">
@@ -144,76 +144,52 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
               </CardHeader>
               <CardContent className="px-5 pb-5 space-y-4">
 
-                {nextSerial && !isEdit && (
-                  <div className="space-y-1">
-                    <Label>Serial No.</Label>
-                    <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                    <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-                  </div>
-                )}
-
-                {/* Customer */}
-                <div className="space-y-1">
-                  <Label>Customer <span className="text-destructive">*</span></Label>
-                  {isEdit ? (
-                    <Input value={selectedCustomer?.name ?? '—'} disabled readOnly className="min-h-[44px]" />
-                  ) : (
-                    <Controller
-                      control={form.control}
-                      name="customerId"
-                      render={({ field, fieldState }) => (
-                        <>
-                          <ItemPickerDialog
-                            items={customerPickerItems}
-                            value={field.value}
-                            onSelect={field.onChange}
-                            placeholder="Select customer…"
-                            title="Select Customer"
-                            createLabel="New Customer"
-                            onCreateSuccess={(item) => setCustomerFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
-                            quickCreate={(onSuccess, onCancel) => (
-                              <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
-                            )}
-                          />
-                          {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
-                        </>
-                      )}
-                    />
-                  )}
-                </div>
-
-                {/* Outstanding reference */}
-                {selectedCustomer && !isEdit && (
-                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">Outstanding balance</span>
-                      <span className={`font-semibold tabular-nums ${selectedCustomer.outstanding > 0 ? 'text-amber-600' : 'text-green-600'}`}>
-                        {formatPKR(selectedCustomer.outstanding)}
-                      </span>
+                {/* Serial · Customer · Date · Currency share one row on wide screens. */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                  {nextSerial && !isEdit && (
+                    <div className="space-y-1 md:col-span-3">
+                      <Label>Serial No.</Label>
+                      <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                      <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
                     </div>
-                    {customerSales.length > 0 && (
-                      <>
-                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
-                        <div className="space-y-1">
-                          {customerSales.map((s) => (
-                            <div key={s.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{formatPKTDate(s.date + 'T00:00:00')} · {s.itemName} × {s.qty}</span>
-                              <span className="tabular-nums">{formatPKR(s.pkrEquivalent)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
+                  )}
+
+                  {/* Customer */}
+                  <div className={`space-y-1 ${nextSerial && !isEdit ? 'md:col-span-5' : 'md:col-span-8'}`}>
+                    <Label>Customer <span className="text-destructive">*</span></Label>
+                    {isEdit ? (
+                      <Input value={selectedCustomer?.name ?? '—'} disabled readOnly className="min-h-[44px]" />
+                    ) : (
+                      <Controller
+                        control={form.control}
+                        name="customerId"
+                        render={({ field, fieldState }) => (
+                          <>
+                            <ItemPickerDialog
+                              items={customerPickerItems}
+                              value={field.value}
+                              onSelect={field.onChange}
+                              placeholder="Select customer…"
+                              title="Select Customer"
+                              createLabel="New Customer"
+                              onCreateSuccess={(item) => setCustomerFull((prev) => [...prev, { id: item.id, name: item.name, outstanding: 0 }])}
+                              quickCreate={(onSuccess, onCancel) => (
+                                <QuickCreateCustomer onSuccess={onSuccess} onCancel={onCancel} />
+                              )}
+                            />
+                            {fieldState.error && <p className="text-xs text-destructive">{fieldState.error.message}</p>}
+                          </>
+                        )}
+                      />
                     )}
                   </div>
-                )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:col-span-2">
                     <Label>Date <span className="text-destructive">*</span></Label>
                     <Input type="date" {...form.register('date')} className="min-h-[44px]" />
                     {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:col-span-2">
                     <Label>Currency</Label>
                     <Controller
                       control={form.control}
@@ -231,8 +207,33 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                   </div>
                 </div>
 
+                {/* Outstanding reference */}
+                {selectedCustomer && !isEdit && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">Outstanding balance</span>
+                      <span className={`font-semibold tabular-nums ${selectedCustomer.outstanding > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                        {formatPKR(selectedCustomer.outstanding)}
+                      </span>
+                    </div>
+                    {customerSales.length > 0 && (
+                      <>
+                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-8 gap-y-1">
+                          {customerSales.map((s) => (
+                            <div key={s.id} className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{formatPKTDate(s.date + 'T00:00:00')} · {s.itemName} × {s.qty}</span>
+                              <span className="tabular-nums">{formatPKR(s.pkrEquivalent)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {watchedCurrency === 'USD' && (
-                  <div className="space-y-1">
+                  <div className="space-y-1 md:max-w-xs">
                     <Label>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></Label>
                     <Input type="number" step="0.01" min="1" {...form.register('exchangeRate', { valueAsNumber: true })} className="min-h-[44px]" />
                   </div>
@@ -240,7 +241,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
 
                 <Separator />
 
-                <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} />
+                <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} layout="wide" />
                 {watchedCurrency !== 'PKR' && (watchedLines ?? []).some((l) => l.transactionType === 'direct') && (
                   <p className="text-xs text-destructive">A direct payment to a supplier must be in PKR.</p>
                 )}
