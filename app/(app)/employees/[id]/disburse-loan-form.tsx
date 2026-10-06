@@ -119,7 +119,7 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-5 items-start">
             <div className="flex flex-col gap-4">
             {showPicker && (
               <FormField control={form.control} name="employeeId" render={({ field }) => (
@@ -226,8 +226,8 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
             )} />
             </div>
 
-            {/* ── Summary — after the fields in source order, shown on the left on wide screens ── */}
-            <div className="md:order-first md:sticky md:top-0">
+            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
+            <div className=" md:sticky md:top-0">
               <Card><CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Loan Summary</p>
 

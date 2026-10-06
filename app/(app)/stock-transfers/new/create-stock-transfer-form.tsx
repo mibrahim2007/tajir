@@ -112,7 +112,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
         <Card>
           <CardHeader className="pb-4 pt-5 px-5">
             <CardTitle className="text-base">Transfer Details</CardTitle>
@@ -202,8 +202,8 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
           </CardContent>
         </Card>
 
-        {/* ── Summary — after the form in source order, shown on the left on wide screens ── */}
-        <div className="xl:order-first xl:sticky xl:top-6">
+        {/* ── Summary — after the form in source order, shown on the right on wide screens ── */}
+        <div className=" xl:sticky xl:top-6">
           <Card>
             <CardContent className="px-5 pt-5 pb-5">
               <p className="font-extrabold text-[15px] tracking-tight mb-4">Transfer Summary</p>

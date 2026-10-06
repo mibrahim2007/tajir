@@ -238,9 +238,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-          {/* ── DETAILS + LINE ITEMS (right on xl; first in source order) ── */}
+          {/* ── DETAILS + LINE ITEMS (left on xl) ── */}
           <div className="space-y-5 min-w-0">
 
             {/* Header card */}
@@ -524,8 +524,8 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
           </div>
 
-          {/* ── SUMMARY (left on xl, sticky) ── */}
-          <Card className="xl:order-first xl:sticky xl:top-6">
+          {/* ── SUMMARY (right on xl, sticky) ── */}
+          <Card className=" xl:sticky xl:top-6">
             <CardContent className="px-5 py-5">
               <div className="flex flex-col gap-5">
 
