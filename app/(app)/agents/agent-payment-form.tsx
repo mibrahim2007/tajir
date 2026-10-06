@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -72,6 +73,10 @@ export function AgentPaymentForm({
   const watchedAgentId = form.watch('agentId')
   const watchedLines = form.watch('lines') ?? []
   const amount = watchedLines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  const watchedDate = form.watch('date')
+  const watchedRate = Number(form.watch('exchangeRate')) || 0
+  const agentName = showPicker ? agents!.find((a) => a.id === watchedAgentId)?.name : undefined
+  const totalPKR = watchedCurrency === 'USD' ? amount * watchedRate : amount
 
   const due = agentId
     ? (outstanding ?? 0)
@@ -108,7 +113,7 @@ export function AgentPaymentForm({
       <SheetTrigger asChild>
         <Button className="min-h-[44px]">Pay Commission</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader>
           <SheetTitle>Agent Commission Payment</SheetTitle>
           <SheetDescription>
@@ -120,53 +125,47 @@ export function AgentPaymentForm({
           <form
             onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))}
             onKeyDown={handleEnterToNext}
-            className="flex flex-col gap-4 mt-6"
+            className="mt-6"
           >
-            {showPicker && (
-              <FormField control={form.control} name="agentId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Agent <span className="text-destructive">*</span></FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select an agent…" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {agents!.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>
-                          {a.name}{a.outstanding > 0 ? ` — ${formatPKR(a.outstanding)} due` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            )}
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
+            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+              {showPicker && (
+                <FormField control={form.control} name="agentId" render={({ field }) => (
+                  <FormItem className="md:col-span-12">
+                    <FormLabel>Agent <span className="text-destructive">*</span></FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select an agent…" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {agents!.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.name}{a.outstanding > 0 ? ` — ${formatPKR(a.outstanding)} due` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
 
-            {due !== 0 && (
-              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-                <span className="text-muted-foreground">Outstanding commission: </span>
-                <span className="font-medium tabular-nums">{formatPKR(Math.abs(due))}</span>
-                {due < 0 && <span className="text-muted-foreground"> paid in advance</span>}
-              </div>
-            )}
+              {nextSerial && (
+                <div className="space-y-2 md:col-span-4">
+                  <label className="text-sm font-medium leading-none">Serial No.</label>
+                  <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                  <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+                </div>
+              )}
 
-            {nextSerial && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Serial No.</label>
-                <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
               <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem>
+                <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
                   <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                   <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="currencyCode" render={({ field }) => (
-                <FormItem>
+                <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
                   <FormLabel>Currency</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
                     <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
@@ -177,20 +176,20 @@ export function AgentPaymentForm({
                   </Select>
                 </FormItem>
               )} />
-            </div>
 
-            {watchedCurrency === 'USD' && (
-              <FormField control={form.control} name="exchangeRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber)} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            )}
+              {watchedCurrency === 'USD' && (
+                <FormField control={form.control} name="exchangeRate" render={({ field }) => (
+                  <FormItem className="md:col-span-6">
+                    <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber)} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              )}
+            </div>
 
             <Separator />
 
@@ -216,11 +215,66 @@ export function AgentPaymentForm({
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Record Payment'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
+            <div className="md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Payment Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  {showPicker && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Agent</span>
+                      <span className="font-medium text-right">{agentName ?? '—'}</span>
+                    </div>
+                  )}
+                  {due !== 0 && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">{due < 0 ? 'Paid in Advance' : 'Outstanding'}</span>
+                      <span className="font-medium tabular-nums">{formatPKR(Math.abs(due))}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Currency</span>
+                    <span className="font-medium">{watchedCurrency}</span>
+                  </div>
+                  {watchedCurrency === 'USD' && (
+                    <>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Rate</span>
+                        <span className="font-medium tabular-nums">{watchedRate.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Amount (USD)</span>
+                        <span className="font-medium tabular-nums">USD {amount.toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Tender Lines</span>
+                    <span className="font-medium tabular-nums">{watchedLines.length}</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Total</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Record Payment'}
+                </Button>
+                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>

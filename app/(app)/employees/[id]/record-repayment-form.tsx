@@ -93,14 +93,14 @@ export function RecordRepaymentForm({ employeeId, today, nextSerial, banks = [],
       <SheetTrigger asChild>
         <Button variant="outline" className="min-h-[44px]">Record Repayment</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-4xl">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader>
           <SheetTitle>Record Repayment</SheetTitle>
           <SheetDescription>Record a loan installment or repayment received from this employee.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-5 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
             <div className="flex flex-col gap-4">
             {nextSerial && (
               <div className="space-y-2">

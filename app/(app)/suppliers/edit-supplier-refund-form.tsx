@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
 import { editSupplierRefundAction } from '@/app/actions/edit-supplier-refund'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { formatPKR } from '@/lib/utils/currency'
 
 type Bank = { id: string; name: string; account_number: string | null }
 
@@ -49,6 +50,11 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
   })
 
   const watchedCurrency = form.watch('currencyCode')
+  const watchedRate     = form.watch('exchangeRate')
+  const watchedDate     = form.watch('date')
+  const watchedLines    = form.watch('lines')
+  const lineTotal = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  const totalPkr  = lineTotal * (watchedCurrency === 'USD' ? (watchedRate || 1) : 1)
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -77,7 +83,10 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext}>
-        <Card>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+
+        {/* ── FORM (left on xl) ── */}
+        <Card className="min-w-0">
           <CardHeader className="pb-3 pt-5 px-5"><CardTitle className="text-base">Refund Details</CardTitle></CardHeader>
           <CardContent className="px-5 pb-5 space-y-4">
             {/* Supplier · Date · Currency share one row on wide screens. */}
@@ -121,16 +130,49 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
               <Input placeholder="e.g. Overpayment return for PO-0042…" {...form.register('notes')} className="min-h-[44px]" />
             </div>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-
-            <div className="flex gap-2">
-              <Button type="submit" className="min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isPending}>
-                {isPending ? 'Saving…' : 'Save Changes'}
-              </Button>
-              <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => router.back()}>Cancel</Button>
-            </div>
           </CardContent>
         </Card>
+
+        {/* ── SUMMARY (right on xl, sticky) ── */}
+        <div className="xl:sticky xl:top-6">
+          <Card>
+            <CardContent className="px-5 pt-5 pb-5">
+              <p className="font-extrabold text-[15px] tracking-tight mb-4">Refund Summary</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Supplier</span>
+                  <span className="font-medium text-right truncate">{supplierName}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="tabular-nums">{watchedDate || '—'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Tender lines</span>
+                  <span className="tabular-nums">{(watchedLines ?? []).filter((l) => (Number(l.amount) || 0) > 0).length}</span>
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="flex justify-between items-center mb-5">
+                <span className="font-bold text-sm">Receiving</span>
+                <span className="text-xl font-extrabold tabular-nums tracking-tight">{formatPKR(totalPkr)}</span>
+              </div>
+
+              <div className="space-y-2">
+                <Button type="submit" className="w-full min-h-[44px] bg-emerald-600 hover:bg-emerald-700 text-white" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Save Changes'}
+                </Button>
+                <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.back()}>Cancel</Button>
+              </div>
+
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+            </CardContent>
+          </Card>
+        </div>
+
+        </div>
       </form>
     </FormProvider>
   )

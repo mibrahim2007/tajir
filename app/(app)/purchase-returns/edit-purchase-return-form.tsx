@@ -11,9 +11,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { editPurchaseReturnAction } from '@/app/actions/edit-purchase-return'
-import { YARN_TYPES } from '@/lib/yarn'
+import { YARN_TYPES, normalizeMultiplyBy } from '@/lib/yarn'
+import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 
 const schema = z.object({
   supplierId:   z.string().uuid('Select a supplier'),
@@ -83,6 +86,20 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
 
   const isYarn = !!lots.find((l) => l.id === form.watch('stockItemId'))?.isYarn
 
+  // Summary values (display only) — mirrors the server's amount formula.
+  const watchedPartyId  = form.watch('supplierId')
+  const watchedStockId  = form.watch('stockItemId')
+  const watchedQty      = Number(form.watch('quantity')) || 0
+  const rateNum         = Number(form.watch('rate')) || 0
+  const watchedCurrency = form.watch('currencyCode')
+  const watchedER       = Number(form.watch('exchangeRate')) || 1
+  const watchedDate     = form.watch('date')
+  const watchedMultiply = isYarn ? normalizeMultiplyBy(form.watch('multiplyBy')) : 1
+  const selectedLot     = lots.find((l) => l.id === watchedStockId)
+  const partyName       = suppliers.find((p) => p.id === watchedPartyId)?.name
+  const lineAmount      = watchedQty * rateNum * watchedMultiply
+  const totalPKR        = lineAmount * (watchedCurrency === 'USD' ? watchedER : 1)
+
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
@@ -98,13 +115,15 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader><SheetTitle>Edit Purchase Return</SheetTitle></SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-6">
-
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
+            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="supplierId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select {...form.register('supplierId')} className={SELECT_CLS}>
@@ -116,7 +135,7 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
             )} />
 
             <FormField control={form.control} name="stockItemId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select {...form.register('stockItemId')} className={SELECT_CLS}>
@@ -126,11 +145,13 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
-                <FormItem>
+                <FormItem className="md:col-span-4">
                   <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.0001" min="0" value={value}
@@ -142,6 +163,7 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
               )
             }} />
 
+            <div className="md:col-span-8">
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
@@ -150,18 +172,21 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
               step="0.0001"
               required
             />
+            </div>
+            </div>
 
             {isYarn && (
               <div className="rounded-md border border-amber-200/70 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-950/20 p-3 space-y-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Yarn</p>
-                <FormItem>
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                <FormItem className="md:col-span-6">
                   <FormLabel>Yarn Type</FormLabel>
                   <select {...form.register('yarnType')} className={SELECT_CLS}>
                     <option value="">Type…</option>
                     {YARN_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </FormItem>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3 md:col-span-6">
                   <FormItem>
                     <FormLabel>Yarn Weight</FormLabel>
                     <Input type="number" step="0.001" min="0" {...form.register('yarnWeight', { valueAsNumber: true })} />
@@ -171,11 +196,14 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
                     <Input type="number" step="0.0001" min="0" {...form.register('multiplyBy', { valueAsNumber: true })} />
                   </FormItem>
                 </div>
+                </div>
               </div>
             )}
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-3' : 'md:col-span-4'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
@@ -183,7 +211,7 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
             )} />
 
             <FormField control={form.control} name="reason" render={({ field }) => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-6' : 'md:col-span-8'}>
                 <FormLabel>Reason</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. Damaged goods, wrong item…" {...field} />
@@ -194,7 +222,7 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
 
             {locations.length > 0 && (
               <FormField control={form.control} name="locationId" render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-3">
                   <FormLabel>Location</FormLabel>
                   <Select
                     value={field.value || '_none_'}
@@ -212,11 +240,69 @@ export function EditPurchaseReturnForm({ ret, suppliers, lots, locations }: Prop
                 </FormItem>
               )} />
             )}
+            </div>
+            </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
+            <div className="md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Return Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Supplier</span>
+                    <span className="font-medium text-right">{partyName ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Item</span>
+                    <span className="font-medium text-right">{selectedLot?.name ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Quantity</span>
+                    <span className="font-medium tabular-nums text-right">{watchedQty.toLocaleString()}{selectedLot?.unitOfMeasure ? ` ${selectedLot.unitOfMeasure}` : ''}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Rate</span>
+                    <span className="font-medium tabular-nums text-right">{formatCurrency(rateNum, watchedCurrency)}</span>
+                  </div>
+                  {isYarn && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Multiply By</span>
+                      <span className="font-medium tabular-nums text-right">{watchedMultiply.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {watchedCurrency === 'USD' && (
+                    <>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Amount (USD)</span>
+                        <span className="font-medium tabular-nums text-right">{formatCurrency(lineAmount, watchedCurrency)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Exchange Rate</span>
+                        <span className="font-medium tabular-nums text-right">{watchedER.toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Total</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Save'}
+                </Button>
+                {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>

@@ -23,7 +23,7 @@ export default async function NewExpensePage() {
   const banks = rawBanks ?? []
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6 max-w-[1440px] mx-auto">
       <PeriodLockBanner className="mb-4" />
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">New Expense</h1>

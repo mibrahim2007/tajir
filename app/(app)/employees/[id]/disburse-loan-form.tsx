@@ -112,14 +112,14 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
       <SheetTrigger asChild>
         <Button className="min-h-[44px]">Disburse Loan</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-4xl">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader>
           <SheetTitle>Disburse Loan / Advance</SheetTitle>
           <SheetDescription>Pay a loan or advance{showPicker ? ' to an employee' : ' to this employee'}. Interest-free.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_240px] gap-5 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
             <div className="flex flex-col gap-4">
             {showPicker && (
               <FormField control={form.control} name="employeeId" render={({ field }) => (

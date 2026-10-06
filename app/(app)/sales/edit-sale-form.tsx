@@ -12,8 +12,11 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleAction } from '@/app/actions/edit-sale'
+import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 
 const schema = z.object({
   customerId:     z.string().min(1, 'Customer is required'),
@@ -78,6 +81,18 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
   const cost               = costMap[watchedStockItemId]
   const belowCost          = cost !== undefined && watchedRate > 0 && (watchedRate * (watchedER || 1)) < cost
 
+  // Summary values (display only)
+  const watchedCustomerId = form.watch('customerId')
+  const watchedQty        = Number(form.watch('quantity')) || 0
+  const watchedCurrency   = form.watch('currencyCode')
+  const watchedDate       = form.watch('date')
+  const watchedDueDate    = form.watch('paymentDueDate')
+  const selectedLot       = lots.find((l) => l.id === watchedStockItemId)
+  const customerName      = customers.find((c) => c.id === watchedCustomerId)?.name
+  const rateNum           = Number(watchedRate) || 0
+  const lineAmount        = watchedQty * rateNum
+  const totalPKR          = lineAmount * (watchedCurrency === 'USD' ? (Number(watchedER) || 1) : 1)
+
   const save = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
@@ -103,12 +118,15 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader><SheetTitle>Edit Sale</SheetTitle></SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
+            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="customerId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select
@@ -123,7 +141,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
             )} />
 
             <FormField control={form.control} name="stockItemId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select
@@ -136,11 +154,13 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === watchedStockItemId)?.unitOfMeasure
               return (
-                <FormItem>
+                <FormItem className="md:col-span-4">
                   <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
                   <FormControl><Input type="number" step="0.001" min="0" value={value} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
                   <FormMessage />
@@ -148,6 +168,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
               )
             }} />
 
+            <div className="md:col-span-8 space-y-2">
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
@@ -156,14 +177,17 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
               required
             />
             {belowCost && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2 flex items-center gap-1">
+              <p className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                 Below purchase cost (Rs {Math.round(cost!).toLocaleString()})
               </p>
             )}
+            </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
@@ -171,7 +195,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
             )} />
 
             <FormField control={form.control} name="paymentDueDate" render={({ field }) => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Payment Due Date</FormLabel>
                 <FormControl><Input type="date" className="min-h-[44px]" {...field} value={field.value ?? ''} /></FormControl>
                 <FormMessage />
@@ -180,7 +204,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
 
             {locations.length > 0 && (
               <FormField control={form.control} name="locationId" render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-4">
                   <FormLabel>Location</FormLabel>
                   <Select
                     value={field.value || '_none_'}
@@ -198,11 +222,67 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
                 </FormItem>
               )} />
             )}
+            </div>
+            </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
+            <div className="md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Sale Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Customer</span>
+                    <span className="font-medium text-right">{customerName ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Item</span>
+                    <span className="font-medium text-right">{selectedLot?.name ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Quantity</span>
+                    <span className="font-medium tabular-nums text-right">{watchedQty.toLocaleString()}{selectedLot?.unitOfMeasure ? ` ${selectedLot.unitOfMeasure}` : ''}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Rate</span>
+                    <span className="font-medium tabular-nums text-right">{formatCurrency(rateNum, watchedCurrency)}</span>
+                  </div>
+                  {watchedCurrency === 'USD' && (
+                    <>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Amount (USD)</span>
+                        <span className="font-medium tabular-nums text-right">{formatCurrency(lineAmount, watchedCurrency)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Exchange Rate</span>
+                        <span className="font-medium tabular-nums text-right">{(Number(watchedER) || 1).toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Due</span>
+                    <span className="font-medium tabular-nums">{watchedDueDate || '—'}</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Total</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Save'}
+                </Button>
+                {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>

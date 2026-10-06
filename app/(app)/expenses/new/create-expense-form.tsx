@@ -116,7 +116,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
               <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
 
                 {/* Expense Account */}
-                <div className="space-y-1 md:col-span-5">
+                <div className="space-y-1 md:col-span-4">
                   <Label>Expense Account <span className="text-destructive">*</span></Label>
                   <Controller
                     control={form.control}
@@ -147,7 +147,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
                 </div>
 
                 {/* Description */}
-                <div className="space-y-1 md:col-span-7">
+                <div className="space-y-1 md:col-span-5">
                   <Label>Description <span className="text-destructive">*</span></Label>
                   <Input placeholder="e.g. Office rent, Electricity bill…" {...form.register('description')} className="min-h-[44px]" />
                   {form.formState.errors.description && <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>}
@@ -168,7 +168,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
 
                 {/* Bank */}
                 {banks.length > 0 && (
-                  <div className="space-y-1 md:col-span-6">
+                  <div className="space-y-1 md:col-span-4">
                     <Label>Bank (optional)</Label>
                     <Controller
                       control={form.control}
@@ -189,7 +189,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
                 )}
 
                 {/* Note */}
-                <div className={`space-y-1 ${banks.length > 0 ? 'md:col-span-12' : 'md:col-span-6'}`}>
+                <div className={`space-y-1 ${banks.length > 0 ? 'md:col-span-5' : 'md:col-span-9'}`}>
                   <Label>Note (optional)</Label>
                   <Input placeholder="e.g. Payee name, invoice number…" {...form.register('note')} className="min-h-[44px]" />
                 </div>

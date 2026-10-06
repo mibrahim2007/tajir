@@ -120,7 +120,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
           {/* Date · From · To, then Stock Item · Quantity share rows on wide screens. */}
           <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem className="md:col-span-4">
+              <FormItem className="md:col-span-2">
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="date" {...field} /></FormControl>
                 <FormMessage />
@@ -128,7 +128,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="fromLocationId" render={({ field }) => (
-              <FormItem className="md:col-span-4">
+              <FormItem className="md:col-span-5">
                 <FormLabel>From Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={handleFromChange}>
                   <FormControl>
@@ -143,7 +143,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             )} />
 
             <FormField control={form.control} name="toLocationId" render={({ field }) => (
-              <FormItem className="md:col-span-4">
+              <FormItem className="md:col-span-5">
                 <FormLabel>To Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>

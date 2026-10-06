@@ -11,10 +11,13 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Card, CardContent } from '@/components/ui/card'
+import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { NumericInput } from '@/components/numeric-input'
 import { computeQtyLbs } from '@/lib/polyester'
 import { editPurchaseAction } from '@/app/actions/edit-purchase'
+import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 
 const optionalNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
@@ -87,6 +90,21 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
   const watchedWt  = form.watch('weightPerCarton')
   const qtyLbs = computeQtyLbs(watchedNos, watchedWt)
 
+  // Summary values (display only) — polyester lines are priced per lb.
+  const watchedSupplierId = form.watch('supplierId')
+  const watchedStockId    = form.watch('stockItemId')
+  const watchedQty        = Number(form.watch('quantity')) || 0
+  const rateNum           = Number(form.watch('rate')) || 0
+  const watchedCurrency   = form.watch('currencyCode')
+  const watchedER         = Number(form.watch('exchangeRate')) || 1
+  const watchedAdvance    = Number(form.watch('advancePaid')) || 0
+  const watchedDate       = form.watch('date')
+  const selectedLot       = lots.find((l) => l.id === watchedStockId)
+  const supplierName      = suppliers.find((s) => s.id === watchedSupplierId)?.name
+  const pricedQty         = selectedIsPolyester ? qtyLbs : watchedQty
+  const lineAmount        = pricedQty * rateNum
+  const totalPKR          = lineAmount * (watchedCurrency === 'USD' ? watchedER : 1)
+
   // For a polyester item, Quantity is derived = Nos Carton × Weight.
   useEffect(() => {
     if (!selectedIsPolyester) return
@@ -113,12 +131,15 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
       <SheetTrigger asChild>
         <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader><SheetTitle>Edit Purchase</SheetTitle></SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
+            <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="supplierId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select
@@ -133,7 +154,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             )} />
 
             <FormField control={form.control} name="stockItemId" render={() => (
-              <FormItem>
+              <FormItem className="md:col-span-6">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select
@@ -146,30 +167,32 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             {selectedIsPolyester && (
-              <div className="grid grid-cols-2 gap-3">
-                <FormItem>
+              <>
+                <FormItem className="md:col-span-3">
                   <FormLabel>Nos Carton</FormLabel>
                   <FormControl>
                     <NumericInput step="0.0001" min="0" className="text-right"
                       {...form.register('nosCarton', { valueAsNumber: true })} />
                   </FormControl>
                 </FormItem>
-                <FormItem>
+                <FormItem className="md:col-span-3">
                   <FormLabel>Weight</FormLabel>
                   <FormControl>
                     <NumericInput step="0.0001" min="0" className="text-right"
                       {...form.register('weightPerCarton', { valueAsNumber: true })} />
                   </FormControl>
                 </FormItem>
-              </div>
+              </>
             )}
 
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
-                <FormItem>
+                <FormItem className={selectedIsPolyester ? 'md:col-span-3' : 'md:col-span-4'}>
                   <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}{selectedIsPolyester && <span className="ml-1 text-muted-foreground font-normal">(auto = Nos Carton × Weight)</span>}</FormLabel>
                   <FormControl><Input type="number" step="0.001" min="0" value={value} readOnly={selectedIsPolyester} tabIndex={selectedIsPolyester ? -1 : undefined} className={selectedIsPolyester ? 'bg-muted/40 text-muted-foreground cursor-default' : undefined} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
                   <FormMessage />
@@ -178,7 +201,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             }} />
 
             {selectedIsPolyester && (
-              <FormItem>
+              <FormItem className="md:col-span-3">
                 <FormLabel>LBS Qty</FormLabel>
                 <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
                   {qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
@@ -186,6 +209,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
               </FormItem>
             )}
 
+            <div className={selectedIsPolyester ? 'md:col-span-12' : 'md:col-span-8'}>
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
@@ -193,9 +217,12 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
               label={selectedIsPolyester ? 'Rate per Lb' : 'Rate per Unit'}
               required
             />
+            </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="advancePaid" render={() => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Advance Paid (PKR)</FormLabel>
                 <FormControl><Input type="number" step="0.01" min="0" {...form.register('advancePaid', { valueAsNumber: true })} /></FormControl>
                 <FormMessage />
@@ -203,7 +230,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             )} />
 
             <FormField control={form.control} name="date" render={({ field }) => (
-              <FormItem>
+              <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                 <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
@@ -212,7 +239,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
 
             {locations.length > 0 && (
               <FormField control={form.control} name="locationId" render={({ field }) => (
-                <FormItem>
+                <FormItem className="md:col-span-4">
                   <FormLabel>Location</FormLabel>
                   <Select
                     value={field.value || '_none_'}
@@ -230,11 +257,73 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
                 </FormItem>
               )} />
             )}
+            </div>
+            </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Save'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
+            <div className="md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Purchase Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Supplier</span>
+                    <span className="font-medium text-right">{supplierName ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Item</span>
+                    <span className="font-medium text-right">{selectedLot?.name ?? '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Quantity</span>
+                    <span className="font-medium tabular-nums text-right">{watchedQty.toLocaleString()}{selectedLot?.unitOfMeasure ? ` ${selectedLot.unitOfMeasure}` : ''}</span>
+                  </div>
+                  {selectedIsPolyester && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">LBS Qty</span>
+                      <span className="font-medium tabular-nums text-right">{qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">{selectedIsPolyester ? 'Rate / Lb' : 'Rate'}</span>
+                    <span className="font-medium tabular-nums text-right">{formatCurrency(rateNum, watchedCurrency)}</span>
+                  </div>
+                  {watchedCurrency === 'USD' && (
+                    <>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Amount (USD)</span>
+                        <span className="font-medium tabular-nums text-right">{formatCurrency(lineAmount, watchedCurrency)}</span>
+                      </div>
+                      <div className="flex justify-between gap-2">
+                        <span className="text-muted-foreground shrink-0">Exchange Rate</span>
+                        <span className="font-medium tabular-nums text-right">{watchedER.toLocaleString()}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Advance Paid</span>
+                    <span className="font-medium tabular-nums text-right">{formatPKR(watchedAdvance)}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Total</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Save'}
+                </Button>
+                {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>
