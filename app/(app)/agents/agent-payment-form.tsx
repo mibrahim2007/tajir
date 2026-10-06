@@ -125,7 +125,7 @@ export function AgentPaymentForm({
           <form
             onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))}
             onKeyDown={handleEnterToNext}
-            className="mt-6"
+            className="mt-6 px-4 pb-6"
           >
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
             <div className="flex flex-col gap-4">
@@ -135,7 +135,7 @@ export function AgentPaymentForm({
                   <FormItem className="md:col-span-12">
                     <FormLabel>Agent <span className="text-destructive">*</span></FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select an agent…" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select an agent…" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {agents!.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
@@ -168,7 +168,7 @@ export function AgentPaymentForm({
                 <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
                   <FormLabel>Currency</FormLabel>
                   <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="PKR">PKR</SelectItem>
                       <SelectItem value="USD">USD</SelectItem>

@@ -118,7 +118,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
       <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
         <SheetHeader><SheetTitle>Edit Sale Return</SheetTitle></SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 px-4 pb-6">
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
             <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
@@ -229,7 +229,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
                     onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
                   >
                     <FormControl>
-                      <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
+                      <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location…" /></SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="_none_">No location</SelectItem>

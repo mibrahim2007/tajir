@@ -77,7 +77,7 @@ export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loan
           <SheetDescription>Withhold part of this month&apos;s salary against the loan. No cash moves — it posts Salaries &amp; Wages against the loan balance.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="mt-6 px-4 pb-6">
             <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
             <div className="flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
@@ -102,7 +102,7 @@ export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loan
                   <FormItem className="md:col-span-4">
                     <FormLabel>Apply to loan</FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value={AUTO}>Auto (oldest first)</SelectItem>
                         {loans.map((l) => (
