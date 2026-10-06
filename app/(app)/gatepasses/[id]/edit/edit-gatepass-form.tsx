@@ -85,9 +85,9 @@ export function EditGatepassForm({ id, gpNumber, type, defaultValues, purchaseOr
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
 
-          {/* ── LEFT COLUMN ── */}
+          {/* ── FORM (right on xl) ── */}
           <div className="space-y-5">
 
             <Card>
@@ -262,8 +262,8 @@ export function EditGatepassForm({ id, gpNumber, type, defaultValues, purchaseOr
             </Card>
           </div>
 
-          {/* ── RIGHT COLUMN ── */}
-          <div className="xl:sticky xl:top-6">
+          {/* ── SUMMARY (left on xl, sticky) ── */}
+          <div className="xl:order-first xl:sticky xl:top-6">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Gatepass Summary</p>

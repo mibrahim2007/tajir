@@ -183,9 +183,9 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
 
-          {/* ── LEFT COLUMN ── */}
+          {/* ── FORM (right on xl) ── */}
           <div className="space-y-5">
 
             {/* Header card */}
@@ -417,8 +417,8 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
             </Card>
           </div>
 
-          {/* ── RIGHT COLUMN — sticky summary ── */}
-          <div className="xl:sticky xl:top-6 space-y-4">
+          {/* ── SUMMARY (left on xl, sticky) ── */}
+          <div className="xl:order-first xl:sticky xl:top-6 space-y-4">
             <Card>
               <CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Return Summary</p>

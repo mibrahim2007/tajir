@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -67,6 +68,10 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
   const watchedCount = Number(form.watch('installmentCount')) || 0
   const watchedFirstDue = form.watch('firstDueDate')
   const principal = watchedLines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  const watchedEmployeeId = form.watch('employeeId')
+  const watchedDate = form.watch('disbursementDate')
+  const employeeName = showPicker ? employees!.find((e) => e.id === watchedEmployeeId)?.name : undefined
+  const fmtAmount = (n: number) => (watchedCurrency !== 'PKR' ? `${watchedCurrency} ${n.toLocaleString()}` : formatPKR(n))
 
   const preview = watchedCount > 0 && watchedFirstDue && principal > 0
     ? generateSchedule({ principal, installmentCount: watchedCount, firstDueDate: watchedFirstDue })
@@ -107,13 +112,15 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
       <SheetTrigger asChild>
         <Button className="min-h-[44px]">Disburse Loan</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-4xl">
         <SheetHeader>
           <SheetTitle>Disburse Loan / Advance</SheetTitle>
           <SheetDescription>Pay a loan or advance{showPicker ? ' to an employee' : ' to this employee'}. Interest-free.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
+            <div className="flex flex-col gap-4">
             {showPicker && (
               <FormField control={form.control} name="employeeId" render={({ field }) => (
                 <FormItem>
@@ -217,11 +224,60 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Disburse Loan'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the left on wide screens ── */}
+            <div className="md:order-first md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Loan Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  {showPicker && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Employee</span>
+                      <span className="font-medium text-right">{employeeName ?? '—'}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Currency</span>
+                    <span className="font-medium">{watchedCurrency}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Installments</span>
+                    <span className="font-medium tabular-nums">{watchedCount > 0 ? watchedCount : 'Ad-hoc'}</span>
+                  </div>
+                  {watchedCount > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">First Due</span>
+                      <span className="font-medium tabular-nums">{watchedFirstDue || '—'}</span>
+                    </div>
+                  )}
+                  {preview.length > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Per Installment</span>
+                      <span className="font-medium tabular-nums">{fmtAmount(preview[0].amount)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Amount</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{fmtAmount(principal)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Disburse Loan'}
+                </Button>
+                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>

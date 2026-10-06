@@ -238,10 +238,10 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
 
-          {/* ── DETAILS + LINE ITEMS (full width) ── */}
-          <div className="space-y-5">
+          {/* ── DETAILS + LINE ITEMS (right on xl; first in source order) ── */}
+          <div className="space-y-5 min-w-0">
 
             {/* Header card */}
             <Card>
@@ -524,13 +524,13 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
           </div>
 
-          {/* ── SUMMARY (below the line items, full width) ── */}
-          <Card>
+          {/* ── SUMMARY (left on xl, sticky) ── */}
+          <Card className="xl:order-first xl:sticky xl:top-6">
             <CardContent className="px-5 py-5">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex flex-col gap-5">
 
                 {/* Totals */}
-                <div className="w-full max-w-sm">
+                <div className="w-full">
                   <p className="font-extrabold text-[15px] tracking-tight mb-3">Purchase Summary</p>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
@@ -556,7 +556,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                 </div>
 
                 {/* Advance paid + actions */}
-                <div className="w-full lg:w-72 space-y-3">
+                <div className="w-full space-y-3">
                   <FormField control={form.control} name="advancePaid" render={() => (
                     <FormItem>
                       <FormLabel>Advance Paid (PKR)</FormLabel>

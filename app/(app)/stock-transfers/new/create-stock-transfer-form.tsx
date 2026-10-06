@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
@@ -53,6 +54,13 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
 
   const watchedFrom = form.watch('fromLocationId')
   const watchedItem = form.watch('stockItemId')
+  const watchedTo   = form.watch('toLocationId')
+  const watchedDate = form.watch('date')
+  const watchedQty  = form.watch('quantity')
+
+  const fromName = locations.find(l => l.id === watchedFrom)?.name
+  const toName   = locations.find(l => l.id === watchedTo)?.name
+  const itemName = items.find(i => i.id === watchedItem)?.name
 
   // Stock at the selected from-location
   const fromLocMap = useMemo<Record<string, number>>(() => {
@@ -103,7 +111,8 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
         <Card>
           <CardHeader className="pb-4 pt-5 px-5">
             <CardTitle className="text-base">Transfer Details</CardTitle>
@@ -193,17 +202,61 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
           </CardContent>
         </Card>
 
-        {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+        {/* ── Summary — after the form in source order, shown on the left on wide screens ── */}
+        <div className="xl:order-first xl:sticky xl:top-6">
+          <Card>
+            <CardContent className="px-5 pt-5 pb-5">
+              <p className="font-extrabold text-[15px] tracking-tight mb-4">Transfer Summary</p>
 
-        <div className="flex gap-2">
-          <Button type="button" variant="outline" className="flex-1 min-h-[44px]" onClick={() => router.back()}>Cancel</Button>
-          <Button type="submit" className="flex-1 min-h-[44px]" disabled={isPending || locations.length < 2}>
-            {isPending ? 'Saving…' : 'Confirm Transfer'}
-          </Button>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Date</span>
+                  <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">From</span>
+                  <span className="font-medium text-right">{fromName ?? '—'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">To</span>
+                  <span className="font-medium text-right">{toName ?? '—'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Stock Item</span>
+                  <span className="font-medium text-right text-xs leading-5">{itemName ?? '—'}</span>
+                </div>
+                {availableQty !== null && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Available</span>
+                    <span className="font-medium tabular-nums">{availableQty.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="flex justify-between items-center mb-5">
+                <span className="font-bold text-sm">Quantity</span>
+                <span className="text-xl font-extrabold tabular-nums tracking-tight">
+                  {Number.isFinite(watchedQty) && watchedQty > 0 ? watchedQty.toLocaleString() : '—'}
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending || locations.length < 2}>
+                  {isPending ? 'Saving…' : 'Confirm Transfer'}
+                </Button>
+                <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.back()}>Cancel</Button>
+              </div>
+              {locations.length < 2 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">Add at least 2 locations first.</p>
+              )}
+
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+            </CardContent>
+          </Card>
         </div>
-        {locations.length < 2 && (
-          <p className="text-xs text-muted-foreground text-center">Add at least 2 locations first.</p>
-        )}
+        </div>
       </form>
     </Form>
   )

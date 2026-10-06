@@ -438,19 +438,19 @@ export function SaleInvoiceForm({
     <>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="space-y-5">
+          <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)] gap-5 items-start">
 
-            {/* ── DETAILS + LINE ITEMS (full width) ── */}
-            <div className="space-y-5">
+            {/* ── DETAILS + LINE ITEMS (right on xl) ── */}
+            <div className="space-y-5 min-w-0">
 
               {/* Header card */}
               <Card>
                 <CardHeader className="pb-3 pt-5 px-5">
                   <CardTitle className="text-base">Sale Details</CardTitle>
                 </CardHeader>
-                <CardContent className="px-5 pb-5 grid gap-4 sm:grid-cols-2">
+                <CardContent className="px-5 pb-5 grid gap-4 grid-cols-1 md:grid-cols-12 items-start">
                   <FormField control={form.control} name="customerId" render={({ field }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="md:col-span-6">
                       <FormLabel>Customer <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <ItemPickerDialog
@@ -471,7 +471,7 @@ export function SaleInvoiceForm({
                   )} />
 
                   {watchedCustomer && liveBalance !== null && liveBalance > 0 && (
-                    <div className="sm:col-span-2 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+                    <div className="md:col-span-12 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
                       <span className="font-semibold">Outstanding balance:</span> This customer owes{' '}
                       <span className="font-semibold">PKR {liveBalance.toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> from previous transactions.
                       {balanceFetching && <span className="ml-2 opacity-60 text-xs">updating…</span>}
@@ -479,7 +479,7 @@ export function SaleInvoiceForm({
                   )}
 
                   {watchedCustomer && liveBalance !== null && liveBalance < 0 && (
-                    <div className="sm:col-span-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
+                    <div className="md:col-span-12 rounded-lg border border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30 px-4 py-3 text-sm text-emerald-800 dark:text-emerald-300">
                       <span className="font-semibold">Credit available:</span> This customer has{' '}
                       <span className="font-semibold">PKR {Math.abs(liveBalance).toLocaleString('en-PK', { maximumFractionDigits: 0 })}</span> in credit from previous returns. The balance will offset their next outstanding amount automatically.
                       {balanceFetching && <span className="ml-2 opacity-60 text-xs">updating…</span>}
@@ -487,7 +487,7 @@ export function SaleInvoiceForm({
                   )}
 
                   <FormField control={form.control} name="date" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Sale Date <span className="text-destructive">*</span></FormLabel>
                       <FormControl><Input type="date" {...field} /></FormControl>
                       <FormMessage />
@@ -495,7 +495,7 @@ export function SaleInvoiceForm({
                   )} />
 
                   <FormField control={form.control} name="dueDays" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Due Days</FormLabel>
                       <FormControl>
                         <Input
@@ -510,7 +510,7 @@ export function SaleInvoiceForm({
                   )} />
 
                   <FormField control={form.control} name="paymentDueDate" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className="md:col-span-2">
                       <FormLabel>Payment Due</FormLabel>
                       <FormControl><Input type="date" {...field} /></FormControl>
                       <FormMessage />
@@ -518,7 +518,7 @@ export function SaleInvoiceForm({
                   )} />
 
                   <FormField control={form.control} name="poNo" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className={locations.length > 0 ? 'md:col-span-3' : 'md:col-span-5'}>
                       <FormLabel>PO No.</FormLabel>
                       <FormControl>
                         <Input
@@ -533,7 +533,7 @@ export function SaleInvoiceForm({
                   )} />
 
                   <FormField control={form.control} name="dcNo" render={({ field }) => (
-                    <FormItem>
+                    <FormItem className={locations.length > 0 ? 'md:col-span-3' : 'md:col-span-5'}>
                       <FormLabel>DC No.</FormLabel>
                       <FormControl>
                         <Input
@@ -549,11 +549,11 @@ export function SaleInvoiceForm({
 
                   {locations.length > 0 && (
                     <FormField control={form.control} name="locationId" render={({ field }) => (
-                      <FormItem>
+                      <FormItem className="md:col-span-4">
                         <FormLabel>Dispatch From <span className="text-destructive">*</span></FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
                           <FormControl>
-                            <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
+                            <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location…" /></SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
@@ -564,13 +564,13 @@ export function SaleInvoiceForm({
                     )} />
                   )}
 
-                  <div className="flex gap-2 items-end">
+                  <div className={`flex gap-2 items-end ${watchedCurrency === 'USD' ? 'md:col-span-6' : 'md:col-span-2'}`}>
                     <FormField control={form.control} name="currencyCode" render={({ field }) => (
-                      <FormItem className="w-28">
+                      <FormItem className={watchedCurrency === 'USD' ? 'w-28' : 'w-full'}>
                         <FormLabel>Currency</FormLabel>
                         <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                           <FormControl>
-                            <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                            <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="PKR">PKR</SelectItem>
@@ -594,13 +594,18 @@ export function SaleInvoiceForm({
                   </div>
 
                   {/* Agent + commission preview. Renders nothing when no agents
-                      are enrolled, so invoices are untouched until one is. */}
-                  <AgentCommissionField
-                    agents={agents}
-                    side="sale"
-                    baseAmount={commissionBase}
-                    baseQuantity={commissionQty}
-                  />
+                      are enrolled, so invoices are untouched until one is. The
+                      cell is skipped too, so it leaves no empty grid row. */}
+                  {agents.length > 0 && (
+                    <div className="md:col-span-6">
+                      <AgentCommissionField
+                        agents={agents}
+                        side="sale"
+                        baseAmount={commissionBase}
+                        baseQuantity={commissionQty}
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -677,7 +682,7 @@ export function SaleInvoiceForm({
                               <React.Fragment key={field.id}>
                               <tr className="align-top">
                                 <td className="px-3 py-3 text-muted-foreground text-xs">{index + 1}</td>
-                                <td className="px-3 py-2 min-w-[180px]">
+                                <td className="px-3 py-2 min-w-[260px]">
                                   <Controller
                                     control={form.control}
                                     name={`lines.${index}.stockItemId`}
@@ -812,63 +817,65 @@ export function SaleInvoiceForm({
               </Card>
             </div>
 
-            {/* ── SUMMARY (below the line items, full width) ── */}
-            <Card>
-              <CardContent className="px-5 py-5">
-                <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            {/* ── SUMMARY (left on xl, sticky; after the form on small screens) ── */}
+            <div className="xl:order-first xl:sticky xl:top-6">
+              <Card>
+                <CardContent className="px-5 py-5">
+                  <div className="space-y-5">
 
-                  {/* Totals */}
-                  <div className="w-full max-w-sm">
-                    <p className="font-extrabold text-[15px] tracking-tight mb-3">Sale Summary</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Items ({fields.length})</span>
-                        <span className="tabular-nums font-medium">Rs {fmt(subtotal)}</span>
-                      </div>
-                      {discountTotal > 0 && (
+                    {/* Totals */}
+                    <div className="w-full">
+                      <p className="font-extrabold text-[15px] tracking-tight mb-3">Sale Summary</p>
+                      <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-muted-foreground">Discount</span>
-                          <span className="tabular-nums font-medium text-rose-600">− Rs {fmt(discountTotal)}</span>
+                          <span className="text-muted-foreground">Items ({fields.length})</span>
+                          <span className="tabular-nums font-medium">Rs {fmt(subtotal)}</span>
                         </div>
-                      )}
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Net Amount</span>
-                        <span className="tabular-nums font-medium">Rs {fmt(netTotal)}</span>
+                        {discountTotal > 0 && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Discount</span>
+                            <span className="tabular-nums font-medium text-rose-600">− Rs {fmt(discountTotal)}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Net Amount</span>
+                          <span className="tabular-nums font-medium">Rs {fmt(netTotal)}</span>
+                        </div>
+                      </div>
+                      <Separator className="my-3" />
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-sm">Total</span>
+                        <span className="text-xl font-extrabold tabular-nums tracking-tight">Rs {fmt(netTotal)}</span>
                       </div>
                     </div>
-                    <Separator className="my-3" />
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-sm">Total</span>
-                      <span className="text-xl font-extrabold tabular-nums tracking-tight">Rs {fmt(netTotal)}</span>
+
+                    {/* Actions */}
+                    <div className="w-full space-y-2">
+                      <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
+                        disabled={isPending}>
+                        {isPending
+                          ? 'Saving…'
+                          : isEdit
+                            ? 'Save Changes'
+                            : `Confirm Sale${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
+                      </Button>
+                      <ExitButton
+                        isDirty={form.formState.isDirty}
+                        onExit={() => router.back()}
+                        className="w-full min-h-[44px]"
+                      />
                     </div>
+
                   </div>
 
-                  {/* Actions */}
-                  <div className="w-full lg:w-72 space-y-2">
-                    <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white"
-                      disabled={isPending}>
-                      {isPending
-                        ? 'Saving…'
-                        : isEdit
-                          ? 'Save Changes'
-                          : `Confirm Sale${fields.length > 1 ? ` (${fields.length} items)` : ''}`}
-                    </Button>
-                    <ExitButton
-                      isDirty={form.formState.isDirty}
-                      onExit={() => router.back()}
-                      className="w-full min-h-[44px]"
-                    />
+                  {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+
+                  <div className="mt-4 pt-4 border-t">
+                    <FileUploader ref={uploaderRef} />
                   </div>
-
-                </div>
-
-                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-
-                <div className="mt-4 pt-4 border-t">
-                  <FileUploader ref={uploaderRef} />
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </div>
 
           </div>
         </form>

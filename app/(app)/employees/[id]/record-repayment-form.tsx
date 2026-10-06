@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -14,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator'
 import { TenderLinesField, type TenderLine } from '@/components/tender-lines-field'
 import { recordLoanRepaymentAction } from '@/app/actions/record-loan-repayment'
+import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 type Bank = { id: string; name: string; account_number: string | null }
@@ -54,6 +56,12 @@ export function RecordRepaymentForm({ employeeId, today, nextSerial, banks = [],
   })
 
   const watchedCurrency = form.watch('currencyCode')
+  const watchedDate = form.watch('date')
+  const watchedLoanId = form.watch('loanId')
+  const watchedLines = form.watch('lines') ?? []
+  const total = watchedLines.reduce((s, l) => s + (Number(l.amount) || 0), 0)
+  const loanLabel = watchedLoanId === AUTO ? 'Auto (oldest first)' : (loans.find((l) => l.id === watchedLoanId)?.label ?? '—')
+  const fmtAmount = (n: number) => (watchedCurrency !== 'PKR' ? `${watchedCurrency} ${n.toLocaleString()}` : formatPKR(n))
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -85,13 +93,15 @@ export function RecordRepaymentForm({ employeeId, today, nextSerial, banks = [],
       <SheetTrigger asChild>
         <Button variant="outline" className="min-h-[44px]">Record Repayment</Button>
       </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
+      <SheetContent className="overflow-y-auto w-full sm:max-w-4xl">
         <SheetHeader>
           <SheetTitle>Record Repayment</SheetTitle>
           <SheetDescription>Record a loan installment or repayment received from this employee.</SheetDescription>
         </SheetHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
+          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-[240px_minmax(0,1fr)] gap-5 items-start">
+            <div className="flex flex-col gap-4">
             {nextSerial && (
               <div className="space-y-2">
                 <label className="text-sm font-medium leading-none">Serial No.</label>
@@ -159,11 +169,44 @@ export function RecordRepaymentForm({ employeeId, today, nextSerial, banks = [],
                 <FormMessage />
               </FormItem>
             )} />
+            </div>
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : 'Record Repayment'}
-            </Button>
+            {/* ── Summary — after the fields in source order, shown on the left on wide screens ── */}
+            <div className="md:order-first md:sticky md:top-0">
+              <Card><CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Repayment Summary</p>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Date</span>
+                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Currency</span>
+                    <span className="font-medium">{watchedCurrency}</span>
+                  </div>
+                  {loans.length > 0 && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Apply to</span>
+                      <span className="font-medium text-right text-xs leading-5">{loanLabel}</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center gap-2 mb-5">
+                  <span className="font-bold text-sm">Amount</span>
+                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{fmtAmount(total)}</span>
+                </div>
+
+                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Record Repayment'}
+                </Button>
+                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+              </CardContent></Card>
+            </div>
+            </div>
           </form>
         </Form>
       </SheetContent>
