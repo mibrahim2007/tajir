@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { createJournalEntryAction } from '@/app/actions/create-journal-entry'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
+import { todayPKT } from '@/lib/utils/dates'
 
 const lineSchema = z.object({
   accountId:   z.string().min(1, 'Account required'),
@@ -125,7 +126,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-3">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

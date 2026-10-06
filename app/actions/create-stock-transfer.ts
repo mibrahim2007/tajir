@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -12,7 +13,7 @@ const schema = z.object({
   toLocationId:   z.string().uuid('Invalid to-location'),
   stockItemId:    z.string().uuid('Invalid stock item'),
   quantity:       z.coerce.number().positive('Quantity must be positive'),
-  date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:           documentDateSchema,
   notes:          z.string().max(500).optional(),
 }).refine(
   (d) => d.fromLocationId !== d.toLocationId,

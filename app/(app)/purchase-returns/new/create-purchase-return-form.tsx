@@ -21,6 +21,7 @@ import { QuickCreateSupplier } from '@/components/quick-create-forms'
 import { createPurchaseReturnAction } from '@/app/actions/create-purchase-return'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { YarnLineFields } from '@/components/yarn-line-fields'
+import { todayPKT } from '@/lib/utils/dates'
 
 const lineSchema = z.object({
   stockItemId: z.string().uuid('Select a stock item'),
@@ -218,7 +219,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-3">
                     <FormLabel>Return Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -15,7 +16,7 @@ const schema = z.object({
   employeeId: z.string().uuid('Select an employee'),
   loanId:     z.string().uuid().optional().nullable(),
   amount:     z.coerce.number().positive('Amount must be positive'),
-  date:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:       documentDateSchema,
   note:       z.string().optional(),
 })
 

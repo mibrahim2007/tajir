@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatPKR } from '@/lib/utils/currency'
 import { createOpeningPdcAction, editOpeningPdcAction } from '@/app/actions/opening-pdc'
 import type { OpeningChequeRow, PartyOption } from './opening-cheques-table'
+import { todayPKT } from '@/lib/utils/dates'
 
 const NO_PARTY = 'none'
 const RETURN_PATH = '/settings/opening-balances'
@@ -152,7 +153,7 @@ export function OpeningChequeForm({ banks, parties, cheque, today }: Props) {
           </div>
           <div className="md:col-span-6 space-y-1">
             <Label>Opening as at</Label>
-            <Input type="date" value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
+            <Input type="date" max={todayPKT()} value={asOfDate} onChange={(e) => setAsOfDate(e.target.value)} />
           </div>
         </CardContent>
       </Card>

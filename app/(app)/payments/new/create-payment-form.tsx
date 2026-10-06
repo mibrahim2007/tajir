@@ -21,7 +21,7 @@ import { editApPaymentAction } from '@/app/actions/edit-ap-payment'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
-import { formatPKTDate } from '@/lib/utils/dates'
+import { formatPKTDate, todayPKT } from '@/lib/utils/dates'
 
 type Supplier = { id: string; name: string; outstanding: number }
 type Purchase = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number; advancePaid: number }
@@ -184,7 +184,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
 
                   <div className="space-y-1 md:col-span-2">
                     <Label>Date <span className="text-destructive">*</span></Label>
-                    <Input type="date" {...form.register('date')} className="min-h-[44px]" />
+                    <Input type="date" max={todayPKT()} {...form.register('date')} className="min-h-[44px]" />
                     {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                   </div>
                   <div className="space-y-1 md:col-span-2">

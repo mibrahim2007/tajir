@@ -15,6 +15,7 @@ import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { NumericInput } from '@/components/numeric-input'
 import { ExitButton } from '@/components/exit-button'
 import { createCreditNoteAction } from '@/app/actions/create-credit-note'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   customerId:   z.string().min(1, 'Customer is required'),
@@ -145,7 +146,7 @@ export function CreateCreditNoteForm({ today, customers, saleOrders }: Props) {
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-3">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

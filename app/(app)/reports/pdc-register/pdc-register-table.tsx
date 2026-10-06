@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatPKR } from '@/lib/utils/currency'
 import { PDC_SOURCES, type PdcRegisterRow } from '@/lib/pdc/sources'
 import { settlePdcAction } from '@/app/actions/settle-pdc'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Bank = { id: string; name: string; account_number: string | null }
 
@@ -118,7 +119,7 @@ export function PdcRegisterTable({
                               </SelectContent>
                             </Select>
                           )}
-                          <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="min-h-[36px]" />
+                          <Input type="date" max={todayPKT()} value={date} onChange={(e) => setDate(e.target.value)} className="min-h-[36px]" />
                           {outcome === 'cleared' && r.pdc_status !== 'endorsed' && (
                             <>
                               <Select value={moneyAccount} onValueChange={(v) => setMoneyAccount(v as 'cash_at_bank' | 'cash_in_hand')}>

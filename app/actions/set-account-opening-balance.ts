@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -10,7 +11,7 @@ import type { ActionResult } from '@/lib/types'
 const schema = z.object({
   accountId: z.string().uuid('Invalid account'),
   amount:    z.coerce.number().min(0, 'Amount must be 0 or greater'),
-  date:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:      documentDateSchema,
 })
 
 export type SetAccountOpeningBalanceInput = z.infer<typeof schema>

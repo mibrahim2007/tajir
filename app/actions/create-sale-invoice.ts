@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -35,7 +36,7 @@ const lineSchema = z.object({
 
 const schema = z.object({
   customerId:     z.string().uuid('Invalid customer'),
-  date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:           documentDateSchema,
   paymentDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   dueDays:        z.number().int().min(0).max(3650).optional(),
   currencyCode:   z.enum(['PKR', 'USD']),

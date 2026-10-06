@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { recordSalaryDeductionAction } from '@/app/actions/record-salary-deduction'
 import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { todayPKT } from '@/lib/utils/dates'
 
 type LoanOption = { id: string; label: string }
 
@@ -81,7 +82,7 @@ export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loan
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem className={hasLoans ? 'md:col-span-4' : 'md:col-span-6'}>
                   <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                  <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

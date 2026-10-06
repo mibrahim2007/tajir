@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -17,7 +18,7 @@ const schema = z.object({
   amount:        z.coerce.number().positive('Amount must be positive').optional(),
   currencyCode:  z.enum(['PKR', 'USD']),
   exchangeRate:  z.coerce.number().positive().default(1),
-  date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:          documentDateSchema,
   // Legacy single-tender path; a lined refund carries the breakdown in `lines`.
   paymentMethod: z.enum(['cash', 'bank_transfer']).optional(),
   notes:         z.string().optional(),

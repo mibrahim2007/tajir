@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -14,7 +15,7 @@ const lineSchema = z.object({
 
 const schema = z.object({
   type:          z.enum(['purchase', 'sale']),
-  date:          z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid gatepass date'),
+  date:          documentDateSchema,
   vehicleNumber: z.string().optional(),
   driverName:    z.string().optional(),
   remarks:       z.string().optional(),

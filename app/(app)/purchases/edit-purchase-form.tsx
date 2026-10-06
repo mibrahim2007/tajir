@@ -16,6 +16,7 @@ import { NumericInput } from '@/components/numeric-input'
 import { computeQtyLbs } from '@/lib/polyester'
 import { editPurchaseAction } from '@/app/actions/edit-purchase'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
+import { todayPKT } from '@/lib/utils/dates'
 
 const optionalNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
@@ -229,7 +230,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

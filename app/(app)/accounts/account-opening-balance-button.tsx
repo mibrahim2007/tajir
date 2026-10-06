@@ -13,6 +13,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { setAccountOpeningBalanceAction } from '@/app/actions/set-account-opening-balance'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   amount: z.coerce.number().min(0, 'Amount must be 0 or greater'),
@@ -114,7 +115,7 @@ export function AccountOpeningBalanceButton({
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem>
                 <FormLabel>As of date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormControl><Input type="date" max={todayPKT()} {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

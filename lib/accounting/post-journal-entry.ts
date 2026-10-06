@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLockedThrough, isLocked, formatLockDate } from './period-lock'
+import { isFutureDate, FUTURE_DATE_ERROR } from '@/lib/validation/document-date'
 
 type JournalLine = {
   accountSystemKey: string
@@ -52,6 +53,7 @@ export type PostFailureReason =
   | 'header_insert_failed'
   | 'lines_insert_failed'
   | 'period_locked'
+  | 'future_date'
 
 function fail(
   reason: PostFailureReason,
@@ -70,6 +72,12 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const { tenantId, date, description, reference, sourceType, sourceId, prefix, lines, voucherNumber: reuseVoucher, suppressPartyName } = params
   const admin = createAdminClient()
   const ctx = { tenantId, sourceType, sourceId }
+
+  // Backstop for the document-date rule: every posting path lands here, so a
+  // caller that skipped the schema still cannot put a future date in the books.
+  if (isFutureDate(date)) {
+    return fail('future_date', `${FUTURE_DATE_ERROR} (${date})`, ctx)
+  }
 
   // Closed period: refuse before writing anything. The database trigger would
   // refuse too, but checking here yields a readable message and leaves no

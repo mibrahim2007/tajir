@@ -15,6 +15,7 @@ import { CurrencyInput } from '@/components/currency-input'
 import { editSaleReturnAction } from '@/app/actions/edit-sale-return'
 import { YARN_TYPES, normalizeMultiplyBy } from '@/lib/yarn'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   customerId:   z.string().uuid('Select a customer'),
@@ -202,7 +203,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem className={locations.length > 0 ? 'md:col-span-3' : 'md:col-span-4'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

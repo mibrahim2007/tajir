@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -16,7 +17,7 @@ const schema = z.object({
   txnType:      z.enum(['withdrawal', 'contribution']),
   currencyCode: z.enum(['PKR', 'USD']).default('PKR'),
   exchangeRate: z.coerce.number().positive().default(1),
-  date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:         documentDateSchema,
   notes:        z.string().trim().optional(),
   lines:        z.array(tenderLineSchema).min(1, 'Add at least one tender line'),
 })

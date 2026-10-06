@@ -27,6 +27,7 @@ import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 import { YarnLineFields } from '@/components/yarn-line-fields'
 import { computeQtyLbs } from '@/lib/polyester'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Customer    = { id: string; name: string }
 type StockItem   = { id: string; name: string; currentQuantity: number; barcode: string | null; unitOfMeasure: string | null; itemNature: 'inventory' | 'service'; isYarn?: boolean; isPolyester?: boolean }
@@ -489,7 +490,7 @@ export function SaleInvoiceForm({
                   <FormField control={form.control} name="date" render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Sale Date <span className="text-destructive">*</span></FormLabel>
-                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormControl><Input type="date" max={todayPKT()} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

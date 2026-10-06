@@ -15,6 +15,7 @@ import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { NumericInput } from '@/components/numeric-input'
 import { ExitButton } from '@/components/exit-button'
 import { createDebitNoteAction } from '@/app/actions/create-debit-note'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   supplierId:      z.string().min(1, 'Supplier is required'),
@@ -145,7 +146,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-3">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

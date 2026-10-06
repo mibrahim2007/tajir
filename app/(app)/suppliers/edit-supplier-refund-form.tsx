@@ -16,6 +16,7 @@ import { TenderLinesField, type TenderLine } from '@/components/tender-lines-fie
 import { editSupplierRefundAction } from '@/app/actions/edit-supplier-refund'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { formatPKR } from '@/lib/utils/currency'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Bank = { id: string; name: string; account_number: string | null }
 
@@ -97,7 +98,7 @@ export function EditSupplierRefundForm({ refundId, supplierName, banks, initial 
               </div>
               <div className="space-y-1 md:col-span-3">
                 <Label>Date <span className="text-destructive">*</span></Label>
-                <Input type="date" {...form.register('date')} className="min-h-[44px]" />
+                <Input type="date" max={todayPKT()} {...form.register('date')} className="min-h-[44px]" />
                 {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
               </div>
               <div className="space-y-1 md:col-span-3">

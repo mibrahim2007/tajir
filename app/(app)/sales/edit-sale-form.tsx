@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleAction } from '@/app/actions/edit-sale'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   customerId:     z.string().min(1, 'Customer is required'),
@@ -188,7 +189,7 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem className={locations.length > 0 ? 'md:col-span-4' : 'md:col-span-6'}>
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

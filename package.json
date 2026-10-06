@@ -24,6 +24,7 @@
     "check:ask-resolve": "tsx scripts/ask-resolve-check.ts",
     "check:return-limit": "tsx scripts/return-limit-check.ts",
     "check:direct-payment": "tsx scripts/direct-payment-check.ts",
+    "check:future-date": "tsx scripts/future-date-check.ts",
   "check:agent-commission": "tsx scripts/agent-commission-check.ts",
   "check:agent-commission-e2e": "tsx --env-file=.env.local scripts/agent-commission-e2e.ts",
     "ask:history": "tsx --env-file=.env.local scripts/ask-history-export.ts",

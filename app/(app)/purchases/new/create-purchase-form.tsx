@@ -25,6 +25,7 @@ import { editPurchaseInvoiceAction } from '@/app/actions/edit-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { YarnLineFields } from '@/components/yarn-line-fields'
 import { computeQtyLbs } from '@/lib/polyester'
+import { todayPKT } from '@/lib/utils/dates'
 
 // Larger, comfortable line-item inputs: ~48px tall, 16px text (md:text-base
 // overrides the Input's md:text-sm so it stays 16px on desktop), right-aligned.
@@ -291,7 +292,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                   <FormField control={form.control} name="date" render={({ field }) => (
                     <FormItem className="md:col-span-2">
                       <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                      <FormControl><Input type="date" {...field} /></FormControl>
+                      <FormControl><Input type="date" max={todayPKT()} {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />

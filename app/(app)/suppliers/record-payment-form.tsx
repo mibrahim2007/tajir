@@ -16,6 +16,7 @@ import { TenderLinesField, type TenderLine } from '@/components/tender-lines-fie
 import { createApPaymentAction } from '@/app/actions/create-ap-payment'
 import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Bank = { id: string; name: string; account_number: string | null }
 
@@ -110,7 +111,7 @@ export function RecordPaymentForm({ supplierId, supplierName, today, nextSerial,
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

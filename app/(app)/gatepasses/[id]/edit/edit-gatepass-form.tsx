@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { editGatepassAction } from '@/app/actions/edit-gatepass'
 import type { OrderOption } from '../../new/create-gatepass-form'
+import { todayPKT } from '@/lib/utils/dates'
 
 const lineSchema = z.object({
   orderId:  z.string().min(1, 'Select an order'),
@@ -120,7 +121,7 @@ export function EditGatepassForm({ id, gpNumber, type, defaultValues, purchaseOr
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="md:col-span-2">
                     <FormLabel>Gatepass Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

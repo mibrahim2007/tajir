@@ -16,6 +16,7 @@ import { TenderLinesField, type TenderLine } from '@/components/tender-lines-fie
 import { createAgentPaymentAction } from '@/app/actions/create-agent-payment'
 import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Bank = { id: string; name: string; account_number: string | null }
 type AgentOption = { id: string; name: string; outstanding: number }
@@ -153,7 +154,7 @@ export function AgentPaymentForm({
                 <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

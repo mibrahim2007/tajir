@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -16,7 +17,7 @@ const schema = z.object({
   source:  z.enum(Object.keys(PDC_SOURCES) as [PdcSource, ...PdcSource[]]),
   lineId:  z.string().uuid(),
   outcome: z.enum(['cleared', 'bounced']),
-  date:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:    documentDateSchema,
   /** Where the money actually landed / left. Ignored for a bounce. */
   moneyAccount: z.enum(['cash_at_bank', 'cash_in_hand']).default('cash_at_bank'),
   bankId:  z.string().uuid().optional().nullable(),

@@ -17,6 +17,7 @@ import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { VoiceExpenseInput } from '@/components/voice-expense-input'
 import type { ParsedExpense } from '@/lib/voice/parse-expense'
+import { todayPKT } from '@/lib/utils/dates'
 
 type Account = { id: string; code: string; name: string; account_type: string }
 type Bank    = { id: string; name: string; account_number: string | null }
@@ -162,7 +163,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
                 </div>
                 <div className="space-y-1 md:col-span-3">
                   <Label>Date <span className="text-destructive">*</span></Label>
-                  <Input type="date" {...form.register('date')} className="min-h-[44px]" />
+                  <Input type="date" max={todayPKT()} {...form.register('date')} className="min-h-[44px]" />
                   {form.formState.errors.date && <p className="text-xs text-destructive">{form.formState.errors.date.message}</p>}
                 </div>
 

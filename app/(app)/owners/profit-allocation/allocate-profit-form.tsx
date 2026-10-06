@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { formatPKR } from '@/lib/utils/currency'
 import { previewProfitAllocationAction, type AllocationPreview } from '@/app/actions/preview-profit-allocation'
 import { createProfitAllocationAction } from '@/app/actions/create-profit-allocation'
+import { todayPKT } from '@/lib/utils/dates'
 
 // Full-page form at /owners/profit-allocation/new (was a drawer on the
 // allocations list, which it returns to).
@@ -63,12 +64,12 @@ export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: st
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
             <div className="space-y-2 md:col-span-4">
               <label className="text-sm font-medium leading-none">Period Start</label>
-              <Input type="date" value={from} className="min-h-[44px]"
+              <Input type="date" max={todayPKT()} value={from} className="min-h-[44px]"
                 onChange={(e) => { setFrom(e.target.value); resetPreview() }} />
             </div>
             <div className="space-y-2 md:col-span-4">
               <label className="text-sm font-medium leading-none">Period End</label>
-              <Input type="date" value={to} className="min-h-[44px]"
+              <Input type="date" max={todayPKT()} value={to} className="min-h-[44px]"
                 onChange={(e) => { setTo(e.target.value); resetPreview() }} />
             </div>
             <div className="md:col-span-4">

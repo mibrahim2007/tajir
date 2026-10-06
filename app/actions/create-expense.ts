@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -10,7 +11,7 @@ import type { ActionResult } from '@/lib/types'
 const schema = z.object({
   expenseAccountId: z.string().uuid('Select an expense account'),
   amount:           z.coerce.number().positive('Amount must be positive'),
-  date:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:             documentDateSchema,
   description:      z.string().min(1, 'Description is required'),
   note:             z.string().optional(),
   bankId:           z.string().uuid().optional(),

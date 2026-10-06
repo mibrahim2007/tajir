@@ -16,7 +16,7 @@ import { TenderLinesField, type TenderLine, type EndorsableCheque } from '@/comp
 import { createEmployeeLoanAction } from '@/app/actions/create-employee-loan'
 import { generateSchedule } from '@/lib/loans/amortization'
 import { formatPKR } from '@/lib/utils/currency'
-import { formatPKTDate } from '@/lib/utils/dates'
+import { formatPKTDate, todayPKT } from '@/lib/utils/dates'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 type Bank = { id: string; name: string; account_number: string | null }
@@ -146,7 +146,7 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
                 <FormField control={form.control} name="disbursementDate" render={({ field }) => (
                   <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
                     <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormControl><Input type="date" max={todayPKT()} className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />

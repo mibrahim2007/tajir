@@ -16,6 +16,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { NumericInput } from '@/components/numeric-input'
 import { createStockTransferAction } from '@/app/actions/create-stock-transfer'
+import { todayPKT } from '@/lib/utils/dates'
 
 const schema = z.object({
   fromLocationId: z.string().uuid('Select from-location'),
@@ -122,7 +123,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
             <FormField control={form.control} name="date" render={({ field }) => (
               <FormItem className="md:col-span-2">
                 <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormControl><Input type="date" max={todayPKT()} {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />

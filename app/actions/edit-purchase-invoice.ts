@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -34,7 +35,7 @@ const schema = z.object({
   invoiceId:    z.string().uuid('Invalid invoice'),
   supplierId:   z.string().uuid('Invalid supplier'),
   supplierInvoiceNo: z.string().trim().max(50, 'Supplier invoice no. is too long').optional().nullable(),
-  date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:         documentDateSchema,
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
   advancePaid:  z.coerce.number().min(0).default(0),

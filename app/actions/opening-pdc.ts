@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -36,7 +37,7 @@ const baseSchema = z.object({
   direction:     z.enum(['in', 'out']),
   chequeNumber:  z.string().trim().min(1, 'Cheque no. is required'),
   chequeDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Due date is required'),
-  asOfDate:      z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  asOfDate:      documentDateSchema,
   amount:        z.coerce.number().positive('Amount must be greater than 0'),
   partyKind:     z.enum(PARTY_KINDS).optional().nullable(),
   partyId:       z.string().uuid().optional().nullable(),

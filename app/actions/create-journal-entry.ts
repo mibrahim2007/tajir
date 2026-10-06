@@ -1,6 +1,7 @@
 'use server'
 
 import { z } from 'zod'
+import { documentDateSchema } from '@/lib/validation/document-date'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -24,7 +25,7 @@ const lineSchema = z.object({
 )
 
 const schema = z.object({
-  date:        z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
+  date:        documentDateSchema,
   description: z.string().min(1, 'Description is required'),
   reference:   z.string().optional(),
   bankId:      z.string().uuid().optional(),
