@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { EditSupplierForm } from './edit-supplier-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteSupplierAction } from '@/app/actions/delete-supplier'
@@ -79,14 +80,9 @@ export function SuppliersList({ suppliers }: { suppliers: SupplierListItem[] }) 
                   <td className="px-4 py-3">
                     <RoleGate allowedRoles={['owner']}>
                       <div className="flex gap-1 justify-end">
-                        <EditSupplierForm
-                          id={s.id}
-                          currentName={s.name}
-                          currentEmail={s.email}
-                          currentOpeningBalance={s.openingBalance}
-                          currentOpeningBalanceCurrency={s.openingBalanceCurrency}
-                          currentOpeningBalancePkr={s.openingBalancePkrEquivalent}
-                        />
+                        <Link href={`/suppliers/${s.id}/edit`}>
+                          <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
+                        </Link>
                         <DeleteButton
                           description={`Delete supplier "${s.name}"? This cannot be undone.`}
                           onDelete={deleteSupplierAction.bind(null, { id: s.id })}

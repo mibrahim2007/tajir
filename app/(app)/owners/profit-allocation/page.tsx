@@ -2,9 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { Button } from '@/components/ui/button'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
-import { AllocateProfitForm } from './allocate-profit-form'
 import { AllocationsList } from './allocations-list'
 
 export default async function ProfitAllocationPage() {
@@ -12,9 +12,6 @@ export default async function ProfitAllocationPage() {
   // Owner equity — profit allocation — is owner-only.
   if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
-
-  const today = new Date().toISOString().split('T')[0]
-  const firstOfYear = today.slice(0, 4) + '-01-01'
 
   const [{ data: rawAllocs }, { data: rawOwners }] = await Promise.all([
     admin.from('profit_allocations')
@@ -80,7 +77,11 @@ export default async function ProfitAllocationPage() {
             {allocationItems.length > 0 && ` · ${formatPKR(totalAllocated)} allocated to date`}
           </p>
         </div>
-        {owners.length > 0 && <AllocateProfitForm defaultFrom={firstOfYear} defaultTo={today} />}
+        {owners.length > 0 && (
+          <Link href="/owners/profit-allocation/new">
+            <Button className="min-h-[44px]">Allocate Profit</Button>
+          </Link>
+        )}
       </div>
 
       {owners.length === 0 ? (

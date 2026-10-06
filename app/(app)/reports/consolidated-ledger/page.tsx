@@ -1,13 +1,13 @@
 import Link from 'next/link'
-import { ArrowRight, Link2 } from 'lucide-react'
+import { ArrowRight, Link2, Plus } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { Button } from '@/components/ui/button'
 import { RoleGate } from '@/components/role-gate'
 import { DeleteButton } from '@/components/delete-button'
 import { deletePartyLinkAction } from '@/app/actions/delete-party-link'
 import { buildConsolidatedLedger } from '@/lib/ledger/consolidated'
 import { formatPKR } from '@/lib/utils/currency'
-import { MapAccountsForm } from './map-accounts-form'
 
 export default async function ConsolidatedLedgerIndexPage() {
   const { tenantId, role } = await requireAuth()
@@ -49,7 +49,9 @@ export default async function ConsolidatedLedgerIndexPage() {
           </p>
         </div>
         <RoleGate allowedRoles={['owner']}>
-          <MapAccountsForm customers={customers ?? []} suppliers={suppliers ?? []} />
+          <Button asChild size="sm" className="min-h-[40px]">
+            <Link href="/reports/consolidated-ledger/map"><Plus className="h-4 w-4 mr-1" />Map Accounts</Link>
+          </Button>
         </RoleGate>
       </div>
 

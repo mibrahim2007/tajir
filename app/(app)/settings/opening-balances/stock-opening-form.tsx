@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useTransition, type ReactNode } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { setStockOpeningBalances } from '@/app/actions/set-opening-balance'
 import type { OpeningLot, LocationOption } from './stock-balance-table'
+
+const RETURN_PATH = '/settings/opening-balances'
 
 /** A line being edited. `key` only exists to keep React rows stable. */
 type DraftLine = { key: number; locationId: string; quantity: string; rate: string }
@@ -29,27 +32,17 @@ function toDraft(lot: OpeningLot): DraftLine[] {
 }
 
 type Props = {
-  trigger: ReactNode
   lot: OpeningLot
   locations: LocationOption[]
 }
 
-export function StockOpeningForm({ trigger, lot, locations }: Props) {
+// Full-page form at /settings/opening-balances/stock/[id]/edit (was a drawer on
+// Opening Balances).
+export function StockOpeningForm({ lot, locations }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [lines, setLines] = useState<DraftLine[]>(() => toDraft(lot))
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
-  // Re-seeding on open keeps the sheet in step with the row after a refresh,
-  // and discards a half-finished edit that was cancelled.
-  const onOpenChange = (next: boolean) => {
-    if (next) {
-      setLines(toDraft(lot))
-      setError(null)
-    }
-    setOpen(next)
-  }
 
   const num = (v: string) => parseFloat(v) || 0
 
@@ -63,6 +56,7 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
 
   const totalQty   = lines.reduce((s, l) => s + num(l.quantity), 0)
   const totalValue = lines.reduce((s, l) => s + num(l.quantity) * num(l.rate), 0)
+  const usedLocations = lines.filter((l) => l.locationId).length
 
   const save = () => {
     // Blank rows are how a user backs out of a location they added by mistake,
@@ -81,23 +75,21 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
         lines: filled.map((l) => ({ locationId: l.locationId, quantity: num(l.quantity), rate: num(l.rate) })),
       })
       if (!result.success) { setError(result.error); return }
-      setOpen(false)
-      router.refresh()
+      // Back to Opening Balances, which re-renders with the new figures. No
+      // router.refresh() inside the transition — it keeps isPending stuck.
+      router.push(RETURN_PATH)
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Opening stock — {lot.name}</SheetTitle>
-          <SheetDescription>
-            List every warehouse that held this item on day one. Add a line per location; the quantities are loaded at all of them together.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-        <div className="px-4 pb-4 space-y-4">
+      {/* ── FORM (left on xl) ── */}
+      <Card className="min-w-0">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-base">Opening Stock by Location</CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-5 space-y-4">
           {locations.length === 0 ? (
             <p className="text-sm text-muted-foreground">Add a location under Inventory → Locations first.</p>
           ) : (
@@ -107,11 +99,11 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
                   const takenElsewhere = new Set(lines.filter((l) => l.key !== line.key).map((l) => l.locationId))
                   return (
                     <div key={line.key} className="grid grid-cols-[1fr_auto] gap-2 items-end border rounded-lg p-3">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="col-span-3 sm:col-span-1 space-y-1">
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                        <div className="md:col-span-6 space-y-1">
                           <Label className="text-xs">Location</Label>
                           <Select value={line.locationId} onValueChange={(v) => setLine(line.key, { locationId: v })}>
-                            <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
+                            <SelectTrigger className="w-full"><SelectValue placeholder="Select…" /></SelectTrigger>
                             <SelectContent>
                               {locations.map((loc) => (
                                 <SelectItem key={loc.id} value={loc.id} disabled={takenElsewhere.has(loc.id)}>
@@ -122,7 +114,7 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
                           </Select>
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="md:col-span-3 space-y-1">
                           <Label className="text-xs">Quantity</Label>
                           <Input
                             type="number" min={0} step="0.001" inputMode="decimal"
@@ -132,7 +124,7 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
                           />
                         </div>
 
-                        <div className="space-y-1">
+                        <div className="md:col-span-3 space-y-1">
                           <Label className="text-xs">Rate (PKR)</Label>
                           <Input
                             type="number" min={0} step="0.01" inputMode="decimal"
@@ -160,26 +152,54 @@ export function StockOpeningForm({ trigger, lot, locations }: Props) {
               <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={addLine}>
                 <Plus className="h-4 w-4 mr-2" /> Add location
               </Button>
-
-              <div className="flex justify-between text-sm border-t pt-3">
-                <span className="text-muted-foreground">Total</span>
-                <span className="tabular-nums font-medium">
-                  {totalQty.toLocaleString('en-PK', { maximumFractionDigits: 4 })} · PKR {fmtPKR(totalValue)}
-                </span>
-              </div>
-
-              {error && <p className="text-sm text-destructive">{error}</p>}
-
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" className="min-h-[44px]" onClick={() => setOpen(false)} disabled={isPending}>Cancel</Button>
-                <Button className="min-h-[44px]" onClick={save} disabled={isPending}>
-                  {isPending ? 'Saving…' : 'Save opening stock'}
-                </Button>
-              </div>
             </>
           )}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </CardContent>
+      </Card>
+
+      {/* ── SUMMARY (right on xl, sticky) ── */}
+      <div className="xl:sticky xl:top-6">
+        <Card>
+          <CardContent className="px-5 pt-5 pb-5">
+            <p className="font-extrabold text-[15px] tracking-tight mb-4">Opening Stock Summary</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Item</span>
+                <span className="font-medium text-right truncate">{lot.name}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Locations</span>
+                <span className="tabular-nums">{usedLocations}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Quantity</span>
+                <span className="tabular-nums">{totalQty.toLocaleString('en-PK', { maximumFractionDigits: 4 })}</span>
+              </div>
+            </div>
+
+            <Separator className="my-4" />
+
+            <div className="flex justify-between items-center gap-2 mb-5">
+              <span className="font-bold text-sm">Total Value</span>
+              <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">PKR {fmtPKR(totalValue)}</span>
+            </div>
+
+            <div className="space-y-2">
+              {locations.length > 0 && (
+                <Button className="w-full min-h-[44px]" onClick={save} disabled={isPending}>
+                  {isPending ? 'Saving…' : 'Save opening stock'}
+                </Button>
+              )}
+              <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push(RETURN_PATH)} disabled={isPending}>
+                Cancel
+              </Button>
+            </div>
+
+            {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+    </div>
   )
 }

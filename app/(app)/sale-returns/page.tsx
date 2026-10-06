@@ -1,13 +1,12 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteSaleReturnAction } from '@/app/actions/delete-sale-return'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { EditSaleReturnForm } from './edit-sale-return-form'
 import { SaleReturnFilters } from './sale-return-filters'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
@@ -44,11 +43,10 @@ export default async function SaleReturnsPage({ searchParams }: { searchParams: 
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const returns = rawReturns ?? []
   const customerList = rawCustomers ?? []
   const customerMap = new Map(customerList.map((c) => [c.id, c.name]))
-  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
@@ -58,12 +56,9 @@ export default async function SaleReturnsPage({ searchParams }: { searchParams: 
   const rowActions = (r: (typeof returns)[number]) => (
     <RoleGate allowedRoles={['owner']}>
       <div className="flex items-center gap-1">
-        <EditSaleReturnForm
-          ret={{ id: r.id, customerId: r.customer_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null }}
-          customers={customerList}
-          lots={lotList}
-          locations={locationList}
-        />
+        <Link href={`/sale-returns/${r.id}/edit`}>
+          <Button variant="ghost" size="sm" className="min-h-[44px]" title="Edit" aria-label="Edit"><Pencil className="h-4 w-4" /></Button>
+        </Link>
         <DeleteButton
           description="Delete this sale return? Stock quantity will be reversed."
           onDelete={deleteSaleReturnAction.bind(null, { id: r.id })}

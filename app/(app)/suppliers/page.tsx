@@ -1,6 +1,8 @@
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { CreateSupplierForm } from './create-supplier-form'
 import { SuppliersList } from './suppliers-list'
 import { SupplierGuide } from './supplier-guide'
 import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
@@ -70,7 +72,9 @@ export default async function SuppliersPage() {
         </div>
         <div className="flex items-center gap-2">
           <SupplierGuide />
-          <CreateSupplierForm />
+          <Link href="/suppliers/new">
+            <Button className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Add Supplier</Button>
+          </Link>
         </div>
       </div>
 

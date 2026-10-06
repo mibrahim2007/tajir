@@ -1,9 +1,9 @@
 'use client'
 
 import { Fragment } from 'react'
+import Link from 'next/link'
 import { MapPin, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { StockOpeningForm } from './stock-opening-form'
 
 /** One warehouse's share of an item's opening stock. */
 export type OpeningLine = { locationId: string; locationName: string; quantity: number; rate: number }
@@ -26,7 +26,7 @@ function lotValue(lot: OpeningLot) {
   return lot.lines.reduce((s, l) => s + l.quantity * l.rate, 0)
 }
 
-export function StockBalanceTable({ lots, locations }: { lots: OpeningLot[]; locations: LocationOption[] }) {
+export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
   if (lots.length === 0) {
     return <p className="text-sm text-muted-foreground">No stock items yet. Add items from the Inventory page first.</p>
   }
@@ -75,15 +75,11 @@ export function StockBalanceTable({ lots, locations }: { lots: OpeningLot[]; loc
                       {value > 0 ? fmtPKR(value) : <span className="text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <StockOpeningForm
-                        lot={lot}
-                        locations={locations}
-                        trigger={
-                          <Button size="sm" variant="ghost" className="min-h-[44px]" aria-label={`Set opening stock for ${lot.name}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        }
-                      />
+                      <Button asChild size="sm" variant="ghost" className="min-h-[44px]">
+                        <Link href={`/settings/opening-balances/stock/${lot.id}/edit`} aria-label={`Set opening stock for ${lot.name}`}>
+                          <Pencil className="h-4 w-4" />
+                        </Link>
+                      </Button>
                     </td>
                   </tr>
 

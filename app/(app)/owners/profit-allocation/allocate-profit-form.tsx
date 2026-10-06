@@ -3,19 +3,20 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { formatPKR } from '@/lib/utils/currency'
 import { previewProfitAllocationAction, type AllocationPreview } from '@/app/actions/preview-profit-allocation'
 import { createProfitAllocationAction } from '@/app/actions/create-profit-allocation'
 
+// Full-page form at /owners/profit-allocation/new (was a drawer on the
+// allocations list, which it returns to).
 // Two-step: preview the split for a period, then commit it. The preview is
 // server-computed from the same P&L helper the action posts from, so what the
 // owner approves is exactly what posts.
 export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: string; defaultTo: string }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(defaultTo)
   const [notes, setNotes] = useState('')
@@ -41,10 +42,9 @@ export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: st
       setError(null)
       const result = await createProfitAllocationAction({ periodStart: from, periodEnd: to, notes })
       if (!result.success) { setError(result.error); return }
-      setPreview(null)
-      setNotes('')
-      setOpen(false)
-      router.refresh()
+      // Back to the list. No router.refresh() inside the transition — it
+      // keeps isPending stuck.
+      router.push('/owners/profit-allocation')
     })
   }
 
@@ -52,35 +52,31 @@ export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: st
   const canCommit = !!preview && preview.sharesComplete && Math.abs(preview.netProfit) >= 0.01
 
   return (
-    <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setPreview(null); setError(null) } }}>
-      <SheetTrigger asChild>
-        <Button className="min-h-[44px]">Allocate Profit</Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-2xl">
-        <SheetHeader>
-          <SheetTitle>Allocate Profit to Owners</SheetTitle>
-          <SheetDescription>
-            Net profit is computed from the ledger for the period, then split by each owner&rsquo;s share %.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-        <div className="flex flex-col gap-4 mt-6">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
+      {/* ── FORM (left on xl) ── */}
+      <Card className="min-w-0">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-base">Allocation Period</CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div className="space-y-2 md:col-span-4">
               <label className="text-sm font-medium leading-none">Period Start</label>
               <Input type="date" value={from} className="min-h-[44px]"
                 onChange={(e) => { setFrom(e.target.value); resetPreview() }} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-4">
               <label className="text-sm font-medium leading-none">Period End</label>
               <Input type="date" value={to} className="min-h-[44px]"
                 onChange={(e) => { setTo(e.target.value); resetPreview() }} />
             </div>
+            <div className="md:col-span-4">
+              <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={onPreview} disabled={isPending}>
+                {isPending && !preview ? 'Calculating…' : 'Calculate Split'}
+              </Button>
+            </div>
           </div>
-
-          <Button type="button" variant="outline" className="min-h-[44px]" onClick={onPreview} disabled={isPending}>
-            {isPending && !preview ? 'Calculating…' : 'Calculate Split'}
-          </Button>
 
           {preview && (
             <>
@@ -144,14 +140,54 @@ export function AllocateProfitForm({ defaultFrom, defaultTo }: { defaultFrom: st
               </div>
             </>
           )}
+        </CardContent>
+      </Card>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* ── SUMMARY (right on xl, sticky) ── */}
+      <div className="xl:sticky xl:top-6">
+        <Card>
+          <CardContent className="px-5 pt-5 pb-5">
+            <p className="font-extrabold text-[15px] tracking-tight mb-4">Allocation Summary</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground shrink-0">From</span>
+                <span className="font-medium tabular-nums">{from || '—'}</span>
+              </div>
+              <div className="flex justify-between gap-2">
+                <span className="text-muted-foreground shrink-0">To</span>
+                <span className="font-medium tabular-nums">{to || '—'}</span>
+              </div>
+              {preview && (
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Owners</span>
+                  <span className="font-medium tabular-nums">{preview.rows.length}</span>
+                </div>
+              )}
+            </div>
 
-          <Button type="button" className="w-full min-h-[44px]" onClick={onCommit} disabled={isPending || !canCommit}>
-            {isPending && preview ? 'Posting…' : 'Post Allocation'}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+            <Separator className="my-4" />
+
+            <div className="flex justify-between items-center gap-2 mb-5">
+              <span className="font-bold text-sm">{preview && !isProfit ? 'Net Loss' : 'Net Profit'}</span>
+              <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">
+                {preview ? formatPKR(Math.abs(preview.netProfit)) : '—'}
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              <Button type="button" className="w-full min-h-[44px]" onClick={onCommit} disabled={isPending || !canCommit}>
+                {isPending && preview ? 'Posting…' : 'Post Allocation'}
+              </Button>
+              <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push('/owners/profit-allocation')}>
+                Cancel
+              </Button>
+            </div>
+
+            {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+    </div>
   )
 }

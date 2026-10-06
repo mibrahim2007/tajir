@@ -1,12 +1,11 @@
 import Link from 'next/link'
+import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseReturnAction } from '@/app/actions/delete-purchase-return'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { EditPurchaseReturnForm } from './edit-purchase-return-form'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
@@ -25,11 +24,10 @@ export default async function PurchaseReturnsPage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const yarnLotIds = await loadYarnLotIds(admin, tenantId)
   const returns = rawReturns ?? []
   const supplierList = rawSuppliers ?? []
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
-  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
@@ -37,12 +35,9 @@ export default async function PurchaseReturnsPage() {
   const rowActions = (r: (typeof returns)[number]) => (
     <RoleGate allowedRoles={['owner']}>
       <div className="flex items-center gap-1">
-        <EditPurchaseReturnForm
-          ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null }}
-          suppliers={supplierList}
-          lots={lotList}
-          locations={locationList}
-        />
+        <Link href={`/purchase-returns/${r.id}/edit`}>
+          <Button variant="ghost" size="sm" className="min-h-[44px]" title="Edit" aria-label="Edit"><Pencil className="h-4 w-4" /></Button>
+        </Link>
         <DeleteButton
           description="Delete this purchase return? Stock quantity will be restored."
           onDelete={deletePurchaseReturnAction.bind(null, { id: r.id })}

@@ -1,6 +1,8 @@
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { CreateCustomerForm } from './create-customer-form'
 import { CustomersList } from './customers-list'
 import { CustomerGuide } from './customer-guide'
 
@@ -66,7 +68,9 @@ export default async function CustomersPage() {
         </div>
         <div className="flex items-center gap-2">
           <CustomerGuide />
-          <CreateCustomerForm />
+          <Link href="/customers/new">
+            <Button className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Add Customer</Button>
+          </Link>
         </div>
       </div>
 

@@ -3,8 +3,6 @@ import Link from 'next/link'
 import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { RecordPaymentForm } from '@/app/(app)/suppliers/record-payment-form'
-import { ReceivePaymentForm } from '@/app/(app)/suppliers/receive-payment-form'
 import { EditApPaymentForm } from '@/app/(app)/suppliers/edit-ap-payment-form'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/export-button'
@@ -12,7 +10,6 @@ import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { fetchDirectPayments, supplierSideDescription } from '@/lib/ledger/direct-payments'
 
 type Props = { params: Promise<{ id: string }> }
@@ -20,7 +17,6 @@ type Props = { params: Promise<{ id: string }> }
 export default async function SupplierLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
-  const today = new Date().toISOString().split('T')[0]
 
   const admin = createAdminClient()
 
@@ -32,11 +28,6 @@ export default async function SupplierLedgerPage({ params }: Props) {
     .single()
 
   if (!supplierRow) notFound()
-
-  const [nextPaymentSerial, nextReceiveSerial] = await Promise.all([
-    peekNextDocumentSerial(admin, tenantId, 'ap_payment', today),
-    peekNextDocumentSerial(admin, tenantId, 'supplier_refund', today),
-  ])
 
   const [
     { data: rawPurchases },
@@ -66,9 +57,6 @@ export default async function SupplierLedgerPage({ params }: Props) {
     // Customer receipts that paid this supplier for us (Direct Payment lines).
     fetchDirectPayments(admin, tenantId, { supplierId: id }),
   ])
-
-  const { data: rawBanks } = await admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name')
-  const banks = rawBanks ?? []
 
   const purchases     = rawPurchases  ?? []
   const payments      = rawPayments   ?? []
@@ -181,8 +169,17 @@ export default async function SupplierLedgerPage({ params }: Props) {
         <div className="flex gap-2 flex-wrap print:hidden">
           <PrintButton />
           <ExportButton href={`/api/export/supplier-ledger/${id}`} label="Export" />
-          <ReceivePaymentForm supplierId={id} today={today} nextSerial={nextReceiveSerial} banks={banks} />
-          <RecordPaymentForm supplierId={id} today={today} nextSerial={nextPaymentSerial} banks={banks} />
+          <Link href={`/suppliers/${id}/receive`}>
+            <Button
+              variant="outline"
+              className="min-h-[44px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/40"
+            >
+              Receive Payment
+            </Button>
+          </Link>
+          <Link href={`/suppliers/${id}/payment`}>
+            <Button variant="outline" className="min-h-[44px]">Record Payment</Button>
+          </Link>
         </div>
       </div>
 

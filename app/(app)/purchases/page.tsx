@@ -4,14 +4,12 @@ import { Pencil } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
-import { EditPurchaseForm } from './edit-purchase-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deletePurchaseAction } from '@/app/actions/delete-purchase'
 import { deletePurchaseInvoiceAction } from '@/app/actions/delete-purchase-invoice'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate, formatPKTDateTime } from '@/lib/utils/dates'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
 import { PurchaseFilters } from './purchase-filters'
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>
@@ -43,14 +41,13 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
   const [{ data: rawOrders }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
     query,
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
   ])
 
-  const polyesterLotIds = await loadPolyesterLotIds(admin, tenantId)
   const orders      = rawOrders ?? []
   const supplierList = rawSuppliers ?? []
-  const lotList      = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isPolyester: polyesterLotIds.has(l.id) }))
+  const lotList      = rawLots ?? []
   const locationList = rawLocs ?? []
 
   const supplierMap = new Map(supplierList.map((s) => [s.id, s.name]))
@@ -218,12 +215,9 @@ export default async function PurchasesPage({ searchParams }: { searchParams: Se
                         )}
                         <RoleGate allowedRoles={['owner']}>
                           {item.singleOrder ? (
-                            <EditPurchaseForm
-                              purchase={{ id: item.singleOrder.id, supplierId: item.singleOrder.supplier_id, stockItemId: item.singleOrder.stock_item_id, quantity: item.singleOrder.quantity, rate: item.singleOrder.rate, currencyCode: item.singleOrder.currency_code, exchangeRate: item.singleOrder.exchange_rate, advancePaid: item.singleOrder.advance_paid, date: item.singleOrder.date, locationId: item.singleOrder.location_id, nosCarton: item.singleOrder.nos_carton, weightPerCarton: item.singleOrder.weight_per_carton }}
-                              suppliers={supplierList}
-                              lots={lotList}
-                              locations={locationList}
-                            />
+                            <Link href={`/purchases/${item.singleOrder.id}/edit`}>
+                              <Button variant="ghost" size="sm" className="min-h-[36px] h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Edit"><Pencil className="h-4 w-4" /></Button>
+                            </Link>
                           ) : item.type === 'invoice' && (
                             <Link href={`/purchases/invoice/${item.invoiceId}/edit`}>
                               <Button variant="ghost" size="sm" className="min-h-[36px] h-8 w-8 p-0 text-muted-foreground hover:text-foreground" title="Edit"><Pencil className="h-4 w-4" /></Button>

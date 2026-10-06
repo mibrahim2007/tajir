@@ -7,8 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -42,20 +41,21 @@ const freshDefaults = (today: string, ownerId = ''): FormValues => ({
   ownerId, txnType: 'withdrawal', currencyCode: 'PKR', exchangeRate: 1, date: today, notes: '', lines: [{ ...emptyLine }],
 })
 
-// Two modes: fixed owner (from an owner ledger) or an owner picker (from the
-// Owners page — pass `owners`, omit `ownerId`).
+// Full-page form. Two modes: fixed owner at /owners/[id]/transaction (from an
+// owner ledger) or an owner picker at /owners/transaction (from the Owners
+// page — pass `owners`, omit `ownerId`). `returnPath` is the page it came from.
 export function OwnerTransactionForm({
-  ownerId, owners, today, nextSerial, banks = [],
+  ownerId, owners, today, nextSerial, banks = [], returnPath,
 }: {
   ownerId?: string
   owners?: OwnerOption[]
   today: string
   nextSerial?: string | null
   banks?: Bank[]
+  returnPath: string
 }) {
   const showPicker = !ownerId && !!owners
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const handleEnterToNext = useEnterToNextField()
@@ -98,201 +98,200 @@ export function OwnerTransactionForm({
         })),
       })
       if (!result.success) { setServerError(result.error); return }
-      form.reset(freshDefaults(today, ownerId ?? ''))
-      setOpen(false)
-      router.refresh()
+      // Back to where the form was opened from. No router.refresh() inside
+      // the transition — it keeps isPending stuck.
+      router.push(returnPath)
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button className="min-h-[44px]">Record Capital Movement</Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
-        <SheetHeader>
-          <SheetTitle>Owner Capital Movement</SheetTitle>
-          <SheetDescription>
-            Record cash an owner takes out of, or puts into, the business.
-          </SheetDescription>
-        </SheetHeader>
-        <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))}
-            onKeyDown={handleEnterToNext}
-            className="mt-6 px-4 pb-6"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
-            <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-              {showPicker && (
-                <FormField control={form.control} name="ownerId" render={({ field }) => (
-                  <FormItem className="md:col-span-6">
-                    <FormLabel>Owner <span className="text-destructive">*</span></FormLabel>
+    <Form {...form}>
+      <form
+        onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))}
+        onKeyDown={handleEnterToNext}
+      >
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+
+          {/* ── FORM (left on xl) ── */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-3 pt-5 px-5">
+              <CardTitle className="text-base">Transaction Details</CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                {showPicker && (
+                  <FormField control={form.control} name="ownerId" render={({ field }) => (
+                    <FormItem className="md:col-span-6">
+                      <FormLabel>Owner <span className="text-destructive">*</span></FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select an owner…" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {owners!.map((o) => (
+                            <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+
+                <FormField control={form.control} name="txnType" render={({ field }) => (
+                  <FormItem className={showPicker ? 'md:col-span-6' : 'md:col-span-12'}>
+                    <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
                     <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select an owner…" /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        {owners!.map((o) => (
-                          <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                        ))}
+                        <SelectItem value="withdrawal">Withdrawal — owner takes money out</SelectItem>
+                        <SelectItem value="contribution">Contribution — owner puts money in</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
-              )}
 
-              <FormField control={form.control} name="txnType" render={({ field }) => (
-                <FormItem className={showPicker ? 'md:col-span-6' : 'md:col-span-12'}>
-                  <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="withdrawal">Withdrawal — owner takes money out</SelectItem>
-                      <SelectItem value="contribution">Contribution — owner puts money in</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+                {nextSerial && isWithdrawal && (
+                  <div className="space-y-2 md:col-span-4">
+                    <label className="text-sm font-medium leading-none">Serial No.</label>
+                    <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                    <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+                  </div>
+                )}
 
-              {nextSerial && isWithdrawal && (
-                <div className="space-y-2 md:col-span-4">
-                  <label className="text-sm font-medium leading-none">Serial No.</label>
-                  <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                  <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-                </div>
-              )}
-
-              <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem className={showSerial ? 'md:col-span-4' : 'md:col-span-6'}>
-                  <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="currencyCode" render={({ field }) => (
-                <FormItem className={showSerial ? 'md:col-span-4' : 'md:col-span-6'}>
-                  <FormLabel>Currency</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="PKR">PKR</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )} />
-
-              {watchedCurrency === 'USD' && (
-                <FormField control={form.control} name="exchangeRate" render={({ field }) => (
-                  <FormItem className="md:col-span-6">
-                    <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
-                    <FormControl>
-                      <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)} />
-                    </FormControl>
+                <FormField control={form.control} name="date" render={({ field }) => (
+                  <FormItem className={showSerial ? 'md:col-span-4' : 'md:col-span-6'}>
+                    <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
+                    <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
                   </FormItem>
                 )} />
-              )}
-            </div>
+                <FormField control={form.control} name="currencyCode" render={({ field }) => (
+                  <FormItem className={showSerial ? 'md:col-span-4' : 'md:col-span-6'}>
+                    <FormLabel>Currency</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="PKR">PKR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
 
-            <Separator />
-
-            <TenderLinesField banks={banks} currency={watchedCurrency} />
-
-            <Separator />
-
-            {/* Spell out the posting so the user can see a withdrawal is a
-                drawing against equity, not a business expense. */}
-            {amount > 0 && (
-              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">Will post as</p>
-                <p className="tabular-nums">
-                  {isWithdrawal ? (
-                    <>Dr <span className="font-medium">Owner&rsquo;s Drawings (3400)</span> · Cr Cash / Bank</>
-                  ) : (
-                    <>Dr Cash / Bank · Cr <span className="font-medium">Owner&rsquo;s Capital (3100)</span></>
-                  )}
-                  {' — '}
-                  {watchedCurrency !== 'PKR' ? `${watchedCurrency} ${amount.toLocaleString()}` : formatPKR(amount)}
-                </p>
-                {isWithdrawal && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Reduces owner&rsquo;s equity. Does not affect profit or loss.
-                  </p>
+                {watchedCurrency === 'USD' && (
+                  <FormField control={form.control} name="exchangeRate" render={({ field }) => (
+                    <FormItem className="md:col-span-6">
+                      <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
+                          onChange={(e) => field.onChange(e.target.valueAsNumber)} />
+                      </FormControl>
+                    </FormItem>
+                  )} />
                 )}
               </div>
-            )}
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Note (optional)</FormLabel>
-                <FormControl><Input placeholder="e.g. Personal use…" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            </div>
+              <Separator />
 
-            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
-            <div className="md:sticky md:top-0">
-              <Card><CardContent className="px-5 pt-5 pb-5">
-                <p className="font-extrabold text-[15px] tracking-tight mb-4">Transaction Summary</p>
+              <TenderLinesField banks={banks} currency={watchedCurrency} layout="wide" />
 
-                <div className="space-y-2 text-sm">
-                  {showPicker && (
+              <Separator />
+
+              {/* Spell out the posting so the user can see a withdrawal is a
+                  drawing against equity, not a business expense. */}
+              {amount > 0 && (
+                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">Will post as</p>
+                  <p className="tabular-nums">
+                    {isWithdrawal ? (
+                      <>Dr <span className="font-medium">Owner&rsquo;s Drawings (3400)</span> · Cr Cash / Bank</>
+                    ) : (
+                      <>Dr Cash / Bank · Cr <span className="font-medium">Owner&rsquo;s Capital (3100)</span></>
+                    )}
+                    {' — '}
+                    {watchedCurrency !== 'PKR' ? `${watchedCurrency} ${amount.toLocaleString()}` : formatPKR(amount)}
+                  </p>
+                  {isWithdrawal && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Reduces owner&rsquo;s equity. Does not affect profit or loss.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Note (optional)</FormLabel>
+                  <FormControl><Input placeholder="e.g. Personal use…" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </CardContent>
+          </Card>
+
+          {/* ── SUMMARY (right on xl, sticky) ── */}
+          <div className="xl:sticky xl:top-6">
+            <Card><CardContent className="px-5 pt-5 pb-5">
+              <p className="font-extrabold text-[15px] tracking-tight mb-4">Transaction Summary</p>
+
+              <div className="space-y-2 text-sm">
+                {showPicker && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Owner</span>
+                    <span className="font-medium text-right">{ownerName ?? '—'}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Type</span>
+                  <span className="font-medium">{isWithdrawal ? 'Withdrawal' : 'Contribution'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Date</span>
+                  <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Currency</span>
+                  <span className="font-medium">{watchedCurrency}</span>
+                </div>
+                {watchedCurrency === 'USD' && (
+                  <>
                     <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Owner</span>
-                      <span className="font-medium text-right">{ownerName ?? '—'}</span>
+                      <span className="text-muted-foreground shrink-0">Rate</span>
+                      <span className="font-medium tabular-nums">{watchedRate.toLocaleString()}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Type</span>
-                    <span className="font-medium">{isWithdrawal ? 'Withdrawal' : 'Contribution'}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Date</span>
-                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Currency</span>
-                    <span className="font-medium">{watchedCurrency}</span>
-                  </div>
-                  {watchedCurrency === 'USD' && (
-                    <>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground shrink-0">Rate</span>
-                        <span className="font-medium tabular-nums">{watchedRate.toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between gap-2">
-                        <span className="text-muted-foreground shrink-0">Amount (USD)</span>
-                        <span className="font-medium tabular-nums">USD {amount.toLocaleString()}</span>
-                      </div>
-                    </>
-                  )}
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Tender Lines</span>
-                    <span className="font-medium tabular-nums">{watchedLines.length}</span>
-                  </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Amount (USD)</span>
+                      <span className="font-medium tabular-nums">USD {amount.toLocaleString()}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Tender Lines</span>
+                  <span className="font-medium tabular-nums">{watchedLines.length}</span>
                 </div>
+              </div>
 
-                <Separator className="my-4" />
+              <Separator className="my-4" />
 
-                <div className="flex justify-between items-center gap-2 mb-5">
-                  <span className="font-bold text-sm">Total</span>
-                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
-                </div>
+              <div className="flex justify-between items-center gap-2 mb-5">
+                <span className="font-bold text-sm">Total</span>
+                <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
+              </div>
 
+              <div className="space-y-2">
                 <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
                   {isPending ? 'Saving…' : isWithdrawal ? 'Record Withdrawal' : 'Record Contribution'}
                 </Button>
-                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-              </CardContent></Card>
-            </div>
-            </div>
-          </form>
-        </Form>
-      </SheetContent>
-    </Sheet>
+                <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push(returnPath)}>
+                  Cancel
+                </Button>
+              </div>
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+            </CardContent></Card>
+          </div>
+
+        </div>
+      </form>
+    </Form>
   )
 }

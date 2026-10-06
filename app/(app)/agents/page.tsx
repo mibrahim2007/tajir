@@ -1,13 +1,13 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
+import { Plus } from 'lucide-react'
 import { PendingChequesPanel } from '@/components/pending-cheques-panel'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { Button } from '@/components/ui/button'
 import { formatPKR } from '@/lib/utils/currency'
 import { getAgentBalances } from '@/lib/agents/ledger'
 import type { CommissionType } from '@/lib/agents/commission'
-import { AgentForm } from './agent-form'
-import { AgentPaymentForm } from './agent-payment-form'
 import { AgentsList, type AgentListItem } from './agents-list'
 
 export default async function AgentsPage() {
@@ -16,18 +16,12 @@ export default async function AgentsPage() {
   // Owners and the rest of the Accounts admin section.
   if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
-  const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: allAgents }, { data: allBanks }] = await Promise.all([
-    admin.from('agents')
-      .select('id, name, agent_code, cnic, phone, email, city, address, is_active, notes, created_at, sale_commission_type, sale_commission_rate, purchase_commission_type, purchase_commission_rate, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent')
-      .eq('tenant_id', tenantId).order('created_at', { ascending: false }),
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-  ])
+  const { data: allAgents } = await admin.from('agents')
+    .select('id, name, agent_code, phone, city, is_active, created_at, sale_commission_type, sale_commission_rate, purchase_commission_type, purchase_commission_rate, opening_balance_pkr_equivalent')
+    .eq('tenant_id', tenantId).order('created_at', { ascending: false })
 
   const agents = allAgents ?? []
-  const banks = allBanks ?? []
-  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'agent_payment', today)
 
   const balances = await getAgentBalances(
     admin, tenantId,
@@ -36,8 +30,6 @@ export default async function AgentsPage() {
 
   const items: AgentListItem[] = agents.map((a) => {
     const b = balances.get(a.id as string) ?? { earned: 0, paid: 0, outstanding: 0 }
-    const openingBalance = Number(a.opening_balance)
-    const openingPkr = Number(a.opening_balance_pkr_equivalent)
     return {
       id: a.id as string,
       name: a.name as string,
@@ -50,35 +42,11 @@ export default async function AgentsPage() {
       purchaseCommissionType: a.purchase_commission_type as CommissionType,
       purchaseCommissionRate: Number(a.purchase_commission_rate),
       ...b,
-      // Prepared here so the edit sheet opens fully populated without a second
-      // round trip when the row is expanded.
-      form: {
-        id: a.id as string,
-        name: a.name as string,
-        agentCode: (a.agent_code as string | null) ?? '',
-        cnic: (a.cnic as string | null) ?? '',
-        phone: (a.phone as string | null) ?? '',
-        email: (a.email as string | null) ?? '',
-        city: (a.city as string | null) ?? '',
-        address: (a.address as string | null) ?? '',
-        saleCommissionType: a.sale_commission_type as CommissionType,
-        saleCommissionRate: Number(a.sale_commission_rate),
-        purchaseCommissionType: a.purchase_commission_type as CommissionType,
-        purchaseCommissionRate: Number(a.purchase_commission_rate),
-        openingBalance,
-        openingBalanceCurrency: a.opening_balance_currency as 'PKR' | 'USD',
-        // Stored as an amount and its PKR equivalent, not a rate — recover the
-        // rate so re-saving an unchanged USD opening balance does not restate it.
-        openingBalanceExchangeRate: openingBalance > 0 ? openingPkr / openingBalance : 1,
-        notes: (a.notes as string | null) ?? '',
-      },
     }
   })
 
   const payable = items.reduce((s, a) => s + a.outstanding, 0)
-  const agentOptions = items
-    .filter((a) => a.isActive)
-    .map((a) => ({ id: a.id, name: a.name, outstanding: a.outstanding }))
+  const hasActiveAgents = items.some((a) => a.isActive)
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -92,10 +60,14 @@ export default async function AgentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {agentOptions.length > 0 && (
-            <AgentPaymentForm agents={agentOptions} today={today} nextSerial={nextSerial} banks={banks} />
+          {hasActiveAgents && (
+            <Link href="/agents/payment">
+              <Button className="min-h-[44px]">Pay Commission</Button>
+            </Link>
           )}
-          <AgentForm />
+          <Link href="/agents/new">
+            <Button variant="outline" className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Enrol Agent</Button>
+          </Link>
         </div>
       </div>
 

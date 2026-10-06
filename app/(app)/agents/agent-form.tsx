@@ -5,16 +5,16 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { createAgentAction } from '@/app/actions/create-agent'
 import { editAgentAction } from '@/app/actions/edit-agent'
-import { COMMISSION_TYPES, type CommissionType } from '@/lib/agents/commission'
+import { COMMISSION_TYPES, formatCommissionRate, type CommissionType } from '@/lib/agents/commission'
+import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 
 const commissionType = z.enum(['percentage', 'per_unit', 'flat', 'none'])
@@ -113,7 +113,8 @@ function CommissionSideFields({
 }
 
 /**
- * Enrolment / edit sheet for a commission agent.
+ * Enrolment / edit form for a commission agent, as a full page at /agents/new
+ * and /agents/[id]/edit (was a drawer on the agents list, which it returns to).
  *
  * `agent` switches it to edit mode. Both modes share one form because the field
  * set is identical — and the commission terms are the point of the record, so
@@ -121,7 +122,6 @@ function CommissionSideFields({
  */
 export function AgentForm({ agent }: { agent?: AgentFormValues }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const handleEnterToNext = useEnterToNextField()
@@ -133,6 +133,7 @@ export function AgentForm({ agent }: { agent?: AgentFormValues }) {
   })
 
   const currency = form.watch('openingBalanceCurrency')
+  const watched = form.watch()
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -141,157 +142,187 @@ export function AgentForm({ agent }: { agent?: AgentFormValues }) {
         ? await editAgentAction({ id: agent!.id, ...values })
         : await createAgentAction(values)
       if (!result.success) { setServerError(result.error); return }
-      if (!isEdit) form.reset(blank)
-      setOpen(false)
-      router.refresh()
+      // Back to the list. No router.refresh() inside the transition — it
+      // keeps isPending stuck.
+      router.push('/agents')
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        {isEdit ? (
-          <button type="button" className="text-xs underline underline-offset-4 text-muted-foreground hover:text-foreground">
-            Edit
-          </button>
-        ) : (
-          <Button variant="outline" className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Enrol Agent</Button>
-        )}
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>{isEdit ? `Edit ${agent!.name}` : 'Enrol Agent'}</SheetTitle>
-          <SheetDescription>
-            A broker who introduces trade. Commission accrues automatically on every
-            invoice they are named on, and is paid out from their ledger.
-          </SheetDescription>
-        </SheetHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="flex flex-col gap-4 mt-6">
-            <FormField control={form.control} name="name" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
-                <FormControl><Input placeholder="Agent / broker name" className="min-h-[44px]" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="agentCode" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Code (optional)</FormLabel>
-                  <FormControl><Input placeholder="e.g. AG-01" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="phone" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Phone (optional)</FormLabel>
-                  <FormControl><Input placeholder="03xx-xxxxxxx" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
+          {/* ── FORM (left on xl) ── */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-3 pt-5 px-5">
+              <CardTitle className="text-base">Agent Details</CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <FormField control={form.control} name="name" render={({ field }) => (
+                  <FormItem className="md:col-span-6">
+                    <FormLabel>Name <span className="text-destructive">*</span></FormLabel>
+                    <FormControl><Input placeholder="Agent / broker name" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="cnic" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CNIC (optional)</FormLabel>
-                  <FormControl><Input placeholder="xxxxx-xxxxxxx-x" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="city" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>City (optional)</FormLabel>
-                  <FormControl><Input placeholder="e.g. Faisalabad" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            </div>
+                <FormField control={form.control} name="agentCode" render={({ field }) => (
+                  <FormItem className="md:col-span-3">
+                    <FormLabel>Code (optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g. AG-01" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="phone" render={({ field }) => (
+                  <FormItem className="md:col-span-3">
+                    <FormLabel>Phone (optional)</FormLabel>
+                    <FormControl><Input placeholder="03xx-xxxxxxx" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-            <FormField control={form.control} name="email" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email (optional)</FormLabel>
-                <FormControl><Input placeholder="name@example.com" className="min-h-[44px]" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+                <FormField control={form.control} name="cnic" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>CNIC (optional)</FormLabel>
+                    <FormControl><Input placeholder="xxxxx-xxxxxxx-x" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="city" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>City (optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g. Faisalabad" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
-            <Separator />
+                <FormField control={form.control} name="email" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>Email (optional)</FormLabel>
+                    <FormControl><Input placeholder="name@example.com" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
 
-            <CommissionSideFields
-              form={form} side="sale" label="Sale Commission"
-              hint="Applied to sales this agent introduces."
-            />
-            <CommissionSideFields
-              form={form} side="purchase" label="Purchase Commission"
-              hint="Applied to purchases this agent arranges."
-            />
+              <Separator />
 
-            <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              Commission is expensed to <span className="font-medium">Commission Expense (6500)</span> and owed on{' '}
-              <span className="font-medium">Agent Commission Payable (2150)</span>. Purchase commission does{' '}
-              <span className="font-medium">not</span> change stock value. An invoice can override these
-              defaults for a one-off deal, and changing a rate here never restates commission already posted.
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <CommissionSideFields
+                  form={form} side="sale" label="Sale Commission"
+                  hint="Applied to sales this agent introduces."
+                />
+                <CommissionSideFields
+                  form={form} side="purchase" label="Purchase Commission"
+                  hint="Applied to purchases this agent arranges."
+                />
+              </div>
 
-            <Separator />
+              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                Commission is expensed to <span className="font-medium">Commission Expense (6500)</span> and owed on{' '}
+                <span className="font-medium">Agent Commission Payable (2150)</span>. Purchase commission does{' '}
+                <span className="font-medium">not</span> change stock value. An invoice can override these
+                defaults for a one-off deal, and changing a rate here never restates commission already posted.
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="openingBalance" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Opening Balance</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" min="0" className="min-h-[44px]" {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber || 0)} />
-                  </FormControl>
-                  <p className="text-xs text-muted-foreground">Commission already owed on day one.</p>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="openingBalanceCurrency" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Currency</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="PKR">PKR</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )} />
-            </div>
+              <Separator />
 
-            {currency === 'USD' && (
-              <FormField control={form.control} name="openingBalanceExchangeRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Exchange Rate (PKR per USD)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
-                      onChange={(e) => field.onChange(e.target.valueAsNumber || 1)} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            )}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <FormField control={form.control} name="openingBalance" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>Opening Balance</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min="0" className="min-h-[44px]" {...field}
+                        onChange={(e) => field.onChange(e.target.valueAsNumber || 0)} />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Commission already owed on day one.</p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="openingBalanceCurrency" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>Currency</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="PKR">PKR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Note (optional)</FormLabel>
-                <FormControl><Input placeholder="e.g. Handles Karachi mills" className="min-h-[44px]" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
+                {currency === 'USD' && (
+                  <FormField control={form.control} name="openingBalanceExchangeRate" render={({ field }) => (
+                    <FormItem className="md:col-span-4">
+                      <FormLabel>Exchange Rate (PKR per USD)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field}
+                          onChange={(e) => field.onChange(e.target.valueAsNumber || 1)} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
 
-            {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-            <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-              {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Enrol Agent'}
-            </Button>
-          </form>
-        </Form>
-      </SheetContent>
-    </Sheet>
+                <FormField control={form.control} name="notes" render={({ field }) => (
+                  <FormItem className="md:col-span-12">
+                    <FormLabel>Note (optional)</FormLabel>
+                    <FormControl><Input placeholder="e.g. Handles Karachi mills" className="min-h-[44px]" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── SUMMARY (right on xl, sticky) ── */}
+          <div className="xl:sticky xl:top-6">
+            <Card>
+              <CardContent className="px-5 pt-5 pb-5">
+                <p className="font-extrabold text-[15px] tracking-tight mb-4">Agent Summary</p>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Name</span>
+                    <span className="font-medium text-right truncate">{watched.name || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">On Sales</span>
+                    <span className="text-right tabular-nums">{formatCommissionRate(watched.saleCommissionType, Number(watched.saleCommissionRate) || 0)}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">On Purchases</span>
+                    <span className="text-right tabular-nums">{formatCommissionRate(watched.purchaseCommissionType, Number(watched.purchaseCommissionRate) || 0)}</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between gap-3 mb-5 text-sm">
+                  <span className="text-muted-foreground">Opening Balance</span>
+                  <span className="font-medium tabular-nums">
+                    {currency !== 'PKR' ? `${currency} ${(Number(watched.openingBalance) || 0).toLocaleString()}` : formatPKR(Number(watched.openingBalance) || 0)}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                    {isPending ? 'Saving…' : isEdit ? 'Save Changes' : 'Enrol Agent'}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push('/agents')}>
+                    Cancel
+                  </Button>
+                </div>
+
+                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+              </CardContent>
+            </Card>
+          </div>
+
+        </div>
+      </form>
+    </Form>
   )
 }

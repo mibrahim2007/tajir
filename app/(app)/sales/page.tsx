@@ -4,7 +4,6 @@ import { Plus, AlertTriangle, Printer, Pencil, RotateCcw, FileText } from 'lucid
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
-import { EditSaleForm } from './edit-sale-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteSaleAction } from '@/app/actions/delete-sale'
@@ -186,13 +185,9 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
             <Button variant="ghost" size="icon-sm" title="Edit" aria-label="Edit" className="text-muted-foreground"><Pencil className="size-4" /></Button>
           </Link>
         ) : item.soloOrder && (
-          <EditSaleForm
-            sale={{ id: item.soloOrder.id, customerId: item.soloOrder.customer_id, stockItemId: item.soloOrder.stock_item_id, quantity: item.soloOrder.quantity, rate: item.soloOrder.rate, currencyCode: item.soloOrder.currency_code, exchangeRate: item.soloOrder.exchange_rate, date: item.soloOrder.date, paymentDueDate: item.soloOrder.payment_due_date, locationId: item.soloOrder.location_id }}
-            customers={customers}
-            lots={lots}
-            locations={locationList}
-            costMap={costMap}
-          />
+          <Link href={`/sales/${item.soloOrder.id}/edit`}>
+            <Button variant="ghost" size="icon-sm" title="Edit" aria-label="Edit" className="text-muted-foreground"><Pencil className="size-4" /></Button>
+          </Link>
         )}
         <DeleteButton
           description={item.type === 'invoice'

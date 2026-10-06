@@ -1,11 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Barcode } from 'lucide-react'
+import { Barcode, Package, Pencil, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { CreateLotFormWrapper } from './form-wrappers'
-import { CreateItemsByTypeWrapper } from './form-wrappers'
-import { EditInventoryLotFormWrapper } from './form-wrappers'
 import { InventoryFilters } from './inventory-filters'
 import { BulkLabelPrint } from './bulk-label-print'
 import { DeleteButton } from '@/components/delete-button'
@@ -31,7 +29,7 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
 
   let dataQuery = admin
     .from('inventory_lots')
-    .select('id, name, sku, code, count, unit_of_measure, type, fiber, lot, current_quantity, item_type_id, item_types(id, name)')
+    .select('id, name, sku, code, count, unit_of_measure, type, fiber, lot, current_quantity, item_types(id, name)')
     .eq('tenant_id', tenantId)
 
   let countQuery = admin
@@ -53,10 +51,8 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
   const totalCount = totalRaw ?? 0
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasFilters = filterCount || filterType || filterFiber || filterLot
-  // All types (with parent link) for the grouped create/edit LOVs.
+  // All types (with parent link) for the filter LOV.
   const safeItemTypes = (itemTypes ?? []).map((t) => ({ id: t.id, name: t.name, parentId: t.parent_id }))
-  // The "Create Items by Type" flow files a batch under one top-level category.
-  const topItemTypes = safeItemTypes.filter((t) => !t.parentId).map((t) => ({ id: t.id, name: t.name }))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -70,8 +66,18 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
         </div>
         <div className="flex items-center gap-2">
           <InventoryGuide />
-          <CreateItemsByTypeWrapper itemTypes={topItemTypes} />
-          <CreateLotFormWrapper itemTypes={safeItemTypes} />
+          <Link href="/inventory/new-by-type">
+            <Button variant="outline" className="min-h-[44px]">
+              <Package className="h-4 w-4 mr-2" />
+              Create Items by Type
+            </Button>
+          </Link>
+          <Link href="/inventory/new">
+            <Button className="min-h-[44px]">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Stock Item
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -139,20 +145,9 @@ export default async function InventoryPage({ searchParams }: { searchParams: Se
                               <Barcode className="h-4 w-4" />
                             </Link>
                             <RoleGate allowedRoles={['owner']}>
-                              <EditInventoryLotFormWrapper
-                                lot={{
-                                  id: lot.id,
-                                  name: lot.name,
-                                  sku: lot.sku,
-                                  code: lot.code,
-                                  count: String(lot.count ?? ''),
-                                  unitOfMeasure: lot.unit_of_measure ?? null,
-                                  itemTypeId: lot.item_type_id ?? null,
-                                  fiber: lot.fiber,
-                                  lot: lot.lot,
-                                }}
-                                itemTypes={safeItemTypes}
-                              />
+                              <Link href={`/inventory/${lot.id}/edit`}>
+                                <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
+                              </Link>
                               <DeleteButton
                                 description={`Delete stock item "${lot.name}"? This cannot be undone.`}
                                 onDelete={deleteInventoryLotAction.bind(null, { id: lot.id })}

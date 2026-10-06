@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { DeleteButton } from '@/components/delete-button'
 import { formatPKR } from '@/lib/utils/currency'
 import { deleteOpeningPdcAction } from '@/app/actions/opening-pdc'
-import { OpeningChequeForm } from './opening-cheque-form'
 
 export type PartyOption = { kind: 'customer' | 'supplier'; id: string; name: string }
 
@@ -38,17 +37,7 @@ const STATUS_BADGE: Record<OpeningChequeRow['status'], string> = {
   endorsed: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-400',
 }
 
-export function OpeningChequesTable({
-  cheques,
-  banks,
-  parties,
-  today,
-}: {
-  cheques: OpeningChequeRow[]
-  banks: { id: string; name: string }[]
-  parties: PartyOption[]
-  today: string
-}) {
+export function OpeningChequesTable({ cheques }: { cheques: OpeningChequeRow[] }) {
   const received = cheques.filter((c) => c.direction === 'in' && c.status === 'pending')
   const issued = cheques.filter((c) => c.direction === 'out' && c.status === 'pending')
   const sum = (rs: OpeningChequeRow[]) => rs.reduce((s, r) => s + r.amount, 0)
@@ -65,12 +54,9 @@ export function OpeningChequesTable({
           </Link>{' '}
           where they can be cleared, bounced or handed on like any other cheque.
         </p>
-        <OpeningChequeForm
-          trigger={<Button className="min-h-[44px] whitespace-nowrap"><Plus className="h-4 w-4 mr-2" />Load Cheque</Button>}
-          banks={banks}
-          parties={parties}
-          today={today}
-        />
+        <Button asChild className="min-h-[44px] whitespace-nowrap">
+          <Link href="/settings/opening-balances/cheques/new"><Plus className="h-4 w-4 mr-2" />Load Cheque</Link>
+        </Button>
       </div>
 
       {cheques.length === 0 ? (
@@ -116,17 +102,11 @@ export function OpeningChequesTable({
                           sit on top of it — the actions refuse it, so hide them. */}
                       {c.status === 'pending' ? (
                         <div className="flex gap-1 justify-end">
-                          <OpeningChequeForm
-                            trigger={
-                              <Button size="sm" variant="ghost" className="min-h-[44px]">
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            }
-                            banks={banks}
-                            parties={parties}
-                            cheque={c}
-                            today={today}
-                          />
+                          <Button asChild size="sm" variant="ghost" className="min-h-[44px]">
+                            <Link href={`/settings/opening-balances/cheques/${c.id}/edit`} aria-label={`Edit cheque ${c.chequeNumber}`}>
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          </Button>
                           <DeleteButton
                             description={`Remove opening cheque ${c.chequeNumber} (${formatPKR(c.amount)})? Its opening ledger entry is removed too.`}
                             onDelete={deleteOpeningPdcAction.bind(null, { id: c.id })}

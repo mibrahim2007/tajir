@@ -6,8 +6,7 @@ import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -31,9 +30,11 @@ type FormValues = z.infer<typeof schema>
 
 const freshDefaults = (today: string): FormValues => ({ loanId: AUTO, amount: 0, date: today, note: '' })
 
+// Full-page form at /employees/[id]/salary-deduction (was a drawer on the
+// employee ledger, which it returns to).
 export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loans = [] }: { employeeId: string; today: string; monthlySalary?: number; loans?: LoanOption[] }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const returnPath = `/employees/${employeeId}/ledger`
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const handleEnterToNext = useEnterToNextField()
@@ -60,27 +61,23 @@ export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loan
         note: values.note,
       })
       if (!result.success) { setServerError(result.error); return }
-      form.reset(freshDefaults(today))
-      setOpen(false)
-      router.refresh()
+      // Back to the ledger. No router.refresh() inside the transition — it
+      // keeps isPending stuck.
+      router.push(returnPath)
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" className="min-h-[44px]">Salary Deduction</Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
-        <SheetHeader>
-          <SheetTitle>Recover via Salary Deduction</SheetTitle>
-          <SheetDescription>Withhold part of this month&apos;s salary against the loan. No cash moves — it posts Salaries &amp; Wages against the loan balance.</SheetDescription>
-        </SheetHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext} className="mt-6 px-4 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
-            <div className="flex flex-col gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} onKeyDown={handleEnterToNext}>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+
+          {/* ── FORM (left on xl) ── */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-3 pt-5 px-5">
+              <CardTitle className="text-base">Deduction Details</CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
               <FormField control={form.control} name="date" render={({ field }) => (
                 <FormItem className={hasLoans ? 'md:col-span-4' : 'md:col-span-6'}>
                   <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
@@ -113,58 +110,62 @@ export function SalaryDeductionForm({ employeeId, today, monthlySalary = 0, loan
                   </FormItem>
                 )} />
               )}
-            </div>
 
-            <FormField control={form.control} name="note" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Note (optional)</FormLabel>
-                <FormControl><Input placeholder="e.g. March payroll" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            </div>
+              <FormField control={form.control} name="note" render={({ field }) => (
+                <FormItem className="md:col-span-12">
+                  <FormLabel>Note (optional)</FormLabel>
+                  <FormControl><Input placeholder="e.g. March payroll" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </CardContent>
+          </Card>
 
-            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
-            <div className="md:sticky md:top-0">
-              <Card><CardContent className="px-5 pt-5 pb-5">
-                <p className="font-extrabold text-[15px] tracking-tight mb-4">Deduction Summary</p>
+          {/* ── SUMMARY (right on xl, sticky) ── */}
+          <div className="xl:sticky xl:top-6">
+            <Card><CardContent className="px-5 pt-5 pb-5">
+              <p className="font-extrabold text-[15px] tracking-tight mb-4">Deduction Summary</p>
 
-                <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Date</span>
+                  <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                </div>
+                {hasLoans && (
                   <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Date</span>
-                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
+                    <span className="text-muted-foreground shrink-0">Loan</span>
+                    <span className="font-medium text-right">{loanLabel}</span>
                   </div>
-                  {hasLoans && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Loan</span>
-                      <span className="font-medium text-right">{loanLabel}</span>
-                    </div>
-                  )}
-                  {monthlySalary > 0 && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Monthly Salary</span>
-                      <span className="font-medium tabular-nums">{formatPKR(monthlySalary)}</span>
-                    </div>
-                  )}
-                </div>
+                )}
+                {monthlySalary > 0 && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Monthly Salary</span>
+                    <span className="font-medium tabular-nums">{formatPKR(monthlySalary)}</span>
+                  </div>
+                )}
+              </div>
 
-                <Separator className="my-4" />
+              <Separator className="my-4" />
 
-                <div className="flex justify-between items-center gap-2 mb-5">
-                  <span className="font-bold text-sm">Deduction</span>
-                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(watchedAmount)}</span>
-                </div>
+              <div className="flex justify-between items-center gap-2 mb-5">
+                <span className="font-bold text-sm">Deduction</span>
+                <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(watchedAmount)}</span>
+              </div>
 
+              <div className="space-y-2">
                 <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
                   {isPending ? 'Saving…' : 'Record Deduction'}
                 </Button>
-                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-              </CardContent></Card>
-            </div>
-            </div>
-          </form>
-        </Form>
-      </SheetContent>
-    </Sheet>
+                <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push(returnPath)}>
+                  Cancel
+                </Button>
+              </div>
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+            </CardContent></Card>
+          </div>
+
+        </div>
+      </form>
+    </Form>
   )
 }

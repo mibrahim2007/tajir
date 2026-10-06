@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Pencil, AlertTriangle } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleAction } from '@/app/actions/edit-sale'
@@ -53,9 +52,9 @@ type Props = {
   costMap: Record<string, number>
 }
 
+// Full-page form at /sales/[id]/edit (was a row drawer on the sales list).
 export function EditSaleForm({ sale, customers, lots, locations, costMap }: Props) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [confirmBelowCost, setConfirmBelowCost] = useState<FormValues | null>(null)
@@ -98,8 +97,9 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
       setError(null)
       const result = await editSaleAction({ id: sale.id, ...values })
       if (!result.success) { setError(result.error); return }
-      setOpen(false)
-      router.refresh()
+      // Back to the list, which re-renders with the change. No
+      // router.refresh() inside the transition — it keeps isPending stuck.
+      router.push('/sales')
     })
   }
 
@@ -114,16 +114,15 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
-        <SheetHeader><SheetTitle>Edit Sale</SheetTitle></SheetHeader>
+    <>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-6 px-4 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
-            <div className="flex flex-col gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
+            <Card className="min-w-0">
+              <CardHeader className="pb-3 pt-5 px-5">
+                <CardTitle className="text-base">Sale Details</CardTitle>
+              </CardHeader>
+              <CardContent className="px-5 pb-5 flex flex-col gap-4">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
             <FormField control={form.control} name="customerId" render={() => (
               <FormItem className="md:col-span-6">
@@ -223,10 +222,11 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
               )} />
             )}
             </div>
-            </div>
+              </CardContent>
+            </Card>
 
-            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
-            <div className="md:sticky md:top-0">
+            {/* ── Summary (right on xl, sticky) ── */}
+            <div className="xl:sticky xl:top-6">
               <Card><CardContent className="px-5 pt-5 pb-5">
                 <p className="font-extrabold text-[15px] tracking-tight mb-4">Sale Summary</p>
 
@@ -276,16 +276,20 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
                   <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{formatPKR(totalPKR)}</span>
                 </div>
 
-                <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
-                  {isPending ? 'Saving…' : 'Save'}
-                </Button>
+                <div className="space-y-2">
+                  <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
+                    {isPending ? 'Saving…' : 'Save'}
+                  </Button>
+                  <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push('/sales')}>
+                    Cancel
+                  </Button>
+                </div>
                 {error && <p className="text-sm text-destructive mt-3">{error}</p>}
               </CardContent></Card>
             </div>
             </div>
           </form>
         </Form>
-      </SheetContent>
 
       {/* Below-cost warning */}
       <Dialog open={!!confirmBelowCost} onOpenChange={(o) => { if (!o) setConfirmBelowCost(null) }}>
@@ -317,6 +321,6 @@ export function EditSaleForm({ sale, customers, lots, locations, costMap }: Prop
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Sheet>
+    </>
   )
 }

@@ -1,8 +1,7 @@
 import Link from 'next/link'
-import { History } from 'lucide-react'
+import { History, Tag } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { SetPriceForm } from './set-price-form'
 import { DeleteButton } from '@/components/delete-button'
 import { Button } from '@/components/ui/button'
 import { deletePricingRuleAction } from '@/app/actions/delete-pricing-rule'
@@ -36,7 +35,11 @@ export default async function PricingPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Customer Pricing</h1>
           <p className="text-sm text-muted-foreground mt-1">{activeRules.length} active rule{activeRules.length !== 1 ? 's' : ''}</p>
         </div>
-        {role === 'owner' && <SetPriceForm customers={customers} stockItems={stockItems} />}
+        {role === 'owner' && (
+          <Link href="/pricing/new">
+            <Button className="min-h-[44px]"><Tag className="h-4 w-4 mr-2" />Set Price</Button>
+          </Link>
+        )}
       </div>
 
       {activeRules.length === 0 ? (

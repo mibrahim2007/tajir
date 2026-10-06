@@ -1,17 +1,14 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { listEndorsableCheques } from '@/lib/pdc/endorsement'
-import { DisburseLoanForm } from '@/app/(app)/employees/[id]/disburse-loan-form'
-import { RecordRepaymentForm } from '@/app/(app)/employees/[id]/record-repayment-form'
-import { SalaryDeductionForm } from '@/app/(app)/employees/[id]/salary-deduction-form'
+import { Button } from '@/components/ui/button'
 import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
 import { DeleteButton } from '@/components/delete-button'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { buildEmployeeLoanLedger } from '@/lib/ledger/employee-loans'
 import { buildEmployeeLoanDetail } from '@/lib/ledger/employee-loan-detail'
 import type { InstallmentStatus } from '@/lib/loans/allocation'
@@ -30,36 +27,22 @@ const STATUS_STYLES: Record<InstallmentStatus, { label: string; cls: string }> =
 export default async function EmployeeLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
-  const today = new Date().toISOString().split('T')[0]
 
   const admin = createAdminClient()
 
   const { data: employeeRow } = await admin
     .from('employees')
-    .select('id, name, designation, monthly_salary')
+    .select('id, name, designation')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!employeeRow) notFound()
 
-  const [ledger, detail, { data: rawBanks }, { data: rawLoans }, nextLoanSerial, nextRepaymentSerial] = await Promise.all([
+  const [ledger, detail] = await Promise.all([
     buildEmployeeLoanLedger(tenantId, id),
     buildEmployeeLoanDetail(tenantId, id),
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-    admin.from('employee_loans').select('id, serial_number, principal, currency_code, disbursement_date')
-      .eq('employee_id', id).eq('tenant_id', tenantId).eq('status', 'active').order('disbursement_date', { ascending: true }),
-    peekNextDocumentSerial(admin, tenantId, 'employee_loan', today),
-    peekNextDocumentSerial(admin, tenantId, 'loan_repayment', today),
   ])
-
-  const banks = rawBanks ?? []
-  // Received cheques that could be handed straight to the employee.
-  const endorsableCheques = await listEndorsableCheques(tenantId)
-  const loanOptions = (rawLoans ?? []).map((l) => ({
-    id: l.id,
-    label: `${l.serial_number ? `${l.serial_number} · ` : ''}${l.currency_code} ${Number(l.principal).toLocaleString()} · ${formatPKTDate(new Date(l.disbursement_date))}`,
-  }))
 
   const { rows, outstanding, totalDisbursed, totalRepaid } = ledger
   const scheduledLoans = detail.loans.filter((l) => l.installments.length > 0)
@@ -74,10 +57,16 @@ export default async function EmployeeLedgerPage({ params }: Props) {
         </div>
         <div className="flex gap-2 flex-wrap justify-end print:hidden">
           <PrintButton />
-          <RecordRepaymentForm employeeId={id} today={today} nextSerial={nextRepaymentSerial} banks={banks} loans={loanOptions} />
+          <Link href={`/employees/${id}/repayment`}>
+            <Button variant="outline" className="min-h-[44px]">Record Repayment</Button>
+          </Link>
           <RoleGate allowedRoles={['owner']}>
-            <SalaryDeductionForm employeeId={id} today={today} monthlySalary={Number(employeeRow.monthly_salary) || 0} loans={loanOptions} />
-            <DisburseLoanForm employeeId={id} today={today} nextSerial={nextLoanSerial} banks={banks} endorsableCheques={endorsableCheques} />
+            <Link href={`/employees/${id}/salary-deduction`}>
+              <Button variant="outline" className="min-h-[44px]">Salary Deduction</Button>
+            </Link>
+            <Link href={`/employees/${id}/loan`}>
+              <Button className="min-h-[44px]">Disburse Loan</Button>
+            </Link>
           </RoleGate>
         </div>
       </div>

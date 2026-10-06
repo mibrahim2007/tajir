@@ -8,7 +8,6 @@ import { formatPKR } from '@/lib/utils/currency'
 import { formatCommissionRate, type CommissionType } from '@/lib/agents/commission'
 import { setAgentActiveAction } from '@/app/actions/edit-agent'
 import { deleteAgentAction } from '@/app/actions/delete-agent'
-import { AgentForm, type AgentFormValues } from './agent-form'
 
 export type AgentListItem = {
   id: string
@@ -25,8 +24,6 @@ export type AgentListItem = {
   earned: number
   paid: number
   outstanding: number
-  /** Everything the edit sheet needs, prepared server-side. */
-  form: AgentFormValues
 }
 
 export function AgentsList({ agents }: { agents: AgentListItem[] }) {
@@ -172,7 +169,12 @@ export function AgentsList({ agents }: { agents: AgentListItem[] }) {
                       >
                         Ledger
                       </Link>
-                      <AgentForm agent={a.form} />
+                      <Link
+                        href={`/agents/${a.id}/edit`}
+                        className="text-xs underline underline-offset-4 text-muted-foreground hover:text-foreground"
+                      >
+                        Edit
+                      </Link>
                       <button
                         type="button"
                         onClick={() => onToggleActive(a)}

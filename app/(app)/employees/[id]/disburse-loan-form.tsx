@@ -7,8 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { tenderLineFormSchema } from '@/lib/constants/tender-types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -48,12 +47,12 @@ const freshDefaults = (today: string): FormValues => ({
   employeeId: '', currencyCode: 'PKR', exchangeRate: 1, disbursementDate: today, installmentCount: 0, firstDueDate: '', notes: '', lines: [{ ...emptyLine }],
 })
 
-// Two modes: fixed employee (from an employee ledger) or an employee picker
-// (from the Loans page — pass `employees`, omit `employeeId`).
-export function DisburseLoanForm({ employeeId, employees, today, nextSerial, banks = [], endorsableCheques = [] }: { employeeId?: string; employees?: EmployeeOption[]; today: string; nextSerial?: string | null; banks?: Bank[]; endorsableCheques?: EndorsableCheque[] }) {
+// Full-page form. Two modes: fixed employee at /employees/[id]/loan (from an
+// employee ledger) or an employee picker at /loans/new (from the Loans page —
+// pass `employees`, omit `employeeId`). `returnPath` is the page it came from.
+export function DisburseLoanForm({ employeeId, employees, today, nextSerial, banks = [], endorsableCheques = [], returnPath }: { employeeId?: string; employees?: EmployeeOption[]; today: string; nextSerial?: string | null; banks?: Bank[]; endorsableCheques?: EndorsableCheque[]; returnPath: string }) {
   const showPicker = !employeeId && !!employees
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const handleEnterToNext = useEnterToNextField()
@@ -101,186 +100,188 @@ export function DisburseLoanForm({ employeeId, employees, today, nextSerial, ban
         })),
       })
       if (!result.success) { setServerError(result.error); return }
-      form.reset(freshDefaults(today))
-      setOpen(false)
-      router.refresh()
+      // Back to where the form was opened from. No router.refresh() inside
+      // the transition — it keeps isPending stuck.
+      router.push(returnPath)
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
-        <Button className="min-h-[44px]">Disburse Loan</Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto w-full sm:max-w-5xl">
-        <SheetHeader>
-          <SheetTitle>Disburse Loan / Advance</SheetTitle>
-          <SheetDescription>Pay a loan or advance{showPicker ? ' to an employee' : ' to this employee'}. Interest-free.</SheetDescription>
-        </SheetHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext} className="mt-6 px-4 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px] gap-5 items-start">
-            <div className="flex flex-col gap-4">
-            {showPicker && (
-              <FormField control={form.control} name="employeeId" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Employee <span className="text-destructive">*</span></FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select an employee…" /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      {employees!.map((e) => (
-                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
-            )}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit, () => setServerError('Please complete the highlighted fields and enter a positive amount.'))} onKeyDown={handleEnterToNext}>
+        <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-            {nextSerial && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium leading-none">Serial No.</label>
-                <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
-                <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
-              </div>
-            )}
+          {/* ── FORM (left on xl) ── */}
+          <Card className="min-w-0">
+            <CardHeader className="pb-3 pt-5 px-5">
+              <CardTitle className="text-base">Loan Details</CardTitle>
+            </CardHeader>
+            <CardContent className="px-5 pb-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                {showPicker && (
+                  <FormField control={form.control} name="employeeId" render={({ field }) => (
+                    <FormItem className="md:col-span-12">
+                      <FormLabel>Employee <span className="text-destructive">*</span></FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select an employee…" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                          {employees!.map((e) => (
+                            <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="currencyCode" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Currency</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
-                    <SelectContent>
-                      <SelectItem value="PKR">PKR</SelectItem>
-                      <SelectItem value="USD">USD</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </FormItem>
-              )} />
-            </div>
+                {nextSerial && (
+                  <div className="space-y-2 md:col-span-4">
+                    <label className="text-sm font-medium leading-none">Serial No.</label>
+                    <Input value={nextSerial} disabled readOnly className="min-h-[44px] font-mono" />
+                    <p className="text-xs text-muted-foreground">Auto-generated on save.</p>
+                  </div>
+                )}
 
-            {watchedCurrency === 'USD' && (
-              <FormField control={form.control} name="exchangeRate" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
-                  <FormControl><Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                </FormItem>
-              )} />
-            )}
-
-            <Separator />
-
-            <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} />
-
-            <Separator />
-
-            <div className="grid grid-cols-2 gap-3">
-              <FormField control={form.control} name="installmentCount" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Installments</FormLabel>
-                  <FormControl><Input type="number" step="1" min="0" placeholder="0 = ad-hoc" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.value === '' ? 0 : e.target.valueAsNumber)} /></FormControl>
-                  <p className="text-xs text-muted-foreground">Leave 0 for open / ad-hoc repayment.</p>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              {watchedCount > 0 && (
-                <FormField control={form.control} name="firstDueDate" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>First Due Date <span className="text-destructive">*</span></FormLabel>
+                <FormField control={form.control} name="disbursementDate" render={({ field }) => (
+                  <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
+                    <FormLabel>Date <span className="text-destructive">*</span></FormLabel>
                     <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-              )}
-            </div>
+                <FormField control={form.control} name="currencyCode" render={({ field }) => (
+                  <FormItem className={nextSerial ? 'md:col-span-4' : 'md:col-span-6'}>
+                    <FormLabel>Currency</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="PKR">PKR</SelectItem>
+                        <SelectItem value="USD">USD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
 
-            {preview.length > 0 && (
-              <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">Schedule preview</p>
-                <ul className="space-y-0.5 max-h-40 overflow-y-auto tabular-nums">
-                  {preview.map((s) => (
-                    <li key={s.installmentNo} className="flex justify-between">
-                      <span className="text-muted-foreground">#{s.installmentNo} · {formatPKTDate(new Date(s.dueDate))}</span>
-                      <span>{watchedCurrency !== 'PKR' ? `${watchedCurrency} ${s.amount.toLocaleString()}` : formatPKR(s.amount)}</span>
-                    </li>
-                  ))}
-                </ul>
+                {watchedCurrency === 'USD' && (
+                  <FormField control={form.control} name="exchangeRate" render={({ field }) => (
+                    <FormItem className="md:col-span-6">
+                      <FormLabel>Exchange Rate (PKR per USD) <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input type="number" step="0.01" min="1" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                    </FormItem>
+                  )} />
+                )}
               </div>
-            )}
 
-            <FormField control={form.control} name="notes" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Note (optional)</FormLabel>
-                <FormControl><Input placeholder="e.g. Advance against salary…" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            </div>
+              <Separator />
 
-            {/* ── Summary — after the fields in source order, shown on the right on wide screens ── */}
-            <div className=" md:sticky md:top-0">
-              <Card><CardContent className="px-5 pt-5 pb-5">
-                <p className="font-extrabold text-[15px] tracking-tight mb-4">Loan Summary</p>
+              <TenderLinesField banks={banks} currency={watchedCurrency} endorsableCheques={endorsableCheques} layout="wide" />
 
-                <div className="space-y-2 text-sm">
-                  {showPicker && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Employee</span>
-                      <span className="font-medium text-right">{employeeName ?? '—'}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Date</span>
-                    <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Currency</span>
-                    <span className="font-medium">{watchedCurrency}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">Installments</span>
-                    <span className="font-medium tabular-nums">{watchedCount > 0 ? watchedCount : 'Ad-hoc'}</span>
-                  </div>
-                  {watchedCount > 0 && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">First Due</span>
-                      <span className="font-medium tabular-nums">{watchedFirstDue || '—'}</span>
-                    </div>
-                  )}
-                  {preview.length > 0 && (
-                    <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">Per Installment</span>
-                      <span className="font-medium tabular-nums">{fmtAmount(preview[0].amount)}</span>
-                    </div>
-                  )}
+              <Separator />
+
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                <FormField control={form.control} name="installmentCount" render={({ field }) => (
+                  <FormItem className="md:col-span-4">
+                    <FormLabel>Installments</FormLabel>
+                    <FormControl><Input type="number" step="1" min="0" placeholder="0 = ad-hoc" className="min-h-[44px]" {...field} onChange={(e) => field.onChange(e.target.value === '' ? 0 : e.target.valueAsNumber)} /></FormControl>
+                    <p className="text-xs text-muted-foreground">Leave 0 for open / ad-hoc repayment.</p>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                {watchedCount > 0 && (
+                  <FormField control={form.control} name="firstDueDate" render={({ field }) => (
+                    <FormItem className="md:col-span-4">
+                      <FormLabel>First Due Date <span className="text-destructive">*</span></FormLabel>
+                      <FormControl><Input type="date" className="min-h-[44px]" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+              </div>
+
+              {preview.length > 0 && (
+                <div className="rounded-lg border bg-muted/30 px-3 py-2 text-sm">
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1">Schedule preview</p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-8 gap-y-0.5 max-h-60 overflow-y-auto tabular-nums">
+                    {preview.map((s) => (
+                      <li key={s.installmentNo} className="flex justify-between">
+                        <span className="text-muted-foreground">#{s.installmentNo} · {formatPKTDate(new Date(s.dueDate))}</span>
+                        <span>{watchedCurrency !== 'PKR' ? `${watchedCurrency} ${s.amount.toLocaleString()}` : formatPKR(s.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
+              )}
 
-                <Separator className="my-4" />
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Note (optional)</FormLabel>
+                  <FormControl><Input placeholder="e.g. Advance against salary…" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </CardContent>
+          </Card>
 
-                <div className="flex justify-between items-center gap-2 mb-5">
-                  <span className="font-bold text-sm">Amount</span>
-                  <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{fmtAmount(principal)}</span>
+          {/* ── SUMMARY (right on xl, sticky) ── */}
+          <div className="xl:sticky xl:top-6">
+            <Card><CardContent className="px-5 pt-5 pb-5">
+              <p className="font-extrabold text-[15px] tracking-tight mb-4">Loan Summary</p>
+
+              <div className="space-y-2 text-sm">
+                {showPicker && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Employee</span>
+                    <span className="font-medium text-right">{employeeName ?? '—'}</span>
+                  </div>
+                )}
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Date</span>
+                  <span className="font-medium tabular-nums">{watchedDate || '—'}</span>
                 </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Currency</span>
+                  <span className="font-medium">{watchedCurrency}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground shrink-0">Installments</span>
+                  <span className="font-medium tabular-nums">{watchedCount > 0 ? watchedCount : 'Ad-hoc'}</span>
+                </div>
+                {watchedCount > 0 && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">First Due</span>
+                    <span className="font-medium tabular-nums">{watchedFirstDue || '—'}</span>
+                  </div>
+                )}
+                {preview.length > 0 && (
+                  <div className="flex justify-between gap-2">
+                    <span className="text-muted-foreground shrink-0">Per Installment</span>
+                    <span className="font-medium tabular-nums">{fmtAmount(preview[0].amount)}</span>
+                  </div>
+                )}
+              </div>
 
+              <Separator className="my-4" />
+
+              <div className="flex justify-between items-center gap-2 mb-5">
+                <span className="font-bold text-sm">Amount</span>
+                <span className="text-lg font-extrabold tabular-nums tracking-tight text-right">{fmtAmount(principal)}</span>
+              </div>
+
+              <div className="space-y-2">
                 <Button type="submit" className="w-full min-h-[44px]" disabled={isPending}>
                   {isPending ? 'Saving…' : 'Disburse Loan'}
                 </Button>
-                {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
-              </CardContent></Card>
-            </div>
-            </div>
-          </form>
-        </Form>
-      </SheetContent>
-    </Sheet>
+                <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push(returnPath)}>
+                  Cancel
+                </Button>
+              </div>
+              {serverError && <p className="text-sm text-destructive mt-3">{serverError}</p>}
+            </CardContent></Card>
+          </div>
+
+        </div>
+      </form>
+    </Form>
   )
 }

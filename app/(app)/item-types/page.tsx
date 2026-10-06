@@ -1,9 +1,11 @@
 import { Fragment } from 'react'
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PageHeader } from '@/components/page-header'
 import { TableCard, Th, Td, EmptyState } from '@/components/table-card'
-import { CreateItemTypeSheet } from './create-item-type-sheet'
+import { Button } from '@/components/ui/button'
 import { ItemTypeActions } from './item-type-actions'
 
 export default async function ItemTypesPage() {
@@ -47,7 +49,13 @@ export default async function ItemTypesPage() {
       <PageHeader
         title="Item Types"
         subtitle="Categorize your stock items (e.g. Yarn, Grey Fabric)"
-        action={isOwner ? <CreateItemTypeSheet /> : undefined}
+        action={isOwner ? (
+          <Link href="/item-types/new">
+            <Button size="sm" className="min-h-[36px]">
+              <Plus className="h-4 w-4 mr-1" />Add Item Type
+            </Button>
+          </Link>
+        ) : undefined}
       />
       <TableCard>
         <table className="w-full text-sm">

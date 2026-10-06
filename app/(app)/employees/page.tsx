@@ -1,6 +1,8 @@
+import Link from 'next/link'
+import { Plus } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { CreateEmployeeForm } from './create-employee-form'
+import { Button } from '@/components/ui/button'
 import { EmployeesList } from './employees-list'
 
 export default async function EmployeesPage() {
@@ -39,7 +41,9 @@ export default async function EmployeesPage() {
           <h1 className="text-2xl font-extrabold tracking-tight">Employees</h1>
           <p className="text-sm text-muted-foreground mt-1">{employees.length} employee{employees.length !== 1 ? 's' : ''} · loans &amp; advances</p>
         </div>
-        <CreateEmployeeForm />
+        <Link href="/employees/new">
+          <Button className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Add Employee</Button>
+        </Link>
       </div>
 
       {employees.length === 0 ? (

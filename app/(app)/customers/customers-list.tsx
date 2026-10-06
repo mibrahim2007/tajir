@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { Pencil } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { EditCustomerForm } from './edit-customer-form'
 import { DeleteButton } from '@/components/delete-button'
 import { RoleGate } from '@/components/role-gate'
 import { deleteCustomerAction } from '@/app/actions/delete-customer'
@@ -120,16 +121,9 @@ export function CustomersList({ customers }: { customers: CustomerListItem[] }) 
                       <td className="px-4 py-3">
                         <RoleGate allowedRoles={['owner']}>
                           <div className="flex gap-1 justify-end">
-                            <EditCustomerForm
-                              id={c.id}
-                              currentName={c.name}
-                              currentEmail={c.email}
-                              currentPhone={c.phone}
-                              currentStatus={c.status}
-                              currentOpeningBalance={c.openingBalance}
-                              currentOpeningBalanceCurrency={c.openingBalanceCurrency}
-                              currentOpeningBalancePkr={c.openingBalancePkrEquivalent}
-                            />
+                            <Link href={`/customers/${c.id}/edit`}>
+                              <Button variant="ghost" size="sm" className="min-h-[44px]"><Pencil className="h-4 w-4" /></Button>
+                            </Link>
                             <DeleteButton
                               description={`Delete customer "${c.name}"? All associated sales and receipts will also be deleted.`}
                               onDelete={deleteCustomerAction.bind(null, { id: c.id })}

@@ -5,7 +5,7 @@ import { type PdcRegisterRow } from '@/lib/pdc/sources'
 import { StockBalanceTable, type OpeningLot } from './stock-balance-table'
 import { CustomerBalanceTable } from './customer-balance-table'
 import { SupplierBalanceTable } from './supplier-balance-table'
-import { OpeningChequesTable, type OpeningChequeRow, type PartyOption } from './opening-cheques-table'
+import { OpeningChequesTable, type OpeningChequeRow } from './opening-cheques-table'
 
 export default async function OpeningBalancesPage() {
   const { tenantId, role } = await requireAuth()
@@ -79,13 +79,6 @@ export default async function OpeningBalancesPage() {
   const banks = (rawBanks ?? []).map((b) => ({ id: b.id, name: b.name }))
   const bankNames = new Map(banks.map((b) => [b.id, b.name]))
 
-  // Both party lists in one picker; the value carries the kind so the action
-  // knows which subledger a bounce would move.
-  const parties: PartyOption[] = [
-    ...(rawCustomers ?? []).map((c) => ({ kind: 'customer' as const, id: c.id, name: c.name })),
-    ...(rawSuppliers ?? []).map((s) => ({ kind: 'supplier' as const, id: s.id, name: s.name })),
-  ].sort((a, b) => a.name.localeCompare(b.name))
-
   // Dates are formatted here rather than in the client table: doing it there
   // made the server and client markup differ and left the buttons inert.
   const cheques: OpeningChequeRow[] = ((rawCheques ?? []) as PdcRegisterRow[])
@@ -118,7 +111,7 @@ export default async function OpeningBalancesPage() {
       <section>
         <h2 className="text-lg font-semibold mb-3">Stock Item Quantities</h2>
         <p className="text-sm text-muted-foreground mb-3">An item held in more than one warehouse can be loaded at all of them at once — add a line per location.</p>
-        <StockBalanceTable lots={lots} locations={locations} />
+        <StockBalanceTable lots={lots} />
       </section>
 
       <section>
@@ -133,7 +126,7 @@ export default async function OpeningBalancesPage() {
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Post-Dated Cheques</h2>
-        <OpeningChequesTable cheques={cheques} banks={banks} parties={parties} today={today} />
+        <OpeningChequesTable cheques={cheques} />
       </section>
     </div>
   )

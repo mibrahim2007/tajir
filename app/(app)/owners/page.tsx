@@ -2,10 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { requireAuth } from '@/lib/auth/require-auth'
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
-import { CreateOwnerForm } from './create-owner-form'
-import { OwnerTransactionForm } from './owner-transaction-form'
 import { OwnersList } from './owners-list'
 
 export default async function OwnersPage() {
@@ -13,20 +12,15 @@ export default async function OwnersPage() {
   // Owner equity — capital and drawings — is owner-only.
   if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
-  const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: allOwners }, { data: allTxns }, { data: allBanks }] = await Promise.all([
+  const [{ data: allOwners }, { data: allTxns }] = await Promise.all([
     admin.from('owners').select('id, name, cnic, profit_share_pct, is_active, created_at')
       .eq('tenant_id', tenantId).order('created_at', { ascending: false }),
     admin.from('owner_transactions').select('owner_id, txn_type, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
   ])
 
   const owners = allOwners ?? []
   const txns = allTxns ?? []
-  const banks = allBanks ?? []
-
-  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'owner_withdrawal', today)
 
   // Net capital = contributions in − drawings out. Negative means the owner has
   // drawn more than they put in, which is normal in a profitable year (profit
@@ -48,7 +42,7 @@ export default async function OwnersPage() {
   })
 
   const totalShare = ownerItems.filter((o) => o.isActive).reduce((s, o) => s + o.profitSharePct, 0)
-  const ownerOptions = owners.filter((o) => o.is_active).map((o) => ({ id: o.id, name: o.name }))
+  const hasActiveOwners = owners.some((o) => o.is_active)
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -67,10 +61,14 @@ export default async function OwnersPage() {
               Profit Allocation
             </Link>
           )}
-          {ownerOptions.length > 0 && (
-            <OwnerTransactionForm owners={ownerOptions} today={today} nextSerial={nextSerial} banks={banks} />
+          {hasActiveOwners && (
+            <Link href="/owners/transaction">
+              <Button className="min-h-[44px]">Record Capital Movement</Button>
+            </Link>
           )}
-          <CreateOwnerForm />
+          <Link href="/owners/new">
+            <Button variant="outline" className="min-h-[44px]"><Plus className="h-4 w-4 mr-2" />Add Owner</Button>
+          </Link>
         </div>
       </div>
 

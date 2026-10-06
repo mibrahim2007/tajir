@@ -1,15 +1,14 @@
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { RecordReceiptForm } from '@/app/(app)/customers/record-receipt-form'
 import { EditArReceiptForm } from '@/app/(app)/customers/edit-ar-receipt-form'
-import { RefundCustomerForm } from '@/app/(app)/customers/refund-customer-form'
+import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/export-button'
 import { PrintButton } from '@/components/print-button'
 import { RoleGate } from '@/components/role-gate'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { toCustomerStatus, CUSTOMER_STATUS_LABELS, CUSTOMER_STATUS_BADGE } from '@/lib/customer-status'
 import { fetchDirectPayments, customerSideSuffix } from '@/lib/ledger/direct-payments'
 
@@ -18,7 +17,6 @@ type Props = { params: Promise<{ id: string }> }
 export default async function CustomerLedgerPage({ params }: Props) {
   const { tenantId } = await requireAuth()
   const { id } = await params
-  const today = new Date().toISOString().split('T')[0]
 
   const admin = createAdminClient()
 
@@ -32,11 +30,6 @@ export default async function CustomerLedgerPage({ params }: Props) {
   if (!customerRow) notFound()
 
   const customerStatus = toCustomerStatus(customerRow.status)
-
-  const [nextReceiptSerial, nextRefundSerial] = await Promise.all([
-    peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today),
-    peekNextDocumentSerial(admin, tenantId, 'customer_refund', today),
-  ])
 
   const [{ data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, directPayments] = await Promise.all([
     admin.from('sales_orders')
@@ -68,12 +61,6 @@ export default async function CustomerLedgerPage({ params }: Props) {
     // Receipt lines where this customer paid one of our suppliers directly.
     fetchDirectPayments(admin, tenantId, { customerId: id }),
   ])
-
-  const [{ data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-    admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
-  ])
-  const banks = rawBanks ?? []
 
   const sales = rawSales ?? []
   const receipts = rawReceipts ?? []
@@ -183,10 +170,16 @@ export default async function CustomerLedgerPage({ params }: Props) {
           <ExportButton href={`/api/export/customer-ledger/${id}`} label="Export" />
           {runningBalance < 0 && (
             <RoleGate allowedRoles={['owner']}>
-              <RefundCustomerForm customerId={id} today={today} creditAmount={Math.abs(runningBalance)} nextSerial={nextRefundSerial} banks={banks} />
+              <Link href={`/customers/${id}/refund`}>
+                <Button variant="outline" className="min-h-[44px] border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/40">
+                  Issue Refund
+                </Button>
+              </Link>
             </RoleGate>
           )}
-          <RecordReceiptForm customerId={id} today={today} nextSerial={nextReceiptSerial} banks={banks} suppliers={rawSuppliers ?? []} />
+          <Link href={`/customers/${id}/receipt`}>
+            <Button className="min-h-[44px]">Record Receipt</Button>
+          </Link>
         </div>
       </div>
 

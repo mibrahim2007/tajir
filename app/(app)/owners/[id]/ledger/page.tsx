@@ -3,10 +3,9 @@ import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { Button } from '@/components/ui/button'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
-import { OwnerTransactionForm } from '../../owner-transaction-form'
 import { OwnerLedgerRows } from './owner-ledger-rows'
 
 export default async function OwnerLedgerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +14,6 @@ export default async function OwnerLedgerPage({ params }: { params: Promise<{ id
   // Owner equity — per-owner ledger — is owner-only.
   if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
-  const today = new Date().toISOString().split('T')[0]
 
   const { data: owner } = await admin
     .from('owners')
@@ -26,17 +24,12 @@ export default async function OwnerLedgerPage({ params }: { params: Promise<{ id
 
   if (!owner) notFound()
 
-  const [{ data: allTxns }, { data: allBanks }] = await Promise.all([
-    admin.from('owner_transactions')
-      .select('id, serial_number, txn_type, amount, currency_code, exchange_rate, pkr_equivalent, date, notes')
-      .eq('tenant_id', tenantId).eq('owner_id', id)
-      .order('date', { ascending: true }).order('created_at', { ascending: true }),
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-  ])
+  const { data: allTxns } = await admin.from('owner_transactions')
+    .select('id, serial_number, txn_type, amount, currency_code, exchange_rate, pkr_equivalent, date, notes')
+    .eq('tenant_id', tenantId).eq('owner_id', id)
+    .order('date', { ascending: true }).order('created_at', { ascending: true })
 
   const txns = allTxns ?? []
-  const banks = allBanks ?? []
-  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'owner_withdrawal', today)
 
   // Running net capital, oldest first: contributions add, drawings subtract.
   let running = 0
@@ -76,7 +69,9 @@ export default async function OwnerLedgerPage({ params }: { params: Promise<{ id
             {Number(owner.profit_share_pct) > 0 && ` · ${Number(owner.profit_share_pct).toFixed(2)}% share`}
           </p>
         </div>
-        <OwnerTransactionForm ownerId={owner.id} today={today} nextSerial={nextSerial} banks={banks} />
+        <Link href={`/owners/${owner.id}/transaction`}>
+          <Button className="min-h-[44px]">Record Capital Movement</Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">

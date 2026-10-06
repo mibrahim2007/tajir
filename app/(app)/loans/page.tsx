@@ -1,11 +1,10 @@
+import Link from 'next/link'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PendingChequesPanel } from "@/components/pending-cheques-panel"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { RoleGate } from '@/components/role-gate'
-import { DisburseLoanForm } from '@/app/(app)/employees/[id]/disburse-loan-form'
+import { Button } from '@/components/ui/button'
 import { LoansList, type LoanListItem } from './loans-list'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
-import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
 
 export default async function LoansPage() {
@@ -13,20 +12,17 @@ export default async function LoansPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawEmployees }, { data: rawLoans }, { data: rawRepayments }, { data: rawBanks }, nextLoanSerial] = await Promise.all([
-    admin.from('employees').select('id, name, is_active').eq('tenant_id', tenantId).order('name'),
+  const [{ data: rawEmployees }, { data: rawLoans }, { data: rawRepayments }] = await Promise.all([
+    admin.from('employees').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('employee_loans')
       .select('id, employee_id, serial_number, principal, currency_code, pkr_equivalent, disbursement_date, installment_count, status')
       .eq('tenant_id', tenantId).neq('status', 'void').order('disbursement_date', { ascending: false }),
     admin.from('loan_repayments').select('employee_id, loan_id, date, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-    peekNextDocumentSerial(admin, tenantId, 'employee_loan', today),
   ])
 
   const employees = rawEmployees ?? []
   const loans = rawLoans ?? []
   const repayments = rawRepayments ?? []
-  const banks = rawBanks ?? []
   const nameById = new Map(employees.map((e) => [e.id, e.name]))
 
   // Per-loan outstanding: group by employee and run FIFO allocation once each.
@@ -56,11 +52,6 @@ export default async function LoansPage() {
     outstanding: outstandingByLoan.get(l.id) ?? l.pkr_equivalent,
   }))
 
-  const activeEmployees = employees.filter((e) => e.is_active).map((e) => ({ id: e.id, name: e.name }))
-
-  // Received cheques that could be handed straight to the employee.
-  const endorsableCheques = await listEndorsableCheques(tenantId)
-
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <PendingChequesPanel direction="out" className="mb-4" />
@@ -70,7 +61,9 @@ export default async function LoansPage() {
           <p className="text-sm text-muted-foreground mt-1">{loans.length} loan{loans.length !== 1 ? 's' : ''} · advances to employees</p>
         </div>
         <RoleGate allowedRoles={['owner']}>
-          <DisburseLoanForm employees={activeEmployees} today={today} nextSerial={nextLoanSerial} banks={banks} endorsableCheques={endorsableCheques} />
+          <Link href="/loans/new">
+            <Button className="min-h-[44px]">Disburse Loan</Button>
+          </Link>
         </RoleGate>
       </div>
 

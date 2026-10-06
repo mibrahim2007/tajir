@@ -3,11 +3,10 @@ import Link from 'next/link'
 import { PendingChequesPanel } from '@/components/pending-cheques-panel'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { Button } from '@/components/ui/button'
 import { formatPKR } from '@/lib/utils/currency'
 import { getAgentLedger } from '@/lib/agents/ledger'
 import { formatCommissionRate, type CommissionType } from '@/lib/agents/commission'
-import { AgentPaymentForm } from '../../agent-payment-form'
 import { AgentLedgerRows } from './agent-ledger-rows'
 
 export default async function AgentLedgerPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +14,6 @@ export default async function AgentLedgerPage({ params }: { params: Promise<{ id
   const { tenantId, role } = await requireAuth()
   if (role !== 'owner') redirect('/dashboard')
   const admin = createAdminClient()
-  const today = new Date().toISOString().split('T')[0]
 
   const { data: agent } = await admin
     .from('agents')
@@ -26,17 +24,11 @@ export default async function AgentLedgerPage({ params }: { params: Promise<{ id
 
   if (!agent) notFound()
 
-  const [{ data: allBanks }, ledger] = await Promise.all([
-    admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
-    getAgentLedger(admin, tenantId, {
-      id: agent.id as string,
-      openingPkr: Number(agent.opening_balance_pkr_equivalent),
-      createdAt: agent.created_at as string,
-    }),
-  ])
-
-  const banks = allBanks ?? []
-  const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'agent_payment', today)
+  const ledger = await getAgentLedger(admin, tenantId, {
+    id: agent.id as string,
+    openingPkr: Number(agent.opening_balance_pkr_equivalent),
+    createdAt: agent.created_at as string,
+  })
   const { rows, totals } = ledger
 
   const terms = [
@@ -60,13 +52,9 @@ export default async function AgentLedgerPage({ params }: { params: Promise<{ id
           </h1>
           <p className="text-sm text-muted-foreground mt-1">Commission ledger · {terms}</p>
         </div>
-        <AgentPaymentForm
-          agentId={agent.id as string}
-          outstanding={totals.outstanding}
-          today={today}
-          nextSerial={nextSerial}
-          banks={banks}
-        />
+        <Link href={`/agents/${agent.id}/payment`}>
+          <Button className="min-h-[44px]">Pay Commission</Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">

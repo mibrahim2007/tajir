@@ -2,17 +2,20 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Link2, Plus } from 'lucide-react'
+import { Link2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { createPartyLinkAction } from '@/app/actions/create-party-link'
 
 type Party = { id: string; name: string }
 
+const RETURN_PATH = '/reports/consolidated-ledger'
+
+// Full-page form at /reports/consolidated-ledger/map (was a drawer on the
+// Consolidated Ledger index).
 export function MapAccountsForm({ customers, suppliers }: { customers: Party[]; suppliers: Party[] }) {
   const router = useRouter()
-  const [open, setOpen] = useState(false)
   const [customerId, setCustomerId] = useState<string>('')
   const [supplierId, setSupplierId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -35,11 +38,9 @@ export function MapAccountsForm({ customers, suppliers }: { customers: Party[]; 
     }
   }
 
-  const reset = () => {
-    setCustomerId('')
-    setSupplierId('')
-    setError(null)
-  }
+  // Summary values (display only)
+  const customerName = customers.find((c) => c.id === customerId)?.name
+  const supplierName = suppliers.find((s) => s.id === supplierId)?.name
 
   const onSubmit = () => {
     if (!customerId || !supplierId) {
@@ -53,32 +54,25 @@ export function MapAccountsForm({ customers, suppliers }: { customers: Party[]; 
         setError(result.error)
         return
       }
-      setOpen(false)
-      reset()
-      router.refresh()
+      // Back to the index, which re-renders with the new mapping. No
+      // router.refresh() inside the transition — it keeps isPending stuck.
+      router.push(RETURN_PATH)
     })
   }
 
   return (
-    <Sheet open={open} onOpenChange={(o) => { setOpen(o); if (!o) reset() }}>
-      <SheetTrigger asChild>
-        <Button size="sm" className="min-h-[40px]">
-          <Plus className="h-4 w-4 mr-1" />Map Accounts
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Map Customer to Supplier</SheetTitle>
-          <SheetDescription>
-            Link a customer account to its supplier counterpart to consolidate their ledgers into one net statement.
-          </SheetDescription>
-        </SheetHeader>
+    <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
 
-        <div className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
+      {/* ── FORM (left on xl) ── */}
+      <Card className="min-w-0">
+        <CardHeader className="pb-3 pt-5 px-5">
+          <CardTitle className="text-base">Accounts to Map</CardTitle>
+        </CardHeader>
+        <CardContent className="px-5 pb-5 grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+          <div className="md:col-span-5 flex flex-col gap-2">
             <label className="text-sm font-medium">Customer <span className="text-destructive">*</span></label>
             <Select value={customerId || undefined} onValueChange={onCustomerChange} disabled={customers.length === 0}>
-              <SelectTrigger className="min-h-[44px]">
+              <SelectTrigger className="min-h-[44px] w-full">
                 <SelectValue placeholder={customers.length === 0 ? 'No customers' : 'Select customer…'} />
               </SelectTrigger>
               <SelectContent>
@@ -89,14 +83,14 @@ export function MapAccountsForm({ customers, suppliers }: { customers: Party[]; 
             </Select>
           </div>
 
-          <div className="flex justify-center text-muted-foreground">
+          <div className="md:col-span-2 flex justify-center items-center min-h-[44px] text-muted-foreground">
             <Link2 className="h-5 w-5" />
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="md:col-span-5 flex flex-col gap-2">
             <label className="text-sm font-medium">Supplier <span className="text-destructive">*</span></label>
             <Select value={supplierId || undefined} onValueChange={setSupplierId} disabled={suppliers.length === 0}>
-              <SelectTrigger className="min-h-[44px]">
+              <SelectTrigger className="min-h-[44px] w-full">
                 <SelectValue placeholder={suppliers.length === 0 ? 'No suppliers' : 'Select supplier…'} />
               </SelectTrigger>
               <SelectContent>
@@ -106,14 +100,39 @@ export function MapAccountsForm({ customers, suppliers }: { customers: Party[]; 
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+      {/* ── SUMMARY (right on xl, sticky) ── */}
+      <div className="xl:sticky xl:top-6">
+        <Card>
+          <CardContent className="px-5 pt-5 pb-5">
+            <p className="font-extrabold text-[15px] tracking-tight mb-4">Mapping Summary</p>
+            <div className="space-y-2 text-sm mb-5">
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Customer</span>
+                <span className="font-medium text-right truncate">{customerName ?? '—'}</span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span className="text-muted-foreground">Supplier</span>
+                <span className="font-medium text-right truncate">{supplierName ?? '—'}</span>
+              </div>
+            </div>
 
-          <Button onClick={onSubmit} className="w-full min-h-[44px]" disabled={isPending}>
-            {isPending ? 'Mapping…' : 'Map Accounts'}
-          </Button>
-        </div>
-      </SheetContent>
-    </Sheet>
+            <div className="space-y-2">
+              <Button onClick={onSubmit} className="w-full min-h-[44px]" disabled={isPending}>
+                {isPending ? 'Mapping…' : 'Map Accounts'}
+              </Button>
+              <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={() => router.push(RETURN_PATH)}>
+                Cancel
+              </Button>
+            </div>
+
+            {error && <p className="text-sm text-destructive mt-3">{error}</p>}
+          </CardContent>
+        </Card>
+      </div>
+
+    </div>
   )
 }
