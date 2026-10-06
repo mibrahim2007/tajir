@@ -134,7 +134,7 @@ export function CreateGatepassForm({ today, nextGpNumber, purchaseOrders, salesO
                     <FormLabel>Type <span className="text-destructive">*</span></FormLabel>
                     <Select value={field.value} onValueChange={handleTypeChange}>
                       <FormControl>
-                        <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="purchase">Purchase (Inward)</SelectItem>

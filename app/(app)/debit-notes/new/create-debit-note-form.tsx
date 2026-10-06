@@ -127,7 +127,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                       }
                     }}
                   >
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="No purchase order" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="No purchase order" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none_">No purchase order</SelectItem>
                       {filteredOrders.map((o) => {
@@ -176,7 +176,7 @@ export function CreateDebitNoteForm({ today, suppliers, purchaseOrders }: Props)
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="PKR">PKR</SelectItem>

@@ -124,7 +124,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
                     render={({ field, fieldState }) => (
                       <>
                         <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="min-h-[44px]">
+                          <SelectTrigger className="min-h-[44px] w-full">
                             <SelectValue placeholder="Select account…" />
                           </SelectTrigger>
                           <SelectContent>
@@ -175,7 +175,7 @@ export function CreateExpenseForm({ today, accounts, banks }: Props) {
                       name="bankId"
                       render={({ field }) => (
                         <Select value={field.value || '__none__'} onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)}>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="__none__">Cash / no bank</SelectItem>
                             {banks.map((b) => (

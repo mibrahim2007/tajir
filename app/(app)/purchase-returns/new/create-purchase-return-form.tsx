@@ -179,7 +179,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                 <FormItem className="md:col-span-4">
                   <FormLabel>Against Purchase Order (optional)</FormLabel>
                   <Select onValueChange={handlePoSelect} value={selectedPoId}>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select purchase order…" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select purchase order…" /></SelectTrigger>
                     <SelectContent>
                       {purchaseOrders.map((o) => {
                         const supplier = suppliers.find((s) => s.id === o.supplierId)
@@ -240,7 +240,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                         onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
                       >
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="_none_">No location</SelectItem>
@@ -258,7 +258,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="PKR">PKR</SelectItem>

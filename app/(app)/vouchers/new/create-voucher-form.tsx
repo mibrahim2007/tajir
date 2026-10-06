@@ -144,7 +144,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                       <FormLabel>Bank (optional)</FormLabel>
                       <Select onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)} value={field.value || '__none__'}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Cash / no bank" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">Cash / no bank</SelectItem>
@@ -198,7 +198,7 @@ export function CreateVoucherForm({ today, accounts, banks }: Props) {
                           <FormField control={form.control} name={`lines.${index}.accountId`} render={({ field: f, fieldState }) => (
                             <div>
                               <Select onValueChange={f.onChange} value={f.value}>
-                                <SelectTrigger className={`min-h-[40px] text-xs ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}>
+                                <SelectTrigger className={`min-h-[40px] w-full min-w-0 text-xs [&>span]:truncate ${fieldState.error ? 'border-destructive ring-destructive' : ''}`}>
                                   <SelectValue placeholder="Select account… *" />
                                 </SelectTrigger>
                                 <SelectContent>

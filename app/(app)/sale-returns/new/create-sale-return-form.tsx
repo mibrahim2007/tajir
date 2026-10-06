@@ -268,7 +268,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                         onValueChange={(v) => field.onChange(v === '_none_' ? '' : v)}
                       >
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location (optional)…" /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="_none_">No location</SelectItem>
@@ -286,7 +286,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="PKR">PKR</SelectItem>

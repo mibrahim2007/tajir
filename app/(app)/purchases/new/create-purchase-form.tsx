@@ -253,7 +253,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                 {/* Supplier · Invoice No. · Date · Receive At · Currency share one row on wide screens. */}
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
                   <FormField control={form.control} name="supplierId" render={({ field }) => (
-                    <FormItem className="md:col-span-4">
+                    <FormItem className="md:col-span-3">
                       <FormLabel>Supplier <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
                         <ItemPickerDialog
@@ -274,7 +274,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                   )} />
 
                   <FormField control={form.control} name="supplierInvoiceNo" render={({ field }) => (
-                    <FormItem className="md:col-span-2">
+                    <FormItem className="md:col-span-3">
                       <FormLabel>Supplier Invoice No.</FormLabel>
                       <FormControl>
                         <Input
@@ -305,7 +305,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                         disabled={locations.length === 0}
                       >
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]">
+                          <SelectTrigger className="min-h-[44px] w-full">
                             <SelectValue placeholder={locations.length === 0 ? 'No locations defined' : 'Select location…'} />
                           </SelectTrigger>
                         </FormControl>
@@ -325,7 +325,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="PKR">PKR</SelectItem>

@@ -196,7 +196,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                       name="currencyCode"
                       render={({ field }) => (
                         <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="PKR">PKR</SelectItem>
                             <SelectItem value="USD">USD</SelectItem>

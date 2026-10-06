@@ -127,7 +127,7 @@ export function CreateCreditNoteForm({ today, customers, saleOrders }: Props) {
                       }
                     }}
                   >
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="No sale order" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="No sale order" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none_">No sale order</SelectItem>
                       {filteredOrders.map((o) => {
@@ -176,7 +176,7 @@ export function CreateCreditNoteForm({ today, customers, saleOrders }: Props) {
                       <FormLabel>Currency</FormLabel>
                       <Select value={field.value} onValueChange={(v) => { field.onChange(v); if (v === 'PKR') form.setValue('exchangeRate', 1) }}>
                         <FormControl>
-                          <SelectTrigger className="min-h-[44px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="min-h-[44px] w-full"><SelectValue /></SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="PKR">PKR</SelectItem>

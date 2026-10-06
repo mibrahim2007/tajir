@@ -123,7 +123,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
                 <FormLabel>From Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={handleFromChange}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location…" /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {locations.map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
@@ -138,7 +138,7 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
                 <FormLabel>To Location <span className="text-destructive">*</span></FormLabel>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <FormControl>
-                    <SelectTrigger className="min-h-[44px]"><SelectValue placeholder="Select location…" /></SelectTrigger>
+                    <SelectTrigger className="min-h-[44px] w-full"><SelectValue placeholder="Select location…" /></SelectTrigger>
                   </FormControl>
                   <SelectContent>
                     {locations.filter(l => l.id !== watchedFrom).map(l => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
