@@ -3,7 +3,12 @@ import { getLockedThrough, isLocked, formatLockDate } from './period-lock'
 import { isFutureDate, FUTURE_DATE_ERROR } from '@/lib/validation/document-date'
 
 type JournalLine = {
-  accountSystemKey: string
+  // Exactly one of these: a system account by its key (the usual case), or a
+  // specific chart-of-accounts row chosen by the user (e.g. the bank GL
+  // account an Online receipt lands in). accountId is checked to belong to
+  // the tenant before anything is written.
+  accountSystemKey?: string
+  accountId?: string
   description?: string
   debit: number
   credit: number
@@ -103,19 +108,43 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
     )
   }
 
-  // Look up all account IDs by system_key in one query
-  const systemKeys = [...new Set(lines.map((l) => l.accountSystemKey))]
-  const { data: accounts } = await admin
-    .from('chart_of_accounts')
-    .select('id, system_key')
-    .eq('tenant_id', tenantId)
-    .in('system_key', systemKeys)
+  if (lines.some((l) => !l.accountSystemKey === !l.accountId)) {
+    return fail('missing_account', 'Each line needs exactly one of accountSystemKey or accountId', ctx)
+  }
 
-  if (!accounts || accounts.length === 0) {
+  // Look up all account IDs by system_key in one query
+  const systemKeys = [...new Set(lines.flatMap((l) => (l.accountSystemKey ? [l.accountSystemKey] : [])))]
+  const { data: accounts } = systemKeys.length
+    ? await admin
+        .from('chart_of_accounts')
+        .select('id, system_key')
+        .eq('tenant_id', tenantId)
+        .in('system_key', systemKeys)
+    : { data: [] as { id: string; system_key: string | null }[] }
+
+  if (systemKeys.length > 0 && (!accounts || accounts.length === 0)) {
     return fail('coa_not_seeded', 'Chart of accounts not seeded for this tenant', ctx)
   }
 
-  const accountMap = new Map(accounts.map((a) => [a.system_key, a.id]))
+  const accountMap = new Map((accounts ?? []).map((a) => [a.system_key, a.id]))
+
+  // Explicit account ids must be this tenant's own, active, postable accounts.
+  const explicitIds = [...new Set(lines.flatMap((l) => (l.accountId ? [l.accountId] : [])))]
+  if (explicitIds.length > 0) {
+    const { data: explicit } = await admin
+      .from('chart_of_accounts')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .eq('is_header', false)
+      .in('id', explicitIds)
+    const found = new Set((explicit ?? []).map((a) => a.id))
+    const bad = explicitIds.filter((id) => !found.has(id))
+    if (bad.length > 0) {
+      return fail('missing_account', `Account(s) not usable for posting: ${bad.join(', ')}`, ctx)
+    }
+  }
+  const resolveAccount = (l: JournalLine) => (l.accountId ?? accountMap.get(l.accountSystemKey!))!
 
   // Verify all required accounts exist
   const missingKeys = systemKeys.filter((k) => !accountMap.has(k))
@@ -192,7 +221,7 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
   const lineRows = lines.map((l) => ({
     journal_entry_id: entry.id,
     tenant_id:        tenantId,
-    account_id:       accountMap.get(l.accountSystemKey)!,
+    account_id:       resolveAccount(l),
     description:      l.description ?? null,
     debit:            l.debit,
     credit:           l.credit,

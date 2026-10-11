@@ -32,10 +32,15 @@ export type ReceiptTenderLine = Omit<TenderLine, 'transactionType'> & {
   supplierId?: string
   /** Free-text hawala / slip reference. */
   hawalaRemarks?: string
+  /** Online only: the GL account the money lands in ('' = Cash at Bank). */
+  accountId?: string
+  /** PDC only: the drawer's bank, free text, for reference. */
+  chequeBankName?: string
 }
 
 type Bank = { id: string; name: string; account_number: string | null }
 type Supplier = { id: string; name: string }
+export type OnlineAccount = { id: string; code: string; name: string; isDefault: boolean }
 
 /** A received cheque that can be handed on instead of writing a new one. */
 export type EndorsableCheque = {
@@ -80,6 +85,8 @@ const COLUMNS = {
   compact:        'sm:grid-cols-[110px_minmax(0,1fr)_minmax(0,1.6fr)_110px_36px]',
   wide:           'lg:grid-cols-[140px_minmax(0,1fr)_minmax(0,1.6fr)_150px_36px]',
   wideWithDirect: 'lg:grid-cols-[150px_minmax(0,0.9fr)_minmax(0,1.2fr)_minmax(0,1.3fr)_minmax(0,1.4fr)_150px_36px]',
+  // Customer receipts: Type | Cheque | Bank | GL Account | Supplier | Hawala | Amount
+  receipt:        'lg:grid-cols-[140px_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.1fr)_minmax(0,1.1fr)_140px_36px]',
 } as const
 
 // Small per-field label shown only while fields stack (where the column header
@@ -98,6 +105,8 @@ export function TenderLinesField({
   currency = 'PKR',
   endorsableCheques = [],
   suppliers,
+  onlineAccounts,
+  pdcBankText = false,
   layout = 'compact',
 }: {
   banks: Bank[]
@@ -108,6 +117,16 @@ export function TenderLinesField({
    * supplier and free-text Hawala remarks.
    */
   suppliers?: Supplier[]
+  /**
+   * Customer receipts only. Passing this adds a GL Account column: an Online
+   * line chooses which asset account it debits (blank = Cash at Bank).
+   */
+  onlineAccounts?: OnlineAccount[]
+  /**
+   * Customer receipts only. A PDC is the customer's cheque on THEIR bank, so
+   * its Bank cell becomes free text (reference only) instead of our banks list.
+   */
+  pdcBankText?: boolean
   /** Received cheques in hand. Passing any turns PDC's Cheque No. into a picker. */
   endorsableCheques?: EndorsableCheque[]
   /**
@@ -122,7 +141,11 @@ export function TenderLinesField({
   const allowDirect = !!suppliers
   const wide = layout === 'wide'
   const L = LAYOUT[layout]
-  const cols = wide ? (allowDirect ? COLUMNS.wideWithDirect : COLUMNS.wide) : COLUMNS.compact
+  const hasAccounts = !!onlineAccounts
+  const cols = wide
+    ? (hasAccounts ? COLUMNS.receipt : allowDirect ? COLUMNS.wideWithDirect : COLUMNS.wide)
+    : COLUMNS.compact
+  const defaultAccount = onlineAccounts?.find((a) => a.isDefault)
   const supplierItems = (suppliers ?? []).map((sp) => ({ id: sp.id, name: sp.name }))
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
 
@@ -181,6 +204,7 @@ export function TenderLinesField({
           <>
             <span>Cheque No.</span>
             <span>Bank</span>
+            {hasAccounts && <span>GL Account</span>}
             {allowDirect && <span>Supplier</span>}
             {allowDirect && <span>Hawala Remarks</span>}
           </>
@@ -268,7 +292,20 @@ export function TenderLinesField({
             </div>
           )
 
-          const bankCell = (
+          // A PDC on a receipt is the customer's cheque on THEIR bank, which is
+          // rarely one of ours — so the cell takes the bank's name as text.
+          const pdcBankAsText = pdcBankText && type === 'pdc'
+          const bankCell = pdcBankAsText ? (
+            <div className="min-w-0 space-y-1">
+              <FieldLabel hide={L.label}>Cheque Bank</FieldLabel>
+              <Input
+                placeholder="Customer's bank (reference)"
+                maxLength={100}
+                className={`${L.h} min-w-0`}
+                {...register(`lines.${i}.chequeBankName`)}
+              />
+            </div>
+          ) : (
             <div className="min-w-0 space-y-1">
               <FieldLabel hide={L.label}>Bank</FieldLabel>
               <Controller
@@ -284,6 +321,40 @@ export function TenderLinesField({
                       <SelectItem value="__none__">No bank</SelectItem>
                       {banks.map((b) => (
                         <SelectItem key={b.id} value={b.id}>{b.name}{b.account_number ? ` — ${b.account_number}` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+            </div>
+          )
+
+          // Online receipts: which GL account the money lands in. Blank keeps
+          // the default (Cash at Bank); other types post to fixed accounts.
+          const isOnline = type === 'online'
+          const accountCell = (
+            <div className="min-w-0 space-y-1">
+              <FieldLabel hide={L.label}>GL Account</FieldLabel>
+              <Controller
+                control={control}
+                name={`lines.${i}.accountId`}
+                render={({ field: f }) => (
+                  <Select
+                    value={isOnline ? (f.value || '__default__') : '__default__'}
+                    onValueChange={(v) => f.onChange(v === '__default__' ? '' : v)}
+                    disabled={!isOnline}
+                  >
+                    <SelectTrigger className={`${L.h} w-full min-w-0 overflow-hidden [&>span]:min-w-0 [&>span]:!block [&>span]:truncate`}>
+                      <SelectValue placeholder="—" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default__">
+                        {isOnline
+                          ? `${defaultAccount ? `${defaultAccount.code} — ${defaultAccount.name}` : 'Cash at Bank'} (default)`
+                          : '—'}
+                      </SelectItem>
+                      {(onlineAccounts ?? []).filter((a) => !a.isDefault).map((a) => (
+                        <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -357,6 +428,7 @@ export function TenderLinesField({
                 <>
                   {chequeCell}
                   {bankCell}
+                  {hasAccounts && accountCell}
                   {allowDirect && supplierCell}
                   {allowDirect && hawalaCell}
                 </>
@@ -368,7 +440,12 @@ export function TenderLinesField({
               ) : (
                 <>
                   {chequeCell}
-                  {bankCell}
+                  {hasAccounts && isOnline ? (
+                    <div className="min-w-0 space-y-2">
+                      {bankCell}
+                      {accountCell}
+                    </div>
+                  ) : bankCell}
                 </>
               )}
 
@@ -412,7 +489,7 @@ export function TenderLinesField({
           variant="outline"
           size="sm"
           className="min-h-[40px]"
-          onClick={() => append({ transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, endorsedFromSource: '', endorsedFromLineId: '', supplierId: '', hawalaRemarks: '' })}
+          onClick={() => append({ transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, endorsedFromSource: '', endorsedFromLineId: '', supplierId: '', hawalaRemarks: '', accountId: '', chequeBankName: '' })}
         >
           <Plus className="h-4 w-4 mr-1" /> Add Line
         </Button>

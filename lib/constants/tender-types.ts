@@ -141,16 +141,33 @@ function requireSupplierForDirect(
   }
 }
 
-/** Server-side receipt line: the shared tender line plus Direct Payment. */
+// An Online line may name the GL account its money lands in; no other type
+// may — cash, PDC and direct lines each post to their own fixed account.
+function accountOnlyForOnline(
+  line: { transactionType: string; accountId?: string | null },
+  ctx: z.RefinementCtx,
+) {
+  if (line.accountId?.trim() && line.transactionType !== 'online') {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['accountId'], message: 'Only an Online line can choose a GL account' })
+  }
+}
+
+/**
+ * Server-side receipt line: the shared tender line plus Direct Payment, the
+ * Online line's GL account (blank = Cash at Bank) and a PDC's bank name.
+ */
 export const receiptTenderLineSchema = tenderLineObject
   .extend({
     transactionType: z.enum(['cash', 'pdc', 'online', 'direct']),
     supplierId:      z.string().uuid().optional().nullable().or(z.literal('')),
     hawalaRemarks:   z.string().trim().max(500).optional().nullable(),
+    accountId:       z.string().uuid().optional().nullable().or(z.literal('')),
+    chequeBankName:  z.string().trim().max(100).optional().nullable(),
   })
   .superRefine(requireChequeForPdc)
   .superRefine(requirePdcForEndorsement)
   .superRefine(requireSupplierForDirect)
+  .superRefine(accountOnlyForOnline)
 
 /**
  * Client-side shape: blank/NaN amounts collapse to 0 so an untouched spare row
@@ -176,12 +193,15 @@ export const tenderLineFormSchema = tenderLineFormObject
   .superRefine(requireChequeForPdc)
   .superRefine(requirePdcForEndorsement)
 
-/** Client-side receipt line: adds Direct Payment's supplier and Hawala remarks. */
+/** Client-side receipt line: adds Direct Payment's supplier and Hawala remarks,
+ *  the Online GL account and the PDC bank name. */
 export const receiptTenderLineFormSchema = tenderLineFormObject
   .extend({
     transactionType: z.enum(['cash', 'pdc', 'online', 'direct']),
     supplierId:      z.string().optional(),
     hawalaRemarks:   z.string().optional(),
+    accountId:       z.string().optional(),
+    chequeBankName:  z.string().optional(),
   })
   .superRefine(requireChequeForPdc)
   .superRefine(requirePdcForEndorsement)

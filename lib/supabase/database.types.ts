@@ -480,8 +480,10 @@ export type Database = {
       }
       ar_receipt_lines: {
         Row: {
+          account_id: string | null
           amount: number
           bank_id: string | null
+          cheque_bank_name: string | null
           cheque_due_date: string | null
           cheque_number: string | null
           created_at: string
@@ -497,8 +499,10 @@ export type Database = {
           transaction_type: string
         }
         Insert: {
+          account_id?: string | null
           amount: number
           bank_id?: string | null
+          cheque_bank_name?: string | null
           cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
@@ -514,8 +518,10 @@ export type Database = {
           transaction_type: string
         }
         Update: {
+          account_id?: string | null
           amount?: number
           bank_id?: string | null
+          cheque_bank_name?: string | null
           cheque_due_date?: string | null
           cheque_number?: string | null
           created_at?: string
@@ -531,6 +537,13 @@ export type Database = {
           transaction_type?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "ar_receipt_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ar_receipt_lines_bank_id_fkey"
             columns: ["bank_id"]

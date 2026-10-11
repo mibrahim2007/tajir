@@ -14,7 +14,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ItemPickerDialog, type PickerItem } from '@/components/item-picker-dialog'
 import { QuickCreateCustomer } from '@/components/quick-create-forms'
-import { TenderLinesField, type ReceiptTenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type ReceiptTenderLine, type OnlineAccount } from '@/components/tender-lines-field'
 import { PartyTransactionHistory, type TxnHistoryItem } from '@/components/party-transaction-history'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { editArReceiptAction } from '@/app/actions/edit-ar-receipt'
@@ -35,6 +35,8 @@ type Props = {
   banks:           Bank[]
   /** For Direct Payment lines: suppliers the customer may have paid for us. */
   suppliers:       Supplier[]
+  /** For Online lines: GL accounts the money may land in (blank = Cash at Bank). */
+  onlineAccounts?: OnlineAccount[]
   nextSerial?:     string | null
   historyByCustomer?: Record<string, TxnHistoryItem[]>
   mode?:           'create' | 'edit'
@@ -64,9 +66,9 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '' }
+const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '', accountId: '', chequeBankName: '' }
 
-export function ReceiptForm({ today, customers, salesByCustomer, banks, suppliers, nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
+export function ReceiptForm({ today, customers, salesByCustomer, banks, suppliers, onlineAccounts = [], nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
@@ -115,6 +117,8 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
           bankId: l.bankId || undefined,
           supplierId: l.transactionType === 'direct' ? (l.supplierId || undefined) : undefined,
           hawalaRemarks: l.transactionType === 'direct' ? (l.hawalaRemarks || undefined) : undefined,
+          accountId: l.transactionType === 'online' ? (l.accountId || undefined) : undefined,
+          chequeBankName: l.transactionType === 'pdc' ? (l.chequeBankName || undefined) : undefined,
           amount: l.amount,
         })),
       }
@@ -241,7 +245,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
 
                 <Separator />
 
-                <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} layout="wide" />
+                <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} onlineAccounts={onlineAccounts} pdcBankText layout="wide" />
                 {watchedCurrency !== 'PKR' && (watchedLines ?? []).some((l) => l.transactionType === 'direct') && (
                   <p className="text-xs text-destructive">A direct payment to a supplier must be in PKR.</p>
                 )}

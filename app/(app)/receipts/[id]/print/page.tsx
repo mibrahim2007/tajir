@@ -46,12 +46,20 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
       .eq('source_type', 'ar_receipt')
       .single(),
     admin.from('ar_receipt_lines')
-      .select('transaction_type, cheque_number, bank_id, supplier_id, hawala_remarks, amount, line_no, suppliers(name)')
+      .select('transaction_type, cheque_number, bank_id, supplier_id, hawala_remarks, account_id, cheque_bank_name, amount, line_no, suppliers(name), chart_of_accounts(code, name)')
       .eq('receipt_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const bankMap = new Map((allBanks ?? []).map((b) => [b.id, b.name]))
+  // An Online line shows the GL account it posted to; a PDC shows the drawer's
+  // bank name typed on the receipt, beside our bank when both are set.
+  const bankText = (l: { bank_id: string | null; cheque_bank_name: string | null; chart_of_accounts: { code: string; name: string } | null }) =>
+    [
+      l.bank_id ? (bankMap.get(l.bank_id) ?? '—') : null,
+      l.cheque_bank_name,
+      l.chart_of_accounts ? `GL ${l.chart_of_accounts.code} — ${l.chart_of_accounts.name}` : null,
+    ].filter(Boolean).join(' · ')
   const lines = (rawLines ?? []).map((l) => {
     // A direct line was paid by the customer straight to our supplier, so the
     // cheque/bank columns carry the supplier and the hawala reference instead.
@@ -59,7 +67,7 @@ export default async function PrintReceiptPage({ params }: { params: Promise<{ i
     return {
       type: receiptTenderLabel(l.transaction_type),
       cheque: direct ? (l.suppliers?.name ?? '—') : (l.cheque_number ?? ''),
-      bank: direct ? (l.hawala_remarks ?? '') : (l.bank_id ? (bankMap.get(l.bank_id) ?? '—') : ''),
+      bank: direct ? (l.hawala_remarks ?? '') : bankText(l),
       amount: Number(l.amount),
     }
   })

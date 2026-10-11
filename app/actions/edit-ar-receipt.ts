@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
-import { checkDirectLines, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
+import { checkDirectLines, checkOnlineAccounts, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
@@ -41,6 +41,8 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   const directError = await checkDirectLines(admin, tenantId, lines, currencyCode)
   if (directError) return { success: false, error: directError, code: 'VALIDATION_ERROR' }
+  const accountError = await checkOnlineAccounts(admin, tenantId, lines)
+  if (accountError) return { success: false, error: accountError, code: 'VALIDATION_ERROR' }
 
   const { data: existing } = await admin
     .from('ar_receipts')

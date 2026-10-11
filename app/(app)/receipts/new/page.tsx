@@ -1,6 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
+import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { CreateReceiptForm } from './create-receipt-form'
 
@@ -9,7 +10,7 @@ export default async function NewReceiptPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }, { data: rawSuppliers }, onlineAccounts] = await Promise.all([
     admin.from('tajir_customers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
@@ -35,6 +36,7 @@ export default async function NewReceiptPage() {
       .eq('tenant_id', tenantId),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    listOnlineReceiptAccounts(admin, tenantId),
   ])
 
   const customers = rawCustomers ?? []
@@ -98,7 +100,7 @@ export default async function NewReceiptPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
       </div>
-      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} suppliers={rawSuppliers ?? []} nextSerial={nextSerial} historyByCustomer={historyByCustomer} />
+      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} suppliers={rawSuppliers ?? []} onlineAccounts={onlineAccounts} nextSerial={nextSerial} historyByCustomer={historyByCustomer} />
     </div>
   )
 }

@@ -30,7 +30,7 @@ console.log('\n— A fully direct receipt moves no money —')
     1, CUSTOMER, 50000,
   )
   check('balanced', sum(gl, 'debit') === sum(gl, 'credit'), `${sum(gl, 'debit')} / ${sum(gl, 'credit')}`)
-  check('no cash or bank leg', !gl.some((l) => ['cash_in_hand', 'cash_at_bank'].includes(l.accountSystemKey)))
+  check('no cash or bank leg', !gl.some((l) => l.accountId || ['cash_in_hand', 'cash_at_bank'].includes(l.accountSystemKey ?? '')))
   const ap = gl.find((l) => l.accountSystemKey === 'accounts_payable')
   check('DR accounts payable tagged with the supplier', ap?.debit === 50000 && 'supplierId' in ap && ap.supplierId === SUPP_A)
   check('hawala remark carried into the GL line', !!ap && 'description' in ap && String(ap.description).includes('HW-77'))
@@ -65,6 +65,29 @@ console.log('\n— Stored rows never mix tender detail with a supplier —')
   check('direct row keeps supplier, trims remarks', rows[0].supplier_id === SUPP_A && rows[0].hawala_remarks === 'slip 9')
   check('direct row drops cheque and bank left from a type switch', rows[0].cheque_number === null && rows[0].bank_id === null)
   check('cash row carries no supplier (DB check would reject it)', rows[1].supplier_id === null && rows[1].hawala_remarks === null)
+}
+
+console.log('\n— Online lines post to the chosen GL account; PDC keeps a bank name —')
+{
+  const ACC = '44444444-4444-4444-8444-444444444444'
+  const gl = receiptJournalLines(
+    [
+      { transactionType: 'online', amount: 3000, accountId: ACC },
+      { transactionType: 'online', amount: 2000, accountId: ACC },
+      { transactionType: 'online', amount: 1000 },
+    ],
+    1, CUSTOMER, 6000,
+  )
+  check('balanced', sum(gl, 'debit') === sum(gl, 'credit'))
+  check('chosen account debited once, summed', gl.filter((l) => l.accountId === ACC).length === 1 && gl.find((l) => l.accountId === ACC)?.debit === 5000)
+  check('online line without an account still hits Cash at Bank', gl.find((l) => l.accountSystemKey === 'cash_at_bank')?.debit === 1000)
+  const rows = receiptLineRows('t', 'r', [
+    { transactionType: 'pdc', amount: 10, accountId: ACC, chequeBankName: '  HBL  ' },
+    { transactionType: 'online', amount: 10, accountId: ACC, chequeBankName: 'x' },
+  ])
+  check('pdc row keeps trimmed bank name, never an account', rows[0].cheque_bank_name === 'HBL' && rows[0].account_id === null)
+  check('online row keeps account, never a bank name', rows[1].account_id === ACC && rows[1].cheque_bank_name === null)
+  check('a non-online line choosing an account is refused', !receiptTenderLineSchema.safeParse({ transactionType: 'cash', amount: 10, accountId: ACC }).success)
 }
 
 console.log('\n— Validation —')

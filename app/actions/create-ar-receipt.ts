@@ -9,7 +9,7 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
-import { checkDirectLines, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
+import { checkDirectLines, checkOnlineAccounts, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import type { ActionResult } from '@/lib/types'
 
@@ -53,6 +53,8 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   if (hasLines) {
     const directError = await checkDirectLines(admin, tenantId, lines!, currencyCode)
     if (directError) return { success: false, error: directError, code: 'VALIDATION_ERROR' }
+    const accountError = await checkOnlineAccounts(admin, tenantId, lines!)
+    if (accountError) return { success: false, error: accountError, code: 'VALIDATION_ERROR' }
   }
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'ar_receipt', date)
   const { data: receipt, error } = await admin

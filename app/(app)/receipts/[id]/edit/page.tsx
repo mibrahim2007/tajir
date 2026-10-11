@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { ReceiptForm } from '@/app/(app)/receipts/new/create-receipt-form'
 import type { ReceiptTenderLine } from '@/components/tender-lines-field'
 
@@ -15,15 +16,16 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: receipt }, { data: rawLines }, { data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
+  const [{ data: receipt }, { data: rawLines }, { data: rawBanks }, { data: rawSuppliers }, onlineAccounts] = await Promise.all([
     admin.from('ar_receipts')
       .select('id, customer_id, amount, currency_code, pkr_equivalent, payment_method_note, date, cheque_number, bank_id')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     admin.from('ar_receipt_lines')
-      .select('transaction_type, cheque_number, cheque_due_date, bank_id, supplier_id, hawala_remarks, amount, line_no')
+      .select('transaction_type, cheque_number, cheque_due_date, bank_id, supplier_id, hawala_remarks, account_id, cheque_bank_name, amount, line_no')
       .eq('receipt_id', id).eq('tenant_id', tenantId).order('line_no'),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    listOnlineReceiptAccounts(admin, tenantId),
   ])
 
   if (!receipt) notFound()
@@ -44,6 +46,8 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
         bankId: l.bank_id ?? '',
         supplierId: l.supplier_id ?? '',
         hawalaRemarks: l.hawala_remarks ?? '',
+        accountId: l.account_id ?? '',
+        chequeBankName: l.cheque_bank_name ?? '',
         amount: Number(l.amount),
       }))
     : [{
@@ -85,6 +89,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
         salesByCustomer={{}}
         banks={banks}
         suppliers={rawSuppliers ?? []}
+        onlineAccounts={onlineAccounts}
         mode="edit"
         receiptId={receipt.id}
         initial={{

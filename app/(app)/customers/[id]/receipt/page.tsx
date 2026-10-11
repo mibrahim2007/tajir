@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PeriodLockBanner } from '@/components/period-lock-banner'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { RecordReceiptForm } from '@/app/(app)/customers/record-receipt-form'
 
@@ -22,11 +23,12 @@ export default async function CustomerReceiptPage({ params }: Props) {
 
   if (!customer) notFound()
 
-  const [nextSerial, { data: rawBanks }, { data: rawSuppliers }] = await Promise.all([
+  const [nextSerial, { data: rawBanks }, { data: rawSuppliers }, onlineAccounts] = await Promise.all([
     peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
     // For Direct Payment lines: suppliers the customer may have paid for us.
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
+    listOnlineReceiptAccounts(admin, tenantId),
   ])
 
   return (
@@ -36,7 +38,7 @@ export default async function CustomerReceiptPage({ params }: Props) {
         <h1 className="text-2xl font-extrabold tracking-tight">Record Receipt — {customer.name}</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from this customer.</p>
       </div>
-      <RecordReceiptForm customerId={id} customerName={customer.name} today={today} nextSerial={nextSerial} banks={rawBanks ?? []} suppliers={rawSuppliers ?? []} />
+      <RecordReceiptForm customerId={id} customerName={customer.name} today={today} nextSerial={nextSerial} banks={rawBanks ?? []} suppliers={rawSuppliers ?? []} onlineAccounts={onlineAccounts} />
     </div>
   )
 }

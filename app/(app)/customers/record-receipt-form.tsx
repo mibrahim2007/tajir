@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { TenderLinesField, type ReceiptTenderLine } from '@/components/tender-lines-field'
+import { TenderLinesField, type ReceiptTenderLine, type OnlineAccount } from '@/components/tender-lines-field'
 import { createArReceiptAction } from '@/app/actions/create-ar-receipt'
 import { formatPKR } from '@/lib/utils/currency'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
@@ -34,13 +34,13 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '' }
+const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '', accountId: '', chequeBankName: '' }
 const freshDefaults = (today: string): FormValues => ({
   currencyCode: 'PKR', exchangeRate: 1, date: today, paymentMethodNote: '', lines: [{ ...emptyLine }],
 })
 
 // Full-page form at /customers/[id]/receipt (was a drawer on the customer ledger).
-export function RecordReceiptForm({ customerId, customerName, today, nextSerial, banks = [], suppliers = [] }: { customerId: string; customerName: string; today: string; nextSerial?: string | null; banks?: Bank[]; suppliers?: { id: string; name: string }[] }) {
+export function RecordReceiptForm({ customerId, customerName, today, nextSerial, banks = [], suppliers = [], onlineAccounts = [] }: { customerId: string; customerName: string; today: string; nextSerial?: string | null; banks?: Bank[]; suppliers?: { id: string; name: string }[]; onlineAccounts?: OnlineAccount[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -75,6 +75,8 @@ export function RecordReceiptForm({ customerId, customerName, today, nextSerial,
           bankId: l.bankId || undefined,
           supplierId: l.transactionType === 'direct' ? (l.supplierId || undefined) : undefined,
           hawalaRemarks: l.transactionType === 'direct' ? (l.hawalaRemarks || undefined) : undefined,
+          accountId: l.transactionType === 'online' ? (l.accountId || undefined) : undefined,
+          chequeBankName: l.transactionType === 'pdc' ? (l.chequeBankName || undefined) : undefined,
           amount: l.amount,
         })),
       })
@@ -142,7 +144,7 @@ export function RecordReceiptForm({ customerId, customerName, today, nextSerial,
 
               <Separator />
 
-              <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} layout="wide" />
+              <TenderLinesField banks={banks} currency={watchedCurrency} suppliers={suppliers} onlineAccounts={onlineAccounts} pdcBankText layout="wide" />
 
               <FormField control={form.control} name="paymentMethodNote" render={({ field }) => (
                 <FormItem>
