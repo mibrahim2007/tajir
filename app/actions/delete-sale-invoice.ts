@@ -44,6 +44,8 @@ export async function deleteSaleInvoiceAction(input: unknown): Promise<ActionRes
   const serviceIds = new Set((lots ?? []).filter((l) => l.item_nature === 'service').map((l) => l.id))
 
   await admin.from('sales_orders').delete().eq('invoice_id', invoiceId).eq('tenant_id', tenantId)
+  // Receipts applied to this invoice go back to settling FIFO.
+  await admin.from('ar_receipt_allocations').delete().eq('invoice_key', invoiceId).eq('tenant_id', tenantId)
 
   const removeMap = new Map<string, number>()
   for (const o of orders) removeMap.set(o.stock_item_id, (removeMap.get(o.stock_item_id) ?? 0) + o.quantity)

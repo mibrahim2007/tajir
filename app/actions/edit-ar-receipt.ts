@@ -10,6 +10,7 @@ import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
 import { checkDirectLines, checkOnlineAccounts, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
+import { receiptAllocationSchema, checkAllocations, saveAllocations } from '@/lib/receivables/receipt-allocations'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -20,6 +21,8 @@ const schema = z.object({
   date:              documentDateSchema,
   paymentMethodNote: z.string().optional(),
   lines:             z.array(receiptTenderLineSchema).min(1, 'Add at least one tender line'),
+  // Replaces the receipt's invoice allocations; [] clears them, omitted keeps them.
+  allocations:       z.array(receiptAllocationSchema).optional(),
 })
 
 export async function editArReceiptAction(input: unknown): Promise<ActionResult<void>> {
@@ -53,6 +56,12 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
 
   if (!existing) return { success: false, error: 'Receipt not found', code: 'NOT_FOUND' }
 
+  const { allocations } = parsed.data
+  const allocationError = allocations
+    ? await checkAllocations(admin, tenantId, existing.customer_id, allocations, pkrEquivalent, id)
+    : null
+  if (allocationError) return { success: false, error: allocationError, code: 'VALIDATION_ERROR' }
+
   const { error } = await admin
     .from('ar_receipts')
     .update({ amount, currency_code: currencyCode, pkr_equivalent: pkrEquivalent, date, payment_method_note: paymentMethodNote ?? null, cheque_number: null, bank_id: null })
@@ -68,6 +77,10 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   const lineRows = receiptLineRows(tenantId, id, lines)
   await admin.from('ar_receipt_lines').insert(lineRows)
 
+  if (allocations && !(await saveAllocations(admin, tenantId, id, existing.customer_id, allocations))) {
+    return { success: false, error: 'Failed to save invoice allocations', code: 'INTERNAL_ERROR' }
+  }
+
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
   const posted = await repostJournalEntry({
@@ -76,7 +89,7 @@ export async function editArReceiptAction(input: unknown): Promise<ActionResult<
   })
   if (!posted.ok) return glEditFailed(posted.message)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ar_receipts', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ar_receipts', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date, allocations } })
 
   return { success: true, data: undefined }
 }

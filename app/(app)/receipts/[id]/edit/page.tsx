@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { ReceiptForm } from '@/app/(app)/receipts/new/create-receipt-form'
 import type { ReceiptTenderLine } from '@/components/tender-lines-field'
+import { loadInvoiceReceivables, openDocs } from '@/lib/receivables/invoice-receivables'
 
 export default async function EditReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -30,8 +31,21 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
 
   if (!receipt) notFound()
 
-  const { data: customer } = await admin
-    .from('tajir_customers').select('id, name').eq('id', receipt.customer_id).single()
+  const [{ data: customer }, { data: rawAllocations }, [receivables]] = await Promise.all([
+    admin.from('tajir_customers').select('id, name').eq('id', receipt.customer_id).single(),
+    admin.from('ar_receipt_allocations').select('invoice_key, amount').eq('receipt_id', id).eq('tenant_id', tenantId),
+    // Left out of the settlement, so its own invoices show what they were
+    // open for before this receipt.
+    loadInvoiceReceivables(admin, tenantId, { customerId: receipt.customer_id, excludeReceiptId: id }),
+  ])
+  const openInvoices = (receivables ? openDocs(receivables) : [])
+    .filter((d) => !d.isOpening)
+    .map((d) => ({ key: d.key, serial: d.serial, poNo: d.poNo, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance }))
+  // An allocation to an invoice that has since been deleted is dropped on save.
+  const openKeys = new Set(openInvoices.map((i) => i.key))
+  const allocations = Object.fromEntries((rawAllocations ?? [])
+    .filter((a) => openKeys.has(a.invoice_key))
+    .map((a) => [a.invoice_key, Number(a.amount)]))
 
   const banks = rawBanks ?? []
   const currency = (receipt.currency_code === 'USD' ? 'USD' : 'PKR') as 'PKR' | 'USD'
@@ -86,7 +100,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
       <ReceiptForm
         today={today}
         customers={customer ? [{ id: customer.id, name: customer.name, outstanding: 0 }] : []}
-        salesByCustomer={{}}
+        openInvoicesByCustomer={{ [receipt.customer_id]: openInvoices }}
         banks={banks}
         suppliers={rawSuppliers ?? []}
         onlineAccounts={onlineAccounts}
@@ -99,6 +113,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
           date: receipt.date,
           paymentMethodNote: receipt.payment_method_note ?? '',
           lines,
+          allocations,
         }}
       />
     </div>

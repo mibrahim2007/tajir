@@ -3,20 +3,22 @@ import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
+import { loadInvoiceReceivables, openDocs } from '@/lib/receivables/invoice-receivables'
 import { CreateReceiptForm } from './create-receipt-form'
+import type { OpenInvoice } from './invoice-allocations'
 
 export default async function NewReceiptPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }, { data: rawSuppliers }, onlineAccounts] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }, { data: rawBanks }, { data: rawSuppliers }, onlineAccounts, receivables] = await Promise.all([
     admin.from('tajir_customers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
       .order('name'),
     admin.from('sales_orders')
-      .select('id, customer_id, date, stock_item_id, quantity, pkr_equivalent')
+      .select('id, customer_id, date, pkr_equivalent')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false }),
     admin.from('ar_receipts')
@@ -31,12 +33,10 @@ export default async function NewReceiptPage() {
     admin.from('customer_refunds')
       .select('id, customer_id, pkr_equivalent')
       .eq('tenant_id', tenantId),
-    admin.from('inventory_lots')
-      .select('id, name')
-      .eq('tenant_id', tenantId),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     listOnlineReceiptAccounts(admin, tenantId),
+    loadInvoiceReceivables(admin, tenantId),
   ])
 
   const customers = rawCustomers ?? []
@@ -45,7 +45,6 @@ export default async function NewReceiptPage() {
   const returns = rawReturns ?? []
   const creditNotes = rawCreditNotes ?? []
   const refunds = rawRefunds ?? []
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
   const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ar_receipt', today)
 
@@ -64,19 +63,15 @@ export default async function NewReceiptPage() {
     return { id: c.id, name: c.name, outstanding: opening + billed - received - returned - credited + refunded }
   })
 
-  // Group sales by customer (most recent first, last 5 per customer)
-  const salesByCustomer: Record<string, { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number }[]> = {}
-  for (const s of sales) {
-    if (!salesByCustomer[s.customer_id]) salesByCustomer[s.customer_id] = []
-    if (salesByCustomer[s.customer_id].length < 5) {
-      salesByCustomer[s.customer_id].push({
-        id: s.id,
-        date: s.date,
-        itemName: lotMap.get(s.stock_item_id) ?? '—',
-        qty: s.quantity,
-        pkrEquivalent: s.pkr_equivalent,
-      })
-    }
+  // Open invoices per customer, oldest first, for "receive against invoice".
+  // The opening balance has no invoice to name, so it is left out here.
+  const openInvoicesByCustomer: Record<string, OpenInvoice[]> = {}
+  for (const c of receivables) {
+    const open = openDocs(c).filter((d) => !d.isOpening)
+    if (open.length === 0) continue
+    openInvoicesByCustomer[c.customerId] = open.map((d) => ({
+      key: d.key, serial: d.serial, poNo: d.poNo, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance,
+    }))
   }
 
   // Combined transaction history per customer (invoices, receipts, returns),
@@ -100,7 +95,7 @@ export default async function NewReceiptPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Receipt</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment received from a customer.</p>
       </div>
-      <CreateReceiptForm today={today} customers={customerList} salesByCustomer={salesByCustomer} banks={banks} suppliers={rawSuppliers ?? []} onlineAccounts={onlineAccounts} nextSerial={nextSerial} historyByCustomer={historyByCustomer} />
+      <CreateReceiptForm today={today} customers={customerList} openInvoicesByCustomer={openInvoicesByCustomer} banks={banks} suppliers={rawSuppliers ?? []} onlineAccounts={onlineAccounts} nextSerial={nextSerial} historyByCustomer={historyByCustomer} />
     </div>
   )
 }

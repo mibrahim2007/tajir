@@ -10,6 +10,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
 import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
+import { loadInvoiceReceivables, openDocs } from '@/lib/receivables/invoice-receivables'
 
 export function ageDays(dateStr: string): number {
   const today = new Date()
@@ -38,8 +39,9 @@ const EMPTY: AgingBuckets = {
 
 /**
  * Ages one party's dated debit lines after settling `credits` against them
- * oldest-first. Payments are not tied to an invoice anywhere in Tajir, so FIFO
- * is the assumption: the oldest bill is the one considered paid.
+ * oldest-first: the oldest bill is the one considered paid. Customers arrive
+ * already settled invoice-wise (credits = 0); suppliers' payments are not tied
+ * to a bill, so FIFO is the assumption there.
  */
 export function bucketParty(lines: { date: string; amount: number }[], credits: number): AgingBuckets {
   const ordered = [...lines].sort((a, b) => a.date.localeCompare(b.date))
@@ -87,48 +89,21 @@ const sumBy = <T,>(rows: T[], match: (r: T) => boolean, value: (r: T) => number)
 /**
  * What each customer still owes, aged from the sale date.
  *
- * The opening balance is aged from the customer's creation date — it is the
- * oldest thing they owe and has no invoice of its own.
+ * Settled invoice by invoice (lib/receivables/invoice-receivables.ts): receipts
+ * applied to an invoice settle that invoice, everything else FIFO — the same
+ * numbers as the Pending Receivables (invoice-wise) report. The opening balance
+ * is aged from the customer's creation date.
  */
 export async function buildReceivablesAging(tenantId: string): Promise<AgingRow[]> {
   const admin = createAdminClient()
-
-  const [
-    { data: rawCustomers },
-    { data: rawSales },
-    { data: rawReceipts },
-    { data: rawReturns },
-    { data: rawCreditNotes },
-    { data: rawRefunds },
-  ] = await Promise.all([
-    admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
-    admin.from('sales_orders').select('customer_id, pkr_equivalent, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
-    admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('credit_notes').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('customer_refunds').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
-  ])
-
-  const sales = rawSales ?? []
+  const customers = await loadInvoiceReceivables(admin, tenantId)
   const rows: AgingRow[] = []
 
-  for (const c of rawCustomers ?? []) {
-    // A refund hands back a credit the customer was holding, so it un-does one.
-    const credits =
-      sumBy(rawReceipts ?? [], (r) => r.customer_id === c.id, (r) => r.pkr_equivalent) +
-      sumBy(rawReturns ?? [], (r) => r.customer_id === c.id, (r) => r.pkr_equivalent) +
-      sumBy(rawCreditNotes ?? [], (n) => n.customer_id === c.id, (n) => n.pkr_equivalent) -
-      sumBy(rawRefunds ?? [], (r) => r.customer_id === c.id, (r) => r.pkr_equivalent)
-
-    const lines = [
-      ...(c.opening_balance_pkr_equivalent > 0
-        ? [{ date: c.created_at.split('T')[0], amount: c.opening_balance_pkr_equivalent }]
-        : []),
-      ...sales.filter((s) => s.customer_id === c.id).map((s) => ({ date: s.date, amount: s.pkr_equivalent })),
-    ]
-
-    const buckets = bucketParty(lines, credits)
-    if (buckets.total > 0.005) rows.push({ partyId: c.id, partyName: c.name, ...buckets })
+  for (const c of customers) {
+    const lines = openDocs(c).map((d) => ({ date: d.date, amount: d.balance }))
+    // Already settled, so no credits to apply again.
+    const buckets = bucketParty(lines, 0)
+    if (buckets.total > 0.005) rows.push({ partyId: c.customerId, partyName: c.customerName, ...buckets })
   }
 
   return rows.sort((a, b) => b.total - a.total)

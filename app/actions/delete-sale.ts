@@ -40,6 +40,10 @@ export async function deleteSaleAction(input: unknown): Promise<ActionResult<voi
 
   if (error) return { success: false, error: 'Failed to delete sale', code: 'INTERNAL_ERROR' }
 
+  // A legacy single-line sale is its own invoice; receipts applied to it go
+  // back to settling FIFO.
+  await admin.from('ar_receipt_allocations').delete().eq('invoice_key', id).eq('tenant_id', tenantId)
+
   // Restore inventory quantity
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: sale.stock_item_id, p_delta: sale.quantity })
 

@@ -11,6 +11,7 @@ import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { receiptTenderLineSchema } from '@/lib/constants/tender-types'
 import { checkDirectLines, checkOnlineAccounts, receiptJournalLines, receiptLineRows } from '@/lib/accounting/receipt-gl'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
+import { receiptAllocationSchema, checkAllocations, saveAllocations } from '@/lib/receivables/receipt-allocations'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -25,6 +26,8 @@ const schema = z.object({
   bankId:            z.string().uuid().optional(),
   moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
   lines:             z.array(receiptTenderLineSchema).optional(),
+  // Optional: apply the receipt (in PKR) to specific sale invoices.
+  allocations:       z.array(receiptAllocationSchema).optional(),
 })
 
 export async function createArReceiptAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -41,6 +44,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
   }
 
   const { customerId, currencyCode, exchangeRate, date, paymentMethodNote, chequeNumber, bankId, moneyAccount, lines } = parsed.data
+  const allocations = parsed.data.allocations ?? []
   const rate = currencyCode === 'USD' ? exchangeRate : 1
 
   // Total is the sum of tender lines when provided, else the single amount.
@@ -56,6 +60,8 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     const accountError = await checkOnlineAccounts(admin, tenantId, lines!)
     if (accountError) return { success: false, error: accountError, code: 'VALIDATION_ERROR' }
   }
+  const allocationError = await checkAllocations(admin, tenantId, customerId, allocations, pkrEquivalent)
+  if (allocationError) return { success: false, error: allocationError, code: 'VALIDATION_ERROR' }
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'ar_receipt', date)
   const { data: receipt, error } = await admin
     .from('ar_receipts')
@@ -89,6 +95,11 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     }
   }
 
+  if (!(await saveAllocations(admin, tenantId, receipt.id, customerId, allocations))) {
+    await admin.from('ar_receipts').delete().eq('id', receipt.id)
+    return { success: false, error: 'Failed to save invoice allocations', code: 'INTERNAL_ERROR' }
+  }
+
   // Auto-post GL: DR each money account (per tender type) or, for a direct
   // line, DR Accounts Payable for the supplier the customer paid; CR Accounts
   // Receivable for the customer. See lib/accounting/receipt-gl.ts.
@@ -108,7 +119,7 @@ export async function createArReceiptAction(input: unknown): Promise<ActionResul
     return glCreateFailed(posted.message)
   }
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'ar_receipts', entityId: receipt.id, after: { customerId, amount, currencyCode, pkrEquivalent, date } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'create', entity: 'ar_receipts', entityId: receipt.id, after: { customerId, amount, currencyCode, pkrEquivalent, date, allocations } })
 
   return { success: true, data: receipt }
 }

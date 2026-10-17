@@ -478,6 +478,58 @@ export type Database = {
           },
         ]
       }
+      ar_receipt_allocations: {
+        Row: {
+          amount: number
+          created_at: string
+          customer_id: string
+          id: string
+          invoice_key: string
+          receipt_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          customer_id: string
+          id?: string
+          invoice_key: string
+          receipt_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          customer_id?: string
+          id?: string
+          invoice_key?: string
+          receipt_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ar_receipt_allocations_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "tajir_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_allocations_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "ar_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ar_receipt_allocations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ar_receipt_lines: {
         Row: {
           account_id: string | null

@@ -15,6 +15,7 @@ const reports = [
   { href: '/reports/stock-valuation', label: 'Stock Valuation', description: 'Current stock with rate (from latest purchase or opening rate) and total value in PKR. Printable.', icon: DollarSign },
   { href: '/reports/location-stock', label: 'Location-wise Stock', description: 'Stock quantities per location, computed from purchases, sales, returns, and transfers. Filterable and printable.', icon: MapPin },
   { href: '/reports/receivables-aging', label: 'Receivables Aging', description: 'Outstanding customer balances by 0–30, 31–60, 61–90, 90+ day buckets, plus unrecovered employee loans and advances aged from their due date.', icon: TrendingUp },
+  { href: '/reports/pending-receivables', label: 'Pending Receivables (Invoice-wise)', description: 'Every unpaid sale invoice with its amount, returns, receipts applied to it, FIFO adjustments and balance — grouped by customer, with overdue days and an age profile.', icon: Receipt },
   { href: '/reports/payables-aging', label: 'Payables Aging', description: 'Outstanding supplier balances by aging bucket.', icon: TrendingDown },
   { href: '/reports/employee-loans', label: 'Employee Loans', description: 'Outstanding loan balances and overdue installment amounts per employee, across all staff loans and advances.', icon: HandCoins },
   { href: '/reports/pdc-register', label: 'Cheque Register', description: 'Every post-dated cheque with its due date, party, amount and status. Overdue cheques are flagged, and cheques are cleared or bounced from here.', icon: BookMarked },

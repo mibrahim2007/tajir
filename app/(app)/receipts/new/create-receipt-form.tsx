@@ -21,17 +21,19 @@ import { editArReceiptAction } from '@/app/actions/edit-ar-receipt'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
-import { formatPKTDate, todayPKT } from '@/lib/utils/dates'
+import { todayPKT } from '@/lib/utils/dates'
+import { Checkbox } from '@/components/ui/checkbox'
+import { InvoiceAllocations, appliedTotal, type OpenInvoice } from './invoice-allocations'
 
 type Customer = { id: string; name: string; outstanding: number }
-type Sale      = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number }
 type Bank      = { id: string; name: string; account_number: string | null }
 type Supplier  = { id: string; name: string }
 
 type Props = {
   today:           string
   customers:       Customer[]
-  salesByCustomer: Record<string, Sale[]>
+  /** Open sale invoices per customer, oldest first — for "receive against invoice". */
+  openInvoicesByCustomer: Record<string, OpenInvoice[]>
   banks:           Bank[]
   /** For Direct Payment lines: suppliers the customer may have paid for us. */
   suppliers:       Supplier[]
@@ -48,6 +50,8 @@ type Props = {
     date:              string
     paymentMethodNote: string
     lines:             ReceiptTenderLine[]
+    /** invoice key → PKR already applied by this receipt. */
+    allocations?:      Record<string, number>
   }
 }
 
@@ -68,13 +72,15 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: ReceiptTenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0, supplierId: '', hawalaRemarks: '', accountId: '', chequeBankName: '' }
 
-export function ReceiptForm({ today, customers, salesByCustomer, banks, suppliers, onlineAccounts = [], nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
+export function ReceiptForm({ today, customers, openInvoicesByCustomer, banks, suppliers, onlineAccounts = [], nextSerial, historyByCustomer, mode = 'create', receiptId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
+  const [allocations, setAllocations] = useState<Record<string, number>>(initial?.allocations ?? {})
+  const [againstInvoice, setAgainstInvoice] = useState(Object.keys(initial?.allocations ?? {}).length > 0)
 
   const [customerFull, setCustomerFull] = useState<Customer[]>(customers)
   const customerPickerItems: PickerItem[] = customerFull.map((c) => ({
@@ -95,17 +101,31 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
   const watchedLines        = form.watch('lines')
 
   const selectedCustomer = customerFull.find((c) => c.id === selectedCustomerId)
-  const customerSales    = selectedCustomerId ? (salesByCustomer[selectedCustomerId] ?? []) : []
+  const openInvoices     = selectedCustomerId ? (openInvoicesByCustomer[selectedCustomerId] ?? []) : []
   const customerHistory  = selectedCustomerId ? (historyByCustomer?.[selectedCustomerId] ?? []) : []
   const er               = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountTotal      = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const amountPkr        = amountTotal * er
+  const applied          = againstInvoice ? appliedTotal(allocations) : 0
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
   const onSubmit = (values: FormValues) => {
+    const allocationList = againstInvoice
+      ? Object.entries(allocations).filter(([, n]) => n > 0).map(([invoiceKey, amount]) => ({ invoiceKey, amount }))
+      : []
+    if (allocationList.reduce((s, a) => s + a.amount, 0) > amountPkr + 0.01) {
+      setServerError('Applied to invoices is more than the receipt amount.')
+      return
+    }
+    const overBalance = allocationList.find((a) => a.amount > (openInvoices.find((i) => i.key === a.invoiceKey)?.balance ?? 0) + 0.01)
+    if (overBalance) {
+      setServerError(`Invoice ${openInvoices.find((i) => i.key === overBalance.invoiceKey)?.serial ?? ''} is applied more than its balance.`)
+      return
+    }
     startTransition(async () => {
       setServerError(null)
       const payload = {
+        allocations: allocationList,
         currencyCode: values.currencyCode,
         exchangeRate: values.exchangeRate,
         date: values.date,
@@ -172,7 +192,7 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                             <ItemPickerDialog
                               items={customerPickerItems}
                               value={field.value}
-                              onSelect={field.onChange}
+                              onSelect={(id) => { field.onChange(id); setAllocations({}) }}
                               placeholder="Select customer…"
                               title="Select Customer"
                               createLabel="New Customer"
@@ -220,19 +240,6 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                         {formatPKR(selectedCustomer.outstanding)}
                       </span>
                     </div>
-                    {customerSales.length > 0 && (
-                      <>
-                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-8 gap-y-1">
-                          {customerSales.map((s) => (
-                            <div key={s.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{formatPKTDate(s.date + 'T00:00:00')} · {s.itemName} × {s.qty}</span>
-                              <span className="tabular-nums">{formatPKR(s.pkrEquivalent)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
                   </div>
                 )}
 
@@ -256,6 +263,31 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                 </div>
               </CardContent>
             </Card>
+
+            {selectedCustomer && (
+              <Card>
+                <CardHeader className="pb-3 pt-5 px-5">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <Checkbox
+                      checked={againstInvoice}
+                      onCheckedChange={(on) => setAgainstInvoice(on === true)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <CardTitle className="text-base">Receive against sale invoice <span className="font-normal text-muted-foreground">(optional)</span></CardTitle>
+                      <span className="block text-xs text-muted-foreground mt-1">
+                        Apply this receipt to specific invoices. Leave off to settle the oldest invoices first.
+                      </span>
+                    </span>
+                  </label>
+                </CardHeader>
+                {againstInvoice && (
+                  <CardContent className="px-5 pb-5">
+                    <InvoiceAllocations invoices={openInvoices} value={allocations} onChange={setAllocations} receiptPkr={amountPkr} />
+                  </CardContent>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
@@ -296,6 +328,19 @@ export function ReceiptForm({ today, customers, salesByCustomer, banks, supplier
                     Rs {fmt(amountPkr)}
                   </span>
                 </div>
+
+                {applied > 0 && (
+                  <div className="space-y-1 text-sm -mt-2 mb-5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Against invoices</span>
+                      <span className="tabular-nums font-medium">Rs {fmt(applied)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">On account</span>
+                      <span className={`tabular-nums font-medium ${amountPkr - applied < -0.01 ? 'text-destructive' : ''}`}>Rs {fmt(amountPkr - applied)}</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending}>

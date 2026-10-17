@@ -146,6 +146,7 @@ export const NAV_SECTIONS: NavSection[] = [
           { href: '/reports/bank-statement',     label: 'Bank Statement' },
           { href: '/reports/pdc-register',       label: 'Cheque Register' },
           { href: '/reports/receivables-aging',  label: 'Receivables Aging' },
+          { href: '/reports/pending-receivables', label: 'Pending Receivables (Invoice-wise)' },
           { href: '/reports/payables-aging',     label: 'Payables Aging' },
           { href: '/reports/employee-loans',     label: 'Employee Loans' },
         ],
