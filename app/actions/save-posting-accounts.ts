@@ -1,0 +1,101 @@
+'use server'
+
+import { z } from 'zod'
+import { requireAuth } from '@/lib/auth/require-auth'
+import { getTenant } from '@/lib/auth/get-tenant'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { isOverridable, POSTING_PROCESSES } from '@/lib/accounting/posting-rules'
+import type { ActionResult } from '@/lib/types'
+
+const schema = z.object({
+  // The complete set of overrides after the edit; anything left out goes back
+  // to the standard head.
+  overrides: z.array(z.object({
+    process:   z.string().min(1),
+    systemKey: z.string().min(1),
+    accountId: z.string().uuid(),
+  })).max(200),
+})
+
+// Saves which account each business process debits / credits — owner only.
+//
+// An override must point at an active, postable account of the SAME type as the
+// standard head it replaces (an asset for Accounts Receivable, revenue for Sales
+// Revenue, …), so the Balance Sheet and P&L keep classifying the amounts the
+// same way. Choosing the standard account itself simply clears the override.
+export async function savePostingAccountsAction(input: unknown): Promise<ActionResult<{ saved: number }>> {
+  const parsed = schema.safeParse(input)
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0].message, code: 'VALIDATION_ERROR' }
+
+  const { user, role, tenantId } = await requireAuth()
+  if (role !== 'owner') return { success: false, error: 'Only owners can change posting accounts', code: 'UNAUTHORIZED' }
+
+  const tenant = await getTenant(tenantId)
+  if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
+
+  const { overrides } = parsed.data
+  const seen = new Set<string>()
+  for (const o of overrides) {
+    if (!isOverridable(o.process, o.systemKey)) {
+      return { success: false, error: `That account cannot be changed for ${o.process}`, code: 'VALIDATION_ERROR' }
+    }
+    const k = `${o.process}:${o.systemKey}`
+    if (seen.has(k)) return { success: false, error: 'Duplicate posting rule', code: 'VALIDATION_ERROR' }
+    seen.add(k)
+  }
+
+  const admin = createAdminClient()
+  const { data: accounts } = await admin
+    .from('chart_of_accounts')
+    .select('id, name, account_type, system_key, is_active, is_header')
+    .eq('tenant_id', tenantId)
+  const byId  = new Map((accounts ?? []).map((a) => [a.id, a]))
+  const byKey = new Map((accounts ?? []).filter((a) => a.system_key).map((a) => [a.system_key!, a]))
+
+  const rows: { tenant_id: string; process: string; system_key: string; account_id: string; updated_by: string }[] = []
+  for (const o of overrides) {
+    const standard = byKey.get(o.systemKey)
+    const target   = byId.get(o.accountId)
+    const label    = POSTING_PROCESSES.find((p) => p.process === o.process)?.label ?? o.process
+    if (!standard) return { success: false, error: `Standard account "${o.systemKey}" is missing from the chart of accounts`, code: 'COA_NOT_SEEDED' }
+    if (!target || !target.is_active || target.is_header) {
+      return { success: false, error: `${label}: choose an active, non-header account`, code: 'VALIDATION_ERROR' }
+    }
+    if (target.account_type !== standard.account_type) {
+      return {
+        success: false,
+        error: `${label}: "${target.name}" is ${target.account_type}, but ${standard.name} needs a ${standard.account_type} account`,
+        code: 'VALIDATION_ERROR',
+      }
+    }
+    if (target.id === standard.id) continue // same as standard — no override needed
+    rows.push({ tenant_id: tenantId, process: o.process, system_key: o.systemKey, account_id: target.id, updated_by: user.id })
+  }
+
+  const { data: before } = await admin
+    .from('posting_account_overrides')
+    .select('process, system_key, account_id')
+    .eq('tenant_id', tenantId)
+
+  const { error: delErr } = await admin.from('posting_account_overrides').delete().eq('tenant_id', tenantId)
+  if (delErr) return { success: false, error: 'Failed to save posting accounts', code: 'INTERNAL_ERROR' }
+  if (rows.length > 0) {
+    const { error: insErr } = await admin.from('posting_account_overrides').insert(rows)
+    if (insErr) {
+      // Put the previous rules back rather than silently reverting everyone to standard.
+      if (before?.length) {
+        await admin.from('posting_account_overrides').insert(before.map((b) => ({ ...b, tenant_id: tenantId, updated_by: user.id })))
+      }
+      return { success: false, error: 'Failed to save posting accounts', code: 'INTERNAL_ERROR' }
+    }
+  }
+
+  await createAuditEntry({
+    tenantId, userId: user.id, action: 'update', entity: 'posting_account_overrides', entityId: tenantId,
+    before: { overrides: before ?? [] },
+    after:  { overrides: rows.map(({ process, system_key, account_id }) => ({ process, system_key, account_id })) },
+  })
+
+  return { success: true, data: { saved: rows.length } }
+}

@@ -6,6 +6,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
+import { loadPostingOverrides } from '@/lib/accounting/posting-rules'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -50,6 +51,9 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
 
   if (!cashAcc) return { success: false, error: 'Chart of accounts not seeded. Go to Accounts and seed first.', code: 'COA_NOT_SEEDED' }
 
+  // Settings → Posting Accounts may route expenses to another cash account.
+  const paidFromId = (await loadPostingOverrides(admin, tenantId, 'expense')).get('cash_in_hand') ?? cashAcc.id
+
   // Get next voucher number
   const { data: voucherNumber } = await admin.rpc('get_next_voucher_number', {
     p_tenant_id: tenantId,
@@ -80,7 +84,7 @@ export async function createExpenseAction(input: unknown): Promise<ActionResult<
   // Insert lines: DR expense account, CR cash
   await admin.from('tajir_journal_entry_lines').insert([
     { journal_entry_id: entry.id, tenant_id: tenantId, account_id: expenseAccountId, description: narration, debit: amount, credit: 0 },
-    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: cashAcc.id,       description: narration, debit: 0,            credit: amount },
+    { journal_entry_id: entry.id, tenant_id: tenantId, account_id: paidFromId,       description: narration, debit: 0,            credit: amount },
   ])
 
   await createAuditEntry({

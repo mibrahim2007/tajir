@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getLockedThrough, isLocked, formatLockDate } from './period-lock'
 import { isFutureDate, FUTURE_DATE_ERROR } from '@/lib/validation/document-date'
+import { loadPostingOverrides } from './posting-rules'
 
 type JournalLine = {
   // Exactly one of these: a system account by its key (the usual case), or a
@@ -128,6 +129,27 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
 
   const accountMap = new Map((accounts ?? []).map((a) => [a.system_key, a.id]))
 
+  // The tenant may have redirected some of this process's standard heads to
+  // accounts of their own (Settings → Posting Accounts). The standard account
+  // must still exist — the override replaces it, it does not stand in for a
+  // missing chart.
+  const overrides = await loadPostingOverrides(admin, tenantId, sourceType)
+  const overrideIds = [...new Set(systemKeys.flatMap((k) => (overrides.has(k) ? [overrides.get(k)!] : [])))]
+  if (overrideIds.length > 0) {
+    const { data: usable } = await admin
+      .from('chart_of_accounts')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('is_active', true)
+      .eq('is_header', false)
+      .in('id', overrideIds)
+    const ok = new Set((usable ?? []).map((a) => a.id))
+    const bad = overrideIds.filter((id) => !ok.has(id))
+    if (bad.length > 0) {
+      return fail('missing_account', 'A posting account set in Settings → Posting Accounts is inactive or a header account', ctx)
+    }
+  }
+
   // Explicit account ids must be this tenant's own, active, postable accounts.
   const explicitIds = [...new Set(lines.flatMap((l) => (l.accountId ? [l.accountId] : [])))]
   if (explicitIds.length > 0) {
@@ -144,7 +166,8 @@ export async function postJournalEntry(params: PostJournalEntryParams): Promise<
       return fail('missing_account', `Account(s) not usable for posting: ${bad.join(', ')}`, ctx)
     }
   }
-  const resolveAccount = (l: JournalLine) => (l.accountId ?? accountMap.get(l.accountSystemKey!))!
+  const resolveAccount = (l: JournalLine) =>
+    (l.accountId ?? overrides.get(l.accountSystemKey!) ?? accountMap.get(l.accountSystemKey!))!
 
   // Verify all required accounts exist
   const missingKeys = systemKeys.filter((k) => !accountMap.has(k))
