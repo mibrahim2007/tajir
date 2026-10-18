@@ -870,6 +870,367 @@ export type Database = {
           },
         ]
       }
+      fbr_api_log: {
+        Row: {
+          created_at: string
+          duration_ms: number | null
+          endpoint: string
+          environment: string
+          error: string | null
+          fbr_invoice_id: string | null
+          http_status: number | null
+          id: string
+          method: string
+          request: Json | null
+          response: Json | null
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint: string
+          environment: string
+          error?: string | null
+          fbr_invoice_id?: string | null
+          http_status?: number | null
+          id?: string
+          method: string
+          request?: Json | null
+          response?: Json | null
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_ms?: number | null
+          endpoint?: string
+          environment?: string
+          error?: string | null
+          fbr_invoice_id?: string | null
+          http_status?: number | null
+          id?: string
+          method?: string
+          request?: Json | null
+          response?: Json | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fbr_api_log_fbr_invoice_id_fkey"
+            columns: ["fbr_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "fbr_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fbr_api_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fbr_credentials: {
+        Row: {
+          environment: string
+          tenant_id: string
+          token_enc: string
+          token_last4: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          environment: string
+          tenant_id: string
+          token_enc: string
+          token_last4: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          environment?: string
+          tenant_id?: string
+          token_enc?: string
+          token_last4?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fbr_credentials_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fbr_invoice_items: {
+        Row: {
+          discount: number
+          extra_tax: number
+          fbr_item_invoice_no: string | null
+          fed_payable: number
+          fixed_notified_value_or_retail_price: number
+          further_tax: number
+          hs_code: string
+          id: string
+          invoice_id: string
+          line_no: number
+          product_description: string
+          quantity: number
+          rate: string
+          sale_type: string
+          sales_tax_applicable: number
+          sales_tax_withheld_at_source: number
+          sro_item_serial_no: string | null
+          sro_schedule_no: string | null
+          tenant_id: string
+          total_values: number
+          unit_price: number
+          uom: string
+          value_sales_excluding_st: number
+        }
+        Insert: {
+          discount?: number
+          extra_tax?: number
+          fbr_item_invoice_no?: string | null
+          fed_payable?: number
+          fixed_notified_value_or_retail_price?: number
+          further_tax?: number
+          hs_code: string
+          id?: string
+          invoice_id: string
+          line_no: number
+          product_description: string
+          quantity: number
+          rate: string
+          sale_type: string
+          sales_tax_applicable?: number
+          sales_tax_withheld_at_source?: number
+          sro_item_serial_no?: string | null
+          sro_schedule_no?: string | null
+          tenant_id: string
+          total_values?: number
+          unit_price?: number
+          uom: string
+          value_sales_excluding_st: number
+        }
+        Update: {
+          discount?: number
+          extra_tax?: number
+          fbr_item_invoice_no?: string | null
+          fed_payable?: number
+          fixed_notified_value_or_retail_price?: number
+          further_tax?: number
+          hs_code?: string
+          id?: string
+          invoice_id?: string
+          line_no?: number
+          product_description?: string
+          quantity?: number
+          rate?: string
+          sale_type?: string
+          sales_tax_applicable?: number
+          sales_tax_withheld_at_source?: number
+          sro_item_serial_no?: string | null
+          sro_schedule_no?: string | null
+          tenant_id?: string
+          total_values?: number
+          unit_price?: number
+          uom?: string
+          value_sales_excluding_st?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fbr_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "fbr_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fbr_invoice_items_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fbr_invoices: {
+        Row: {
+          buyer_address: string
+          buyer_business_name: string
+          buyer_ntn_cnic: string | null
+          buyer_province: string
+          buyer_registration_type: string
+          created_at: string
+          created_by: string | null
+          customer_id: string | null
+          environment: string
+          fbr_dated: string | null
+          fbr_invoice_number: string | null
+          id: string
+          invoice_date: string
+          invoice_ref_no: string | null
+          invoice_type: string
+          last_error: string | null
+          last_request: Json | null
+          last_response: Json | null
+          posted_at: string | null
+          scenario_id: string | null
+          serial_number: string | null
+          status: string
+          tenant_id: string
+          total_amount: number
+          total_further_tax: number
+          total_sales_tax: number
+          total_value_excl_st: number
+          updated_at: string
+        }
+        Insert: {
+          buyer_address: string
+          buyer_business_name: string
+          buyer_ntn_cnic?: string | null
+          buyer_province: string
+          buyer_registration_type: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          environment: string
+          fbr_dated?: string | null
+          fbr_invoice_number?: string | null
+          id?: string
+          invoice_date: string
+          invoice_ref_no?: string | null
+          invoice_type?: string
+          last_error?: string | null
+          last_request?: Json | null
+          last_response?: Json | null
+          posted_at?: string | null
+          scenario_id?: string | null
+          serial_number?: string | null
+          status?: string
+          tenant_id: string
+          total_amount?: number
+          total_further_tax?: number
+          total_sales_tax?: number
+          total_value_excl_st?: number
+          updated_at?: string
+        }
+        Update: {
+          buyer_address?: string
+          buyer_business_name?: string
+          buyer_ntn_cnic?: string | null
+          buyer_province?: string
+          buyer_registration_type?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string | null
+          environment?: string
+          fbr_dated?: string | null
+          fbr_invoice_number?: string | null
+          id?: string
+          invoice_date?: string
+          invoice_ref_no?: string | null
+          invoice_type?: string
+          last_error?: string | null
+          last_request?: Json | null
+          last_response?: Json | null
+          posted_at?: string | null
+          scenario_id?: string | null
+          serial_number?: string | null
+          status?: string
+          tenant_id?: string
+          total_amount?: number
+          total_further_tax?: number
+          total_sales_tax?: number
+          total_value_excl_st?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fbr_invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "tajir_customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fbr_invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fbr_settings: {
+        Row: {
+          business_activity: string | null
+          enabled: boolean
+          environment: string
+          further_tax_rate: number
+          last_test_at: string | null
+          last_test_message: string | null
+          last_test_ok: boolean | null
+          reference_cache: Json | null
+          sector: string | null
+          seller_address: string | null
+          seller_business_name: string | null
+          seller_ntn_cnic: string | null
+          seller_province: string | null
+          tenant_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          business_activity?: string | null
+          enabled?: boolean
+          environment?: string
+          further_tax_rate?: number
+          last_test_at?: string | null
+          last_test_message?: string | null
+          last_test_ok?: boolean | null
+          reference_cache?: Json | null
+          sector?: string | null
+          seller_address?: string | null
+          seller_business_name?: string | null
+          seller_ntn_cnic?: string | null
+          seller_province?: string | null
+          tenant_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          business_activity?: string | null
+          enabled?: boolean
+          environment?: string
+          further_tax_rate?: number
+          last_test_at?: string | null
+          last_test_message?: string | null
+          last_test_ok?: boolean | null
+          reference_cache?: Json | null
+          sector?: string | null
+          seller_address?: string | null
+          seller_business_name?: string | null
+          seller_ntn_cnic?: string | null
+          seller_province?: string | null
+          tenant_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fbr_settings_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posting_account_override_history: {
         Row: {
           action: string

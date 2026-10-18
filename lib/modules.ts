@@ -21,6 +21,7 @@ import {
   HandCoins,
   Banknote,
   Handshake,
+  FileCheck2,
 } from 'lucide-react'
 
 export type ModuleKey =
@@ -46,6 +47,7 @@ export type ModuleKey =
   | 'employees'
   | 'loans'
   | 'agents'
+  | 'fbr_invoices'
 
 export const ALL_MODULES: ModuleKey[] = [
   'inventory', 'purchases', 'purchase_returns', 'sales', 'sale_returns',
@@ -53,7 +55,15 @@ export const ALL_MODULES: ModuleKey[] = [
   'customers', 'receipts', 'credit_notes', 'suppliers', 'payments',
   'debit_notes', 'pricing', 'expenses',
   'accounts', 'vouchers', 'reports', 'employees', 'loans', 'agents',
+  'fbr_invoices',
 ]
+
+/**
+ * Modules a tenant must switch on explicitly (FBR Digital Invoicing is only for
+ * sales-tax-registered businesses), so a tenant with no features config does
+ * not get them by default.
+ */
+export const OPT_IN_MODULES = new Set<ModuleKey>(['fbr_invoices'])
 
 export const MODULE_META: Record<ModuleKey, { label: string; section: string; icon: React.ElementType; href: string }> = {
   // ── Sales (selling to customers) ──
@@ -62,6 +72,7 @@ export const MODULE_META: Record<ModuleKey, { label: string; section: string; ic
   customers:        { label: 'Customers',          section: 'Sales',        icon: Users,         href: '/customers' },
   receipts:         { label: 'Receipts',           section: 'Sales',        icon: ArrowDownLeft, href: '/receipts' },
   credit_notes:     { label: 'Credit Notes',       section: 'Sales',        icon: FileMinus,     href: '/credit-notes' },
+  fbr_invoices:     { label: 'FBR Tax Invoices',   section: 'Sales',        icon: FileCheck2,    href: '/fbr-invoices' },
   pricing:          { label: 'Pricing',            section: 'Sales',        icon: Tag,           href: '/pricing' },
   // ── Procurement (buying from suppliers) ──
   purchases:        { label: 'Purchases',          section: 'Procurement',  icon: ShoppingCart,  href: '/purchases' },
@@ -85,7 +96,7 @@ export const MODULE_META: Record<ModuleKey, { label: string; section: string; ic
 }
 
 /** Modules enabled by default when tenant has no features config */
-export const DEFAULT_TENANT_FEATURES = new Set<ModuleKey>(ALL_MODULES)
+export const DEFAULT_TENANT_FEATURES = new Set<ModuleKey>(ALL_MODULES.filter((m) => !OPT_IN_MODULES.has(m)))
 
 /** Modules an assistant can access by default when user has no permissions config */
 export const DEFAULT_ASSISTANT_PERMISSIONS = new Set<ModuleKey>([
@@ -95,7 +106,7 @@ export const DEFAULT_ASSISTANT_PERMISSIONS = new Set<ModuleKey>([
 ])
 
 export function parseTenantFeatures(raw: unknown): Set<ModuleKey> {
-  if (!raw || !Array.isArray(raw)) return new Set(ALL_MODULES)
+  if (!raw || !Array.isArray(raw)) return new Set(DEFAULT_TENANT_FEATURES)
   return new Set(raw.filter((k): k is ModuleKey => ALL_MODULES.includes(k as ModuleKey)))
 }
 

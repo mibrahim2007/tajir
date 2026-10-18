@@ -3,7 +3,7 @@ import {
   LifeBuoy, Settings, Building2, UserCog, FlaskConical, UsersRound, Wallet,
   Package, ShoppingCart, ShoppingBag, ClipboardList, ArrowDownLeft, ArrowUpRight,
   Receipt, PenLine, BarChart2, HandCoins, Banknote, Handshake, Tag, Users, Truck, Wand2,
-  RefreshCcw, Undo2, FileMinus, FilePlus, MapPin, ArrowLeftRight, Coins, Boxes, KeyRound, Scale,
+  RefreshCcw, Undo2, FileMinus, FilePlus, MapPin, ArrowLeftRight, Coins, Boxes, KeyRound, Scale, FileCheck2,
 } from 'lucide-react'
 import { type ModuleKey } from './modules'
 
@@ -83,6 +83,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/customers',     label: 'Customers',    icon: Users,         module: 'customers' },
       { href: '/receipts',      label: 'Receipts',     icon: ArrowDownLeft, module: 'receipts' },
       { href: '/credit-notes',  label: 'Credit Notes', icon: FileMinus,     module: 'credit_notes' },
+      { href: '/fbr-invoices',  label: 'FBR Tax Invoices', icon: FileCheck2, module: 'fbr_invoices' },
       { href: '/pricing',       label: 'Pricing',      icon: Tag,           module: 'pricing' },
     ],
   },
@@ -200,6 +201,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { href: '/banks',                     label: 'Banks',            icon: Landmark },
       { href: '/settings/opening-balances', label: 'Opening Balances', icon: Wallet },
       { href: '/settings/posting-accounts', label: 'Posting Accounts', icon: Scale },
+      { href: '/settings/fbr',              label: 'FBR Digital Invoicing', icon: FileCheck2 },
       { href: '/settings/period-lock',      label: 'Close the Books',  icon: Lock },
       { href: '/settings/api-keys',         label: 'API Keys',         icon: KeyRound },
       { href: '/audit',                     label: 'Audit Log',        icon: Search },

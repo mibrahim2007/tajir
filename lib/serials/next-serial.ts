@@ -15,10 +15,11 @@ export type DocType =
   | 'owner_contribution'
   | 'profit_allocation'
   | 'agent_payment'
+  | 'fbr_invoice'
 
 /**
  * Prefix per document type — MUST stay in sync with the `CASE` in the
- * `next_document_serial` Postgres function (migrations 0018 / 0019 / 0020 / 0026 / 0036 / 0058).
+ * `next_document_serial` Postgres function (migrations 0018 / 0019 / 0020 / 0026 / 0036 / 0058 / 0070).
  */
 const DOC_TYPE_PREFIX: Record<DocType, string> = {
   purchase_order:  'PO',
@@ -35,6 +36,7 @@ const DOC_TYPE_PREFIX: Record<DocType, string> = {
   owner_contribution: 'OC',
   profit_allocation:  'PA',
   agent_payment:      'AGP',
+  fbr_invoice:        'FTI',
 }
 
 function formatSerial(docType: DocType, year: number, n: number): string {
