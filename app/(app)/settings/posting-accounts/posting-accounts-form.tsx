@@ -98,7 +98,7 @@ export function PostingAccountsForm({ accounts, overrides }: { accounts: Posting
                         ? accounts.filter((a) => a.type === standard.type && a.active && a.id !== standard.id)
                         : []
                       return (
-                        <div key={k} className="grid grid-cols-1 sm:grid-cols-[3.5rem_1fr_minmax(0,18rem)] gap-x-3 gap-y-1.5 px-4 py-3 sm:items-center">
+                        <div key={k} className="grid grid-cols-1 sm:grid-cols-[3.5rem_1fr_minmax(0,21rem)] gap-x-3 gap-y-1.5 px-4 py-3 sm:items-center">
                           <span className={`text-xs font-bold ${h.side === 'Cr' ? 'text-sky-700 dark:text-sky-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                             {h.side}
                           </span>
@@ -109,7 +109,7 @@ export function PostingAccountsForm({ accounts, overrides }: { accounts: Posting
                             </p>
                           </div>
                           <Select value={current ?? STANDARD} onValueChange={(v) => set(k, v)} disabled={!standard}>
-                            <SelectTrigger className={`w-full min-h-[44px] ${current ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : ''}`}>
+                            <SelectTrigger className={`w-full min-h-[44px] [&>span]:truncate ${current ? 'border-amber-400 bg-amber-50 dark:bg-amber-950/30' : ''}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
