@@ -53,7 +53,7 @@ export async function savePostingAccountsAction(input: unknown): Promise<ActionR
   const byId  = new Map((accounts ?? []).map((a) => [a.id, a]))
   const byKey = new Map((accounts ?? []).filter((a) => a.system_key).map((a) => [a.system_key!, a]))
 
-  const rows: { tenant_id: string; process: string; system_key: string; account_id: string; updated_by: string }[] = []
+  const rows: { process: string; system_key: string; account_id: string }[] = []
   for (const o of overrides) {
     const standard = byKey.get(o.systemKey)
     const target   = byId.get(o.accountId)
@@ -70,32 +70,35 @@ export async function savePostingAccountsAction(input: unknown): Promise<ActionR
       }
     }
     if (target.id === standard.id) continue // same as standard — no override needed
-    rows.push({ tenant_id: tenantId, process: o.process, system_key: o.systemKey, account_id: target.id, updated_by: user.id })
+    rows.push({ process: o.process, system_key: o.systemKey, account_id: target.id })
   }
 
-  const { data: before } = await admin
-    .from('posting_account_overrides')
-    .select('process, system_key, account_id')
-    .eq('tenant_id', tenantId)
+  // Who made the change, as it should read in the history even if the user
+  // is later renamed or removed.
+  const { data: member } = await admin
+    .from('tenant_users').select('username').eq('tenant_id', tenantId).eq('user_id', user.id).maybeSingle()
+  const userLabel = member?.username || user.email || null
 
-  const { error: delErr } = await admin.from('posting_account_overrides').delete().eq('tenant_id', tenantId)
-  if (delErr) return { success: false, error: 'Failed to save posting accounts', code: 'INTERNAL_ERROR' }
-  if (rows.length > 0) {
-    const { error: insErr } = await admin.from('posting_account_overrides').insert(rows)
-    if (insErr) {
-      // Put the previous rules back rather than silently reverting everyone to standard.
-      if (before?.length) {
-        await admin.from('posting_account_overrides').insert(before.map((b) => ({ ...b, tenant_id: tenantId, updated_by: user.id })))
-      }
-      return { success: false, error: 'Failed to save posting accounts', code: 'INTERNAL_ERROR' }
-    }
-  }
-
-  await createAuditEntry({
-    tenantId, userId: user.id, action: 'update', entity: 'posting_account_overrides', entityId: tenantId,
-    before: { overrides: before ?? [] },
-    after:  { overrides: rows.map(({ process, system_key, account_id }) => ({ process, system_key, account_id })) },
+  // One transaction: only the heads that actually changed are inserted,
+  // updated or deleted, and each change lands in posting_account_override_history.
+  const { data: result, error } = await admin.rpc('save_posting_account_overrides', {
+    p_tenant_id:  tenantId,
+    p_user_id:    user.id,
+    p_user_label: userLabel ?? '',
+    p_rows:       rows,
   })
+  if (error) {
+    console.error(`[savePostingAccounts] ${error.message} (tenant=${tenantId})`)
+    return { success: false, error: 'Failed to save posting accounts', code: 'INTERNAL_ERROR' }
+  }
+  const counts = result as { inserted: number; updated: number; deleted: number }
+
+  if (counts.inserted + counts.updated + counts.deleted > 0) {
+    await createAuditEntry({
+      tenantId, userId: user.id, action: 'update', entity: 'posting_account_overrides', entityId: tenantId,
+      after: { ...counts, overrides: rows },
+    })
+  }
 
   return { success: true, data: { saved: rows.length } }
 }

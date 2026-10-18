@@ -870,6 +870,65 @@ export type Database = {
           },
         ]
       }
+      posting_account_override_history: {
+        Row: {
+          action: string
+          batch_id: string | null
+          changed_at: string
+          changed_by: string | null
+          changed_by_label: string | null
+          id: string
+          new_account_id: string | null
+          new_account_label: string | null
+          old_account_id: string | null
+          old_account_label: string | null
+          process: string
+          reason: string | null
+          system_key: string
+          tenant_id: string
+        }
+        Insert: {
+          action: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_label?: string | null
+          id?: string
+          new_account_id?: string | null
+          new_account_label?: string | null
+          old_account_id?: string | null
+          old_account_label?: string | null
+          process: string
+          reason?: string | null
+          system_key: string
+          tenant_id: string
+        }
+        Update: {
+          action?: string
+          batch_id?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_label?: string | null
+          id?: string
+          new_account_id?: string | null
+          new_account_label?: string | null
+          old_account_id?: string | null
+          old_account_label?: string | null
+          process?: string
+          reason?: string | null
+          system_key?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posting_account_override_history_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posting_account_overrides: {
         Row: {
           account_id: string
@@ -4067,6 +4126,10 @@ export type Database = {
           order_count: number
           recent_sales: number
         }[]
+      }
+      save_posting_account_overrides: {
+        Args: { p_rows: Json; p_tenant_id: string; p_user_id: string; p_user_label: string }
+        Returns: Json
       }
       get_next_voucher_number: {
         Args: { p_prefix?: string; p_tenant_id: string }
