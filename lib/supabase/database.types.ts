@@ -328,6 +328,58 @@ export type Database = {
           },
         ]
       }
+      ap_payment_allocations: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_key: string
+          payment_id: string
+          supplier_id: string
+          tenant_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_key: string
+          payment_id: string
+          supplier_id: string
+          tenant_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_key?: string
+          payment_id?: string
+          supplier_id?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ap_payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "ap_payments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_allocations_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ap_payment_allocations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ap_payment_lines: {
         Row: {
           amount: number

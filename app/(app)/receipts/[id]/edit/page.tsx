@@ -40,7 +40,7 @@ export default async function EditReceiptPage({ params }: { params: Promise<{ id
   ])
   const openInvoices = (receivables ? openDocs(receivables) : [])
     .filter((d) => !d.isOpening)
-    .map((d) => ({ key: d.key, serial: d.serial, poNo: d.poNo, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance }))
+    .map((d) => ({ key: d.key, serial: d.serial, ref: d.ref, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance }))
   // An allocation to an invoice that has since been deleted is dropped on save.
   const openKeys = new Set(openInvoices.map((i) => i.key))
   const allocations = Object.fromEntries((rawAllocations ?? [])

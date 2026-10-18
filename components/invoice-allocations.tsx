@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { formatPKR } from '@/lib/utils/currency'
 import { formatPKTDate } from '@/lib/utils/dates'
 
-/** An invoice the customer still owes on (see lib/receivables/invoice-receivables.ts). */
+/** An invoice still owed on (see lib/settlement/invoice-settlement.ts). */
 export type OpenInvoice = {
   key:     string
   serial:  string | null
-  poNo:    string | null
+  ref:    string | null
   date:    string
   dueDate: string | null
   amount:  number
@@ -22,8 +22,11 @@ type Props = {
   /** invoice key → PKR applied. */
   value:       Record<string, number>
   onChange:    (next: Record<string, number>) => void
-  /** Receipt total in PKR — what there is to apply. */
+  /** Receipt / payment total in PKR — what there is to apply. */
   receiptPkr:  number
+  /** Label for the party's reference shown under the voucher no. */
+  refLabel?:   string
+  partyNoun?:  'customer' | 'supplier'
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
@@ -34,11 +37,11 @@ export function appliedTotal(value: Record<string, number>): number {
 }
 
 /**
- * Optional "receipt against sale invoice" picker. Whatever is not applied
+ * Optional "receipt / payment against invoice" picker. Whatever is not applied
  * here keeps settling the oldest open invoices first, so leaving it empty
  * behaves exactly like a plain receipt.
  */
-export function InvoiceAllocations({ invoices, value, onChange, receiptPkr }: Props) {
+export function InvoiceAllocations({ invoices, value, onChange, receiptPkr, refLabel = 'PO', partyNoun = 'customer' }: Props) {
   const applied   = appliedTotal(value)
   const unapplied = r2(receiptPkr - applied)
   const today     = new Date().toISOString().split('T')[0]
@@ -64,7 +67,7 @@ export function InvoiceAllocations({ invoices, value, onChange, receiptPkr }: Pr
   }
 
   if (invoices.length === 0) {
-    return <p className="text-xs text-muted-foreground">This customer has no open sale invoices.</p>
+    return <p className="text-xs text-muted-foreground">This {partyNoun} has no open {partyNoun === 'customer' ? 'sale' : 'purchase'} invoices.</p>
   }
 
   return (
@@ -105,7 +108,7 @@ export function InvoiceAllocations({ invoices, value, onChange, receiptPkr }: Pr
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className="font-mono">{inv.serial ?? '—'}</span>
-                      {inv.poNo && <span className="block text-xs text-muted-foreground">PO {inv.poNo}</span>}
+                      {inv.ref && <span className="block text-xs text-muted-foreground">{refLabel} {inv.ref}</span>}
                     </td>
                     <td className="px-3 py-2 whitespace-nowrap">{fmtDate(inv.date)}</td>
                     <td className={`px-3 py-2 whitespace-nowrap ${overdue ? 'text-destructive font-medium' : ''}`}>
@@ -148,7 +151,7 @@ export function InvoiceAllocations({ invoices, value, onChange, receiptPkr }: Pr
         </div>
       </div>
       <p className="text-xs text-muted-foreground">
-        Any amount not applied here settles this customer&apos;s oldest open invoices first.
+        Any amount not applied here settles this {partyNoun}&apos;s oldest open invoices first.
       </p>
     </div>
   )

@@ -7,10 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button'
 
 type Props = {
-  customers: { id: string; name: string }[]
+  parties:      { id: string; name: string }[]
+  /** "Customers" / "Suppliers". */
+  partiesLabel: string
+  searchHint:   string
 }
 
-export function PendingReceivablesFilters({ customers }: Props) {
+/** Filter bar for the Pending Receivables / Payables (invoice-wise) reports. */
+export function PendingInvoicesFilters({ parties, partiesLabel, searchHint }: Props) {
   const router       = useRouter()
   const pathname     = usePathname()
   const searchParams = useSearchParams()
@@ -22,18 +26,18 @@ export function PendingReceivablesFilters({ customers }: Props) {
     router.push(`${pathname}?${params.toString()}`)
   }, [router, pathname, searchParams])
 
-  const hasFilters = searchParams.has('customer') || searchParams.has('status') || searchParams.has('q')
+  const hasFilters = searchParams.has('party') || searchParams.has('status') || searchParams.has('q')
 
   return (
     <div className="flex flex-wrap gap-2 mb-6 print:hidden">
       <Select
-        value={searchParams.get('customer') ?? 'all'}
-        onValueChange={v => set('customer', v === 'all' ? '' : v)}
+        value={searchParams.get('party') ?? 'all'}
+        onValueChange={v => set('party', v === 'all' ? '' : v)}
       >
-        <SelectTrigger className="w-full sm:w-56 min-h-[44px]"><SelectValue placeholder="All Customers" /></SelectTrigger>
+        <SelectTrigger className="w-full sm:w-56 min-h-[44px]"><SelectValue placeholder={`All ${partiesLabel}`} /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Customers</SelectItem>
-          {customers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+          <SelectItem value="all">All {partiesLabel}</SelectItem>
+          {parties.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
         </SelectContent>
       </Select>
       <Select
@@ -50,8 +54,8 @@ export function PendingReceivablesFilters({ customers }: Props) {
       {/* defaultValue + onBlur so typing doesn't re-navigate on every keystroke. */}
       <Input
         type="search"
-        placeholder="Voucher / PO no…"
-        aria-label="Search voucher or PO number"
+        placeholder={searchHint}
+        aria-label={searchHint.replace('…', '')}
         defaultValue={searchParams.get('q') ?? ''}
         onBlur={e => set('q', e.target.value.trim())}
         onKeyDown={e => { if (e.key === 'Enter') set('q', e.currentTarget.value.trim()) }}

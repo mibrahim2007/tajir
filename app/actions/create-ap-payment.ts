@@ -12,6 +12,7 @@ import { aggregateMoneyLegs, pdcAccount, PDC_ASSET_KEY, type TenderType, tenderL
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import { verifyEndorsable, markEndorsed, releaseEndorsement, type EndorsementRef } from '@/lib/pdc/endorsement'
 import type { PdcSource } from '@/lib/pdc/sources'
+import { paymentAllocationSchema, checkPaymentAllocations, savePaymentAllocations } from '@/lib/payables/payment-allocations'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -26,6 +27,8 @@ const schema = z.object({
   bankId:            z.string().uuid().optional(),
   moneyAccount:      z.enum(['cash_in_hand', 'cash_at_bank', 'post_dated_cheques']).default('cash_in_hand'),
   lines:             z.array(tenderLineSchema).optional(),
+  // Optional: apply the payment (in PKR) to specific purchase invoices.
+  allocations:       z.array(paymentAllocationSchema).optional(),
 })
 
 export async function createApPaymentAction(input: unknown): Promise<ActionResult<{ id: string }>> {
@@ -69,6 +72,9 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
   const pkrEquivalent = amount * rate
 
   const admin = createAdminClient()
+  const allocations = parsed.data.allocations ?? []
+  const allocationError = await checkPaymentAllocations(admin, tenantId, supplierId, allocations, pkrEquivalent)
+  if (allocationError) return { success: false, error: allocationError, code: 'VALIDATION_ERROR' }
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'ap_payment', date)
   const { data: payment, error } = await admin
     .from('ap_payments')
@@ -125,6 +131,12 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
     }
   }
 
+  if (!(await savePaymentAllocations(admin, tenantId, payment.id, supplierId, allocations))) {
+    for (const ref of endorsements) await releaseEndorsement(tenantId, ref)
+    await admin.from('ap_payments').delete().eq('id', payment.id)
+    return { success: false, error: 'Failed to save invoice allocations', code: 'INTERNAL_ERROR' }
+  }
+
   // Auto-post GL: DR Accounts Payable, CR each money account (per tender type).
   // On the single-account path a PDC selection is a cheque we issue, so it must
   // land in the liability account, not the received-cheques asset.
@@ -151,7 +163,7 @@ export async function createApPaymentAction(input: unknown): Promise<ActionResul
 
   await createAuditEntry({
     tenantId, userId: user.id, action: 'create', entity: 'ap_payments', entityId: payment.id,
-    after: { supplierId, amount, currencyCode, pkrEquivalent, date },
+    after: { supplierId, amount, currencyCode, pkrEquivalent, date, allocations },
   })
 
   return { success: true, data: payment }

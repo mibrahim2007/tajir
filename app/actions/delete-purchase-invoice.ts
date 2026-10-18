@@ -52,6 +52,8 @@ export async function deletePurchaseInvoiceAction(input: unknown): Promise<Actio
   }
 
   await admin.from('purchase_orders').delete().eq('invoice_id', invoiceId).eq('tenant_id', tenantId)
+  // Payments applied to this invoice go back to settling FIFO.
+  await admin.from('ap_payment_allocations').delete().eq('invoice_key', invoiceId).eq('tenant_id', tenantId)
 
   for (const [stockItemId, qty] of removeMap) {
     await admin.rpc('adjust_inventory_quantity', { p_lot_id: stockItemId, p_delta: -qty })

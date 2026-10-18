@@ -57,6 +57,10 @@ export async function deletePurchaseAction(input: unknown): Promise<ActionResult
 
   if (error) return { success: false, error: 'Failed to delete purchase', code: 'INTERNAL_ERROR' }
 
+  // A legacy single-line purchase is its own invoice; payments applied to it
+  // go back to settling FIFO.
+  await admin.from('ap_payment_allocations').delete().eq('invoice_key', id).eq('tenant_id', tenantId)
+
   // Reverse the inventory increment
   await admin.rpc('adjust_inventory_quantity', { p_lot_id: purchase.stock_item_id, p_delta: -purchase.quantity })
 

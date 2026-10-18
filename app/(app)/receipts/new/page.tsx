@@ -5,7 +5,7 @@ import { listOnlineReceiptAccounts } from '@/lib/receipts/online-accounts'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { loadInvoiceReceivables, openDocs } from '@/lib/receivables/invoice-receivables'
 import { CreateReceiptForm } from './create-receipt-form'
-import type { OpenInvoice } from './invoice-allocations'
+import type { OpenInvoice } from '@/components/invoice-allocations'
 
 export default async function NewReceiptPage() {
   const { tenantId } = await requireAuth()
@@ -69,8 +69,8 @@ export default async function NewReceiptPage() {
   for (const c of receivables) {
     const open = openDocs(c).filter((d) => !d.isOpening)
     if (open.length === 0) continue
-    openInvoicesByCustomer[c.customerId] = open.map((d) => ({
-      key: d.key, serial: d.serial, poNo: d.poNo, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance,
+    openInvoicesByCustomer[c.partyId] = open.map((d) => ({
+      key: d.key, serial: d.serial, ref: d.ref, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance,
     }))
   }
 

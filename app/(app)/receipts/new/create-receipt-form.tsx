@@ -23,7 +23,7 @@ import { FileUploader, type FileUploaderHandle } from '@/components/file-uploade
 import { formatPKR } from '@/lib/utils/currency'
 import { todayPKT } from '@/lib/utils/dates'
 import { Checkbox } from '@/components/ui/checkbox'
-import { InvoiceAllocations, appliedTotal, type OpenInvoice } from './invoice-allocations'
+import { InvoiceAllocations, appliedTotal, type OpenInvoice } from '@/components/invoice-allocations'
 
 type Customer = { id: string; name: string; outstanding: number }
 type Bank      = { id: string; name: string; account_number: string | null }

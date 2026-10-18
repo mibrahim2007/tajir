@@ -11,6 +11,7 @@ import { aggregateMoneyLegs, type TenderType, tenderLineSchema } from '@/lib/con
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import { verifyEndorsable, markEndorsed, releaseEndorsement, endorsementRefsFrom, type EndorsementRef } from '@/lib/pdc/endorsement'
 import type { PdcSource } from '@/lib/pdc/sources'
+import { paymentAllocationSchema, checkPaymentAllocations, savePaymentAllocations } from '@/lib/payables/payment-allocations'
 import type { ActionResult } from '@/lib/types'
 
 
@@ -21,6 +22,8 @@ const schema = z.object({
   date:              documentDateSchema,
   paymentMethodNote: z.string().optional(),
   lines:             z.array(tenderLineSchema).min(1, 'Add at least one tender line'),
+  // Replaces the payment's invoice allocations; [] clears them, omitted keeps them.
+  allocations:       z.array(paymentAllocationSchema).optional(),
 })
 
 export async function editApPaymentAction(input: unknown): Promise<ActionResult<void>> {
@@ -78,6 +81,12 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
   const amount = lines.reduce((s, l) => s + l.amount, 0)
   const pkrEquivalent = amount * rate
 
+  const { allocations } = parsed.data
+  const allocationError = allocations
+    ? await checkPaymentAllocations(admin, tenantId, existing.supplier_id, allocations, pkrEquivalent, id)
+    : null
+  if (allocationError) return { success: false, error: allocationError, code: 'VALIDATION_ERROR' }
+
   const { error } = await admin
     .from('ap_payments')
     .update({ amount, currency_code: currencyCode, pkr_equivalent: pkrEquivalent, date, payment_method_note: paymentMethodNote ?? null, cheque_number: null, bank_id: null })
@@ -108,6 +117,10 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
     if (!wantedKeys.has(refKey(ref))) await releaseEndorsement(tenantId, ref)
   }
 
+  if (allocations && !(await savePaymentAllocations(admin, tenantId, id, existing.supplier_id, allocations))) {
+    return { success: false, error: 'Failed to save invoice allocations', code: 'INTERNAL_ERROR' }
+  }
+
   // Re-post GL. The helper snapshots the previous entry first, so a failed
   // post restores it instead of leaving this document with no ledger entry.
   const moneyLegs = aggregateMoneyLegs(lines.map((l) => ({ transactionType: l.transactionType as TenderType, amount: l.amount, endorsed: !!l.endorsedFromLineId })), rate, 'out')
@@ -120,7 +133,7 @@ export async function editApPaymentAction(input: unknown): Promise<ActionResult<
   })
   if (!posted.ok) return glEditFailed(posted.message)
 
-  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ap_payments', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date } })
+  await createAuditEntry({ tenantId, userId: user.id, action: 'update', entity: 'ap_payments', entityId: id, before: { amount: existing.amount, pkrEquivalent: existing.pkr_equivalent, date: existing.date }, after: { amount, pkrEquivalent, date, allocations } })
 
   return { success: true, data: undefined }
 }

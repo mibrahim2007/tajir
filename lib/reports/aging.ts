@@ -9,8 +9,9 @@
 
 import { createAdminClient } from '@/lib/supabase/admin'
 import { allocateEmployeeLoans, type LoanInput, type RepaymentInput } from '@/lib/loans/allocation'
-import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
-import { loadInvoiceReceivables, openDocs } from '@/lib/receivables/invoice-receivables'
+import { loadInvoiceReceivables } from '@/lib/receivables/invoice-receivables'
+import { loadInvoicePayables } from '@/lib/payables/invoice-payables'
+import { openDocs, type SettledParty } from '@/lib/settlement/invoice-settlement'
 
 export function ageDays(dateStr: string): number {
   const today = new Date()
@@ -83,9 +84,6 @@ export function sumBuckets(rows: AgingBuckets[]): AgingBuckets {
   }), { ...EMPTY })
 }
 
-const sumBy = <T,>(rows: T[], match: (r: T) => boolean, value: (r: T) => number) =>
-  rows.filter(match).reduce((s, r) => s + value(r), 0)
-
 /**
  * What each customer still owes, aged from the sale date.
  *
@@ -97,15 +95,18 @@ const sumBy = <T,>(rows: T[], match: (r: T) => boolean, value: (r: T) => number)
 export async function buildReceivablesAging(tenantId: string): Promise<AgingRow[]> {
   const admin = createAdminClient()
   const customers = await loadInvoiceReceivables(admin, tenantId)
-  const rows: AgingRow[] = []
+  return agedFromSettlement(customers)
+}
 
-  for (const c of customers) {
-    const lines = openDocs(c).map((d) => ({ date: d.date, amount: d.balance }))
+/** Ages parties already settled invoice-wise; only what is still open ages. */
+function agedFromSettlement(parties: SettledParty[]): AgingRow[] {
+  const rows: AgingRow[] = []
+  for (const p of parties) {
+    const lines = openDocs(p).map((d) => ({ date: d.date, amount: d.balance }))
     // Already settled, so no credits to apply again.
     const buckets = bucketParty(lines, 0)
-    if (buckets.total > 0.005) rows.push({ partyId: c.customerId, partyName: c.customerName, ...buckets })
+    if (buckets.total > 0.005) rows.push({ partyId: p.partyId, partyName: p.partyName, ...buckets })
   }
-
   return rows.sort((a, b) => b.total - a.total)
 }
 
@@ -197,58 +198,12 @@ export async function buildEmployeeLoanAging(tenantId: string): Promise<AgingRow
 /**
  * What is still owed to each supplier, aged from the purchase date.
  *
- * A purchase records the advance paid on the invoice itself, so only the
- * unpaid remainder ages.
+ * Settled invoice by invoice (lib/payables/invoice-payables.ts): payments
+ * applied to a bill settle that bill, everything else FIFO — the same numbers
+ * as the Pending Payables (invoice-wise) report. A purchase records the
+ * advance paid on the invoice itself, so only the unpaid remainder ages.
  */
 export async function buildPayablesAging(tenantId: string): Promise<AgingRow[]> {
   const admin = createAdminClient()
-
-  const [
-    { data: rawSuppliers },
-    { data: rawPurchases },
-    { data: rawPayments },
-    { data: rawReturns },
-    { data: rawDebitNotes },
-    { data: rawRefunds },
-    directPayments,
-  ] = await Promise.all([
-    admin.from('suppliers').select('id, name, opening_balance_pkr_equivalent, created_at').eq('tenant_id', tenantId),
-    admin.from('purchase_orders').select('supplier_id, pkr_equivalent, advance_paid, date').eq('tenant_id', tenantId).order('date', { ascending: true }),
-    admin.from('ap_payments').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('purchase_returns').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('debit_notes').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
-    admin.from('supplier_refunds').select('supplier_id, pkr_equivalent').eq('tenant_id', tenantId),
-    fetchDirectPayments(admin, tenantId),
-  ])
-
-  const purchases = rawPurchases ?? []
-  // A customer who paid the supplier for us settles the oldest bills, same as a payment.
-  const directBySupplier = sumBySupplier(directPayments)
-  const rows: AgingRow[] = []
-
-  for (const s of rawSuppliers ?? []) {
-    // Mirror of the receivables side: a refund from the supplier hands back a
-    // credit we were holding against them.
-    const credits =
-      sumBy(rawPayments ?? [], (p) => p.supplier_id === s.id, (p) => p.pkr_equivalent) +
-      (directBySupplier.get(s.id) ?? 0) +
-      sumBy(rawReturns ?? [], (r) => r.supplier_id === s.id, (r) => r.pkr_equivalent) +
-      sumBy(rawDebitNotes ?? [], (n) => n.supplier_id === s.id, (n) => n.pkr_equivalent) -
-      sumBy(rawRefunds ?? [], (r) => r.supplier_id === s.id, (r) => r.pkr_equivalent)
-
-    const lines = [
-      ...(s.opening_balance_pkr_equivalent > 0
-        ? [{ date: s.created_at.split('T')[0], amount: s.opening_balance_pkr_equivalent }]
-        : []),
-      ...purchases
-        .filter((p) => p.supplier_id === s.id)
-        .map((p) => ({ date: p.date, amount: p.pkr_equivalent - p.advance_paid }))
-        .filter((p) => p.amount > 0),
-    ]
-
-    const buckets = bucketParty(lines, credits)
-    if (buckets.total > 0.005) rows.push({ partyId: s.id, partyName: s.name, ...buckets })
-  }
-
-  return rows.sort((a, b) => b.total - a.total)
+  return agedFromSettlement(await loadInvoicePayables(admin, tenantId))
 }

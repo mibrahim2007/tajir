@@ -21,16 +21,18 @@ import { editApPaymentAction } from '@/app/actions/edit-ap-payment'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { formatPKR } from '@/lib/utils/currency'
-import { formatPKTDate, todayPKT } from '@/lib/utils/dates'
+import { todayPKT } from '@/lib/utils/dates'
+import { Checkbox } from '@/components/ui/checkbox'
+import { InvoiceAllocations, appliedTotal, type OpenInvoice } from '@/components/invoice-allocations'
 
 type Supplier = { id: string; name: string; outstanding: number }
-type Purchase = { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number; advancePaid: number }
 type Bank     = { id: string; name: string; account_number: string | null }
 
 type Props = {
   today:               string
   suppliers:           Supplier[]
-  purchasesBySupplier: Record<string, Purchase[]>
+  /** Open purchase invoices per supplier, oldest first — for "pay against invoice". */
+  openInvoicesBySupplier: Record<string, OpenInvoice[]>
   banks:               Bank[]
   nextSerial?:         string | null
   historyBySupplier?:  Record<string, TxnHistoryItem[]>
@@ -44,6 +46,8 @@ type Props = {
     date:              string
     paymentMethodNote: string
     lines:             TenderLine[]
+    /** invoice key → PKR already applied by this payment. */
+    allocations?:      Record<string, number>
   }
 }
 
@@ -64,13 +68,15 @@ type FormValues = z.infer<typeof schema>
 
 const emptyLine: TenderLine = { transactionType: 'cash', chequeNumber: '', chequeDueDate: '', bankId: '', amount: 0 }
 
-export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, nextSerial, historyBySupplier, endorsableCheques = [], mode = 'create', paymentId, initial }: Props) {
+export function PaymentForm({ today, suppliers, openInvoicesBySupplier, banks, nextSerial, historyBySupplier, endorsableCheques = [], mode = 'create', paymentId, initial }: Props) {
   const router = useRouter()
   const isEdit = mode === 'edit'
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const uploaderRef = useRef<FileUploaderHandle>(null)
   const handleEnterToNext = useEnterToNextField()
+  const [allocations, setAllocations] = useState<Record<string, number>>(initial?.allocations ?? {})
+  const [againstInvoice, setAgainstInvoice] = useState(Object.keys(initial?.allocations ?? {}).length > 0)
 
   const [supplierFull, setSupplierFull] = useState<Supplier[]>(suppliers)
   const supplierPickerItems: PickerItem[] = supplierFull.map((s) => ({
@@ -91,17 +97,31 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
   const watchedLines        = form.watch('lines')
 
   const selectedSupplier  = supplierFull.find((s) => s.id === selectedSupplierId)
-  const supplierPurchases = selectedSupplierId ? (purchasesBySupplier[selectedSupplierId] ?? []) : []
+  const openInvoices      = selectedSupplierId ? (openInvoicesBySupplier[selectedSupplierId] ?? []) : []
   const supplierHistory   = selectedSupplierId ? (historyBySupplier?.[selectedSupplierId] ?? []) : []
   const er                = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
   const amountTotal       = (watchedLines ?? []).reduce((s, l) => s + (Number(l.amount) || 0), 0)
   const amountPkr         = amountTotal * er
+  const applied           = againstInvoice ? appliedTotal(allocations) : 0
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
 
   const onSubmit = (values: FormValues) => {
+    const allocationList = againstInvoice
+      ? Object.entries(allocations).filter(([, n]) => n > 0).map(([invoiceKey, amount]) => ({ invoiceKey, amount }))
+      : []
+    if (allocationList.reduce((s, a) => s + a.amount, 0) > amountPkr + 0.01) {
+      setServerError('Applied to invoices is more than the payment amount.')
+      return
+    }
+    const overBalance = allocationList.find((a) => a.amount > (openInvoices.find((i) => i.key === a.invoiceKey)?.balance ?? 0) + 0.01)
+    if (overBalance) {
+      setServerError(`Invoice ${openInvoices.find((i) => i.key === overBalance.invoiceKey)?.serial ?? ''} is applied more than its balance.`)
+      return
+    }
     startTransition(async () => {
       setServerError(null)
       const payload = {
+        allocations: allocationList,
         currencyCode: values.currencyCode,
         exchangeRate: values.exchangeRate,
         date: values.date,
@@ -166,7 +186,7 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
                             <ItemPickerDialog
                               items={supplierPickerItems}
                               value={field.value}
-                              onSelect={field.onChange}
+                              onSelect={(id) => { field.onChange(id); setAllocations({}) }}
                               placeholder="Select supplier…"
                               title="Select Supplier"
                               createLabel="New Supplier"
@@ -214,22 +234,6 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
                         {formatPKR(selectedSupplier.outstanding)}
                       </span>
                     </div>
-                    {supplierPurchases.length > 0 && (
-                      <>
-                        <p className="text-xs text-muted-foreground">Invoices for reference:</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-x-8 gap-y-1">
-                          {supplierPurchases.map((p) => (
-                            <div key={p.id} className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>{formatPKTDate(p.date + 'T00:00:00')} · {p.itemName} × {p.qty}</span>
-                              <span className="tabular-nums">
-                                {formatPKR(p.pkrEquivalent - p.advancePaid)}
-                                {p.advancePaid > 0 && <span className="ml-1 text-green-600">(adv. {formatPKR(p.advancePaid)})</span>}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
                   </div>
                 )}
 
@@ -250,6 +254,34 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
                 </div>
               </CardContent>
             </Card>
+
+            {selectedSupplier && (
+              <Card>
+                <CardHeader className="pb-3 pt-5 px-5">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <Checkbox
+                      checked={againstInvoice}
+                      onCheckedChange={(on) => setAgainstInvoice(on === true)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      <CardTitle className="text-base">Pay against purchase invoice <span className="font-normal text-muted-foreground">(optional)</span></CardTitle>
+                      <span className="block text-xs text-muted-foreground mt-1">
+                        Apply this payment to specific bills. Leave off to settle the oldest bills first.
+                      </span>
+                    </span>
+                  </label>
+                </CardHeader>
+                {againstInvoice && (
+                  <CardContent className="px-5 pb-5">
+                    <InvoiceAllocations
+                      invoices={openInvoices} value={allocations} onChange={setAllocations} receiptPkr={amountPkr}
+                      refLabel="Bill" partyNoun="supplier"
+                    />
+                  </CardContent>
+                )}
+              </Card>
+            )}
           </div>
 
           {/* ── RIGHT COLUMN — transaction history + sticky summary ── */}
@@ -290,6 +322,19 @@ export function PaymentForm({ today, suppliers, purchasesBySupplier, banks, next
                     Rs {fmt(amountPkr)}
                   </span>
                 </div>
+
+                {applied > 0 && (
+                  <div className="space-y-1 text-sm -mt-2 mb-5">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Against invoices</span>
+                      <span className="tabular-nums font-medium">Rs {fmt(applied)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">On account</span>
+                      <span className={`tabular-nums font-medium ${amountPkr - applied < -0.01 ? 'text-destructive' : ''}`}>Rs {fmt(amountPkr - applied)}</span>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Button type="submit" className="w-full min-h-[44px] bg-green-600 hover:bg-green-700 text-white" disabled={isPending}>

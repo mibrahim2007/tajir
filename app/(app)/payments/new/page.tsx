@@ -5,6 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { peekNextDocumentSerial } from '@/lib/serials/next-serial'
 import { listEndorsableCheques } from '@/lib/pdc/endorsement'
 import { CreatePaymentForm } from './create-payment-form'
+import { loadInvoicePayables, openDocs } from '@/lib/payables/invoice-payables'
+import type { OpenInvoice } from '@/components/invoice-allocations'
 import { fetchDirectPayments, sumBySupplier } from '@/lib/ledger/direct-payments'
 
 export default async function NewPaymentPage() {
@@ -12,13 +14,13 @@ export default async function NewPaymentPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawRefunds }, { data: rawLots }, { data: rawBanks }, directPayments] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawPurchases }, { data: rawPayments }, { data: rawReturns }, { data: rawDebitNotes }, { data: rawRefunds }, { data: rawBanks }, directPayments, payables] = await Promise.all([
     admin.from('suppliers')
       .select('id, name, opening_balance_pkr_equivalent')
       .eq('tenant_id', tenantId)
       .order('name'),
     admin.from('purchase_orders')
-      .select('id, supplier_id, date, stock_item_id, quantity, pkr_equivalent, advance_paid')
+      .select('id, supplier_id, date, pkr_equivalent, advance_paid')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false }),
     admin.from('ap_payments')
@@ -33,11 +35,9 @@ export default async function NewPaymentPage() {
     admin.from('supplier_refunds')
       .select('id, supplier_id, pkr_equivalent')
       .eq('tenant_id', tenantId),
-    admin.from('inventory_lots')
-      .select('id, name')
-      .eq('tenant_id', tenantId),
     admin.from('banks').select('id, name, account_number').eq('tenant_id', tenantId).order('name'),
     fetchDirectPayments(admin, tenantId),
+    loadInvoicePayables(admin, tenantId),
   ])
 
   // Cheques received from customers that could be handed on to this supplier
@@ -50,7 +50,6 @@ export default async function NewPaymentPage() {
   const returns = rawReturns ?? []
   const debitNotes = rawDebitNotes ?? []
   const refunds = rawRefunds ?? []
-  const lotMap = new Map((rawLots ?? []).map((l) => [l.id, l.name]))
   const banks = rawBanks ?? []
   const nextSerial = await peekNextDocumentSerial(admin, tenantId, 'ap_payment', today)
 
@@ -72,20 +71,15 @@ export default async function NewPaymentPage() {
     return { id: s.id, name: s.name, outstanding: opening + purchased - paid - paidByCustomers - returned - debited + refunded }
   })
 
-  // Group purchases by supplier (most recent first, last 5 per supplier)
-  const purchasesBySupplier: Record<string, { id: string; date: string; itemName: string; qty: number; pkrEquivalent: number; advancePaid: number }[]> = {}
-  for (const p of purchases) {
-    if (!purchasesBySupplier[p.supplier_id]) purchasesBySupplier[p.supplier_id] = []
-    if (purchasesBySupplier[p.supplier_id].length < 5) {
-      purchasesBySupplier[p.supplier_id].push({
-        id: p.id,
-        date: p.date,
-        itemName: lotMap.get(p.stock_item_id) ?? '—',
-        qty: p.quantity,
-        pkrEquivalent: p.pkr_equivalent,
-        advancePaid: p.advance_paid,
-      })
-    }
+  // Open purchase invoices per supplier, oldest first, for "pay against
+  // invoice". The opening balance has no invoice to name, so it is left out.
+  const openInvoicesBySupplier: Record<string, OpenInvoice[]> = {}
+  for (const p of payables) {
+    const open = openDocs(p).filter((d) => !d.isOpening)
+    if (open.length === 0) continue
+    openInvoicesBySupplier[p.partyId] = open.map((d) => ({
+      key: d.key, serial: d.serial, ref: d.ref, date: d.date, dueDate: d.dueDate, amount: d.amount, balance: d.balance,
+    }))
   }
 
   // Combined transaction history per supplier (bills, payments, returns),
@@ -111,7 +105,7 @@ export default async function NewPaymentPage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Payment</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a payment made to a supplier.</p>
       </div>
-      <CreatePaymentForm today={today} suppliers={supplierList} purchasesBySupplier={purchasesBySupplier} banks={banks} nextSerial={nextSerial} historyBySupplier={historyBySupplier} endorsableCheques={endorsableCheques} />
+      <CreatePaymentForm today={today} suppliers={supplierList} openInvoicesBySupplier={openInvoicesBySupplier} banks={banks} nextSerial={nextSerial} historyBySupplier={historyBySupplier} endorsableCheques={endorsableCheques} />
     </div>
   )
 }
