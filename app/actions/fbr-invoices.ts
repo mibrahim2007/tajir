@@ -9,6 +9,7 @@ import { documentDateSchema } from '@/lib/validation/document-date'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { lineTotals, invoiceTotals } from '@/lib/fbr/calc'
 import { scenarioById } from '@/lib/fbr/scenarios'
+import { normalizeNtnCnic, isNtnOrCnic } from '@/lib/fbr/ntn'
 import { buildFbrPayload } from '@/lib/fbr/payload'
 import { fbrCall, loadToken, interpretResponse, FBR_ENDPOINTS, type FbrEnv } from '@/lib/fbr/client'
 import type { ActionResult } from '@/lib/types'
@@ -38,7 +39,7 @@ const invoiceSchema = z.object({
   invoiceType:           z.enum(['Sale Invoice', 'Debit Note']),
   invoiceDate:           documentDateSchema,
   buyerRegistrationType: z.enum(['Registered', 'Unregistered']),
-  buyerNtnCnic:          z.string().trim().transform((s) => s.replace(/[-\s]/g, '')).default(''),
+  buyerNtnCnic:          z.string().default('').transform(normalizeNtnCnic),
   buyerBusinessName:     z.string().trim().min(2, 'Buyer name is required').max(200),
   buyerProvince:         z.string().trim().min(2, 'Buyer province is required'),
   buyerAddress:          z.string().trim().min(3, 'Buyer address is required').max(300),
@@ -48,10 +49,10 @@ const invoiceSchema = z.object({
   lines:                 z.array(lineSchema).min(1, 'Add at least one line').max(200),
 }).superRefine((v, ctx) => {
   // Spec §4.1: buyer NTN/CNIC is required for Registered, optional for Unregistered.
-  if (v.buyerRegistrationType === 'Registered' && !/^(\d{7}|\d{13})$/.test(v.buyerNtnCnic)) {
+  if (v.buyerRegistrationType === 'Registered' && !isNtnOrCnic(v.buyerNtnCnic)) {
     ctx.addIssue({ code: 'custom', path: ['buyerNtnCnic'], message: 'Registered buyer needs NTN (7 digits) or CNIC (13 digits)' })
   }
-  if (v.buyerRegistrationType === 'Unregistered' && v.buyerNtnCnic && !/^(\d{7}|\d{13})$/.test(v.buyerNtnCnic)) {
+  if (v.buyerRegistrationType === 'Unregistered' && v.buyerNtnCnic && !isNtnOrCnic(v.buyerNtnCnic)) {
     ctx.addIssue({ code: 'custom', path: ['buyerNtnCnic'], message: 'Buyer NTN must be 7 digits or CNIC 13 digits (or leave it blank)' })
   }
   // Debit note must cite the FBR number of the original invoice: 22 chars (NTN) / 28 (CNIC).
@@ -279,8 +280,8 @@ export async function checkBuyerRegistrationAction(ntnCnic: string): Promise<Act
   const c = await context()
   if (c.error) return c.error
   const { ctx: { tenantId }, admin, settings } = c
-  const regNo = ntnCnic.replace(/[-\s]/g, '')
-  if (!/^(\d{7}|\d{13})$/.test(regNo)) return { success: false, error: 'Enter a 7-digit NTN or 13-digit CNIC', code: 'VALIDATION_ERROR' }
+  const regNo = normalizeNtnCnic(ntnCnic)
+  if (!isNtnOrCnic(regNo)) return { success: false, error: 'Enter a 7-digit NTN or 13-digit CNIC', code: 'VALIDATION_ERROR' }
   const env = settings.environment as FbrEnv
   const token = await loadToken(admin, tenantId, env).catch(() => null)
   if (!token) return { success: false, error: 'Save your FBR token first', code: 'NO_TOKEN' }

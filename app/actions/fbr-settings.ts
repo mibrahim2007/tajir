@@ -9,11 +9,12 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { encryptToken, tokenKeyConfigured } from '@/lib/fbr/crypto'
 import { fbrCall, loadToken, FBR_ENDPOINTS } from '@/lib/fbr/client'
 import { BUSINESS_ACTIVITIES, SECTORS } from '@/lib/fbr/scenarios'
+import { normalizeNtnCnic, isNtnOrCnic } from '@/lib/fbr/ntn'
 import { ALL_MODULES, parseTenantFeatures } from '@/lib/modules'
 import type { ActionResult } from '@/lib/types'
 
-const ntnCnic = z.string().trim().transform((s) => s.replace(/[-\s]/g, ''))
-  .refine((s) => /^(\d{7}|\d{13})$/.test(s), 'NTN must be 7 digits or CNIC 13 digits')
+const ntnCnic = z.string().transform(normalizeNtnCnic)
+  .refine(isNtnOrCnic, 'NTN must be 7 digits (e.g. 1234567 or 1234567-8) or CNIC 13 digits')
 
 const settingsSchema = z.object({
   enabled:            z.boolean(),
