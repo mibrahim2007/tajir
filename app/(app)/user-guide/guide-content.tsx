@@ -330,17 +330,19 @@ export function GuideContent() {
           <H2 n="5">Inventory Management</H2>
           <H3>Item Types</H3>
           <P>Item types are categories for your stock items. Add them at <strong>Setup → Item Types</strong>, from the Setup Wizard, or with <strong>+ Add item type…</strong> in an item&apos;s Item Type list. Examples: Yarn, Grey Fabric, Chemicals.</P>
-          <P>Every item type has a <strong>formula</strong> that decides how invoice lines for its items are measured and billed:</P>
+          <P>Every stock item is given one of a type&apos;s <strong>sub types</strong>; the item type is filled in from it. A type that still has items can&apos;t be deleted.</P>
+          <H3>Rate Basis</H3>
+          <P>Each line on a purchase, sale, sale return, purchase return and opening balance has a <strong>Rate Basis</strong> that decides how it is measured and billed:</P>
           <Ul>
-            <Li><strong>Count item</strong> — Qty × Rate. The default, for anything sold by number.</Li>
-            <Li><strong>Yarn</strong> — Qty × Rate × Multiply By, with the Yarn Type and Yarn Weight fields.</Li>
-            <Li><strong>Weighed, rate per lb</strong> — enter Nos Carton and Weight (kg); stock is cartons × kg and the amount is billed on lbs.</Li>
-            <Li><strong>Weighed, rate per kg</strong> — Nos Carton × Weight (kg) × Rate.</Li>
-            <Li><strong>Packed, rate per pack</strong> — number of packs (bags) × Rate; weight is optional.</Li>
+            <Li><strong>Qty × Rate</strong> — anything sold by count.</Li>
+            <Li><strong>Yarn (× Multiply)</strong> — Qty × Rate × Multiply By, with the Yarn Type and Yarn Weight fields.</Li>
+            <Li><strong>Per lb</strong> — enter Nos Carton and Weight (kg); stock is cartons × kg and the amount is billed on lbs.</Li>
+            <Li><strong>Per kg</strong> — Nos Carton × Weight (kg) × Rate.</Li>
+            <Li><strong>Per bag / pack</strong> — number of bags × Rate; weight is optional.</Li>
           </Ul>
-          <P>A type can also set its stock unit, pack unit and a standard weight per pack, which is pre-filled on invoice lines. Sub-types follow their parent&apos;s formula. Once items of a type have invoices or returns, its formula can no longer be changed, and a type that still has items can&apos;t be deleted.</P>
+          <P>A new line starts on the basis last used for that item, and can be changed per line, e.g. one supplier bills per lb, another per bag. Each line keeps its basis, so old invoices calculate the same way when edited.</P>
           <H3>Grades and Lots</H3>
-          <P>Tick <strong>Track grade</strong> and/or <strong>Track lot number</strong> on an item type to follow its stock grade by grade and lot by lot. Manage the grade list (AA-Even, A-Uneven…) at <strong>Setup → Grades</strong>, or add one with <strong>+ Add grade…</strong> right on an invoice line.</P>
+          <P>Every line whose Rate Basis is not Qty × Rate needs a <strong>Grade</strong> and a <strong>Lot No.</strong>, so stock is followed grade by grade and lot by lot; count items never ask for them. Manage the grade list (AA-Even, A-Uneven…) at <strong>Setup → Grades</strong>, or add one with <strong>+ Add grade…</strong> right on an invoice line.</P>
           <Ul>
             <Li><strong>Purchase</strong> — each line takes a grade, a lot number and its own godown. A lot left blank is numbered from the invoice, e.g. <em>PI-2026-0012/2</em>.</Li>
             <Li><strong>Sale</strong> — pick the grade and lot from what is in stock at the dispatch location; the list shows the kg and cartons on hand. Selling more than a lot holds is refused unless the Owner confirms the oversell.</Li>
@@ -350,7 +352,7 @@ export function GuideContent() {
           <H3>Cost of Goods Sold</H3>
           <P>Every sale line is costed when it is saved, and cost of goods sold and stock are posted at that cost, so the books show your real gross profit.</P>
           <Ul>
-            <Li><strong>Items that track lot or grade</strong> are costed from what that lot (or grade) cost: its purchases and opening stock, less purchase returns, in PKR per stock unit (per kg for weighed yarn).</Li>
+            <Li><strong>Lines with a grade or lot</strong> are costed from what that lot (or grade) cost: its purchases and opening stock, less purchase returns, in PKR per stock unit (per kg for weighed yarn).</Li>
             <Li><strong>Other items</strong> use the item&apos;s average cost: opening stock plus purchases, less purchase returns, up to the sale date.</Li>
             <Li><strong>Sale returns</strong> put stock back at the cost the goods went out at.</Li>
           </Ul>
@@ -364,7 +366,7 @@ export function GuideContent() {
             <Li><strong>Code</strong> — your internal product code (optional).</Li>
             <Li><strong>Unit</strong> — KG, Cone, Than, Meter, Piece… The list suggested depends on the item&apos;s type.</Li>
             <Li><strong>Count</strong> — yarn count or specification (optional).</Li>
-            <Li><strong>Sub Type</strong> — required, picked from the sub types of your item types (e.g. Polyester → 150/144), or added on the spot with <strong>+ Add sub type…</strong>. The <strong>Item Type</strong> fills in automatically from the sub type, and its formula decides how the item is billed on invoices.</Li>
+            <Li><strong>Sub Type</strong> — required, picked from the sub types of your item types (e.g. Polyester → 150/144), or added on the spot with <strong>+ Add sub type…</strong>. The <strong>Item Type</strong> fills in automatically from the sub type.</Li>
             <Li><strong>Nature</strong> — <strong>Inventory</strong> for goods that are counted and costed, or <strong>Service</strong> for things like freight or labour. A service item has no stock, so it never blocks a sale and carries no cost of sales.</Li>
           </Ul>
           <P>Add items at <strong>Stock → Inventory → Add New Item</strong>, or several at once under one category with <strong>Create items by type</strong>. Edit or deactivate from the item list.</P>
@@ -604,7 +606,7 @@ export function GuideContent() {
           </Ul>
           <Note>Enter a party&apos;s opening balance <strong>net of</strong> any post-dated cheque you load for them, or the same money is counted twice.</Note>
           <H3>Item Types</H3>
-          <P>Product categories used to group stock items. Each type&apos;s formula decides how its items are billed. Add, rename, or remove at <strong>Setup → Item Types</strong>.</P>
+          <P>Product categories used to group stock items, each with sub types. Add, rename, or remove at <strong>Setup → Item Types</strong>.</P>
           <H3>Team Management</H3>
           <P>Invite team members at <strong>Setup → Team → Invite Member</strong>.</P>
           <Ul>

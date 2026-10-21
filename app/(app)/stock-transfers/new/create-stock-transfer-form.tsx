@@ -52,7 +52,7 @@ type LocationStock = { stockItemId: string; locationId: string; quantity: number
 type Props = {
   today: string
   locations: { id: string; name: string }[]
-  /** Each item's formula profile comes from its item type. */
+  /** Each item's defaults (last-used rate basis, units). */
   items: { id: string; name: string; count: string; profile?: ItemProfile }[]
   locationStock: LocationStock[]
   /** Grade / lot positions per item and location (stock_position). */
@@ -82,7 +82,15 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
   const fromName = locations.find(l => l.id === watchedFrom)?.name
   const toName   = locations.find(l => l.id === watchedTo)?.name
   const itemName = items.find(i => i.id === watchedItem)?.name
-  const profile  = items.find(i => i.id === watchedItem)?.profile ?? STANDARD_PROFILE
+  const itemProfile = items.find(i => i.id === watchedItem)?.profile ?? STANDARD_PROFILE
+  // Grade / lot are asked for when the item's default basis tracks them, or when
+  // its stock at the from-location is held by grade / lot (same rule as the server).
+  const held = positions.filter((p) => p.stockItemId === watchedItem && p.locationId === watchedFrom && p.quantity > 0)
+  const profile  = {
+    ...itemProfile,
+    trackGrade: itemProfile.trackGrade || held.some((p) => p.gradeId),
+    trackLot:   itemProfile.trackLot || held.some((p) => p.lotNo),
+  }
   const carton   = usesCartons(profile.formula)
   const tracked  = profile.trackGrade || profile.trackLot
   const watchedGrade  = form.watch('gradeId')

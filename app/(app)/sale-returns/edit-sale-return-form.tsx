@@ -16,8 +16,9 @@ import { editSaleReturnAction } from '@/app/actions/edit-sale-return'
 import { YARN_TYPES, normalizeMultiplyBy } from '@/lib/yarn'
 import { GradeSelect } from '@/components/grade-select'
 import type { GradeOption } from '@/app/actions/grades'
-import { usesCartons, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
-import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { usesCartons, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount, normalizeFormula, ITEM_FORMULAS } from '@/lib/item-formula'
+import { STANDARD_PROFILE, profileAt, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { RateBasisSelect } from '@/components/rate-basis-select'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 import { todayPKT } from '@/lib/utils/dates'
 
@@ -40,6 +41,8 @@ const schema = z.object({
   // Grade / lot, used only when the item type tracks them.
   gradeId:      z.string().nullable().optional(),
   lotNo:        z.string().nullable().optional(),
+  // How the line is measured and billed (0074).
+  rateBasis:    z.enum(ITEM_FORMULAS).default('standard'),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -62,6 +65,7 @@ type SaleReturn = {
   weightPerCarton: number | null
   gradeId: string | null
   lotNo: string | null
+  rateBasis: string | null
   /** Booked against an invoice line: grade / lot come from that line. */
   linked: boolean
 }
@@ -101,12 +105,16 @@ export function EditSaleReturnForm({ ret, customers, lots, locations, grades: in
       weightPerCarton: ret.weightPerCarton ?? NaN,
       gradeId:      ret.gradeId,
       lotNo:        ret.lotNo,
+      rateBasis:    normalizeFormula(ret.rateBasis),
     },
   })
 
   const [grades, setGrades] = useState<GradeOption[]>(initialGrades)
   // The item type's formula decides the carton fields and the billed quantity.
-  const profile = lots.find((l) => l.id === form.watch('stockItemId'))?.profile ?? STANDARD_PROFILE
+  // The line's own rate basis decides the carton fields, billed quantity and
+  // grade / lot rules (0074); the item only supplies units and defaults.
+  const itemProfileOf = (id?: string) => lots.find((l) => l.id === id)?.profile ?? STANDARD_PROFILE
+  const profile = profileAt(itemProfileOf(form.watch('stockItemId')), normalizeFormula(form.watch('rateBasis')))
   const isYarn = profile.formula === 'yarn'
   const isCarton = usesCartons(profile.formula)
   const watchedNos = form.watch('nosCarton')
@@ -119,7 +127,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations, grades: in
     if (Number.isFinite(Number(form.getValues('weightPerCarton')))) return
     form.setValue('weightPerCarton', profile.stdPackWeight, { shouldDirty: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.watch('stockItemId')])
+  }, [form.watch('stockItemId'), form.watch('rateBasis')])
   // For a carton item, Quantity is derived (Nos Carton × Weight; per pack: packs).
   useEffect(() => {
     const q = cartonStockQty(profile.formula, { nosCarton: watchedNos, weightPerCarton: watchedWt })
@@ -157,6 +165,7 @@ export function EditSaleReturnForm({ ret, customers, lots, locations, grades: in
         weightPerCarton: Number.isFinite(values.weightPerCarton) ? values.weightPerCarton : undefined,
         gradeId:         values.gradeId || undefined,
         lotNo:           values.lotNo?.trim() || undefined,
+        rateBasis:       values.rateBasis,
       })
       if (!result.success) { setError(result.error); return }
       // Back to the list, which re-renders with the change. No
@@ -191,7 +200,13 @@ export function EditSaleReturnForm({ ret, customers, lots, locations, grades: in
               <FormItem className="md:col-span-6">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <select {...form.register('stockItemId')} className={SELECT_CLS}>
+                  <select
+                    {...form.register('stockItemId', {
+                      // A different item starts on the basis last used for it.
+                      onChange: (e) => form.setValue('rateBasis', itemProfileOf(e.target.value).formula, { shouldDirty: true }),
+                    })}
+                    className={SELECT_CLS}
+                  >
                     {lots.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
                   </select>
                 </FormControl>
@@ -201,6 +216,14 @@ export function EditSaleReturnForm({ ret, customers, lots, locations, grades: in
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            <FormItem className="md:col-span-3">
+              <FormLabel>Rate Basis</FormLabel>
+              <RateBasisSelect
+                className="min-h-[44px] w-full"
+                value={form.watch('rateBasis')}
+                onChange={(b) => form.setValue('rateBasis', b, { shouldDirty: true })}
+              />
+            </FormItem>
             {isCarton && (
               <>
                 <FormItem className="md:col-span-3">

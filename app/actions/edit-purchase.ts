@@ -6,8 +6,7 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
-import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { ITEM_FORMULAS, normalizeFormula, usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -21,6 +20,8 @@ const schema = z.object({
   advancePaid:  z.coerce.number().min(0).default(0),
   date:         documentDateSchema,
   locationId:   z.string().uuid().optional().or(z.literal('')),
+  // The line's rate basis (0074); defaults to what the row was saved with.
+  rateBasis:       z.enum(ITEM_FORMULAS).optional().nullable(),
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
 })
@@ -40,9 +41,11 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
 
   const admin = createAdminClient()
 
-  // The item type's formula decides the billed quantity (lib/item-formula.ts);
+  // The line's rate basis decides the billed quantity (lib/item-formula.ts);
   // carton lines derive stock from cartons × weight (per pack: packs).
-  const formula = profileOf(await loadProfilesFor(admin, tenantId, [stockItemId]), stockItemId).formula
+  const { data: savedRow } = await admin
+    .from('purchase_orders').select('rate_basis').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+  const formula = normalizeFormula(parsed.data.rateBasis ?? savedRow?.rate_basis)
   const isCarton = usesCartons(formula)
   const quantity = cartonStockQty(formula, { nosCarton, weightPerCarton }) ?? parsed.data.quantity
   if (!(quantity > 0)) return { success: false, error: 'Enter Nos Carton and Weight', code: 'VALIDATION_ERROR' }
@@ -95,6 +98,7 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
       nos_carton:        isCarton ? (nosCarton ?? null) : null,
       weight_per_carton: isCarton ? (weightPerCarton ?? null) : null,
       qty_lbs:           qtyLbs,
+      rate_basis:        formula,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

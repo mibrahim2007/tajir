@@ -16,6 +16,8 @@ export type OpeningStockLine = {
   lotNo?: string | null
   nosCarton?: number | null
   weightPerCarton?: number | null
+  /** How the line was measured (0074): 'standard', 'per_lb', … */
+  rateBasis?: string | null
 }
 
 /** Identity of an opening row: location × grade × lot. */

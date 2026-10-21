@@ -11,7 +11,7 @@
 
 import {
   billingQty, cartonStockQty, lineGrossAmount, lineQtyLbs, normalizeFormula,
-  suggestFormula, usesCartons, needsWeight,
+  suggestFormula, usesCartons, needsWeight, tracksGradeLot,
 } from '@/lib/item-formula'
 import { LBS_PER_KG } from '@/lib/polyester'
 import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/line-tracking'
@@ -85,6 +85,10 @@ check('suggest: polyester → per_lb', suggestFormula('Polyester 150/144') === '
 check('suggest: misspelt ployester → per_lb', suggestFormula('150D Ployester') === 'per_lb')
 check('suggest: Yarn → yarn', suggestFormula(' yarn ') === 'yarn')
 check('suggest: anything else → standard', suggestFormula('Electric') === 'standard')
+
+// ── rate basis → grade / lot (0074) ─────────────────────────────────────────
+check('Qty × Rate lines skip grade / lot', !tracksGradeLot('standard'))
+check('weighed / packed / yarn lines need grade / lot', tracksGradeLot('per_lb') && tracksGradeLot('per_kg') && tracksGradeLot('per_pack') && tracksGradeLot('yarn'))
 
 // ── grade / lot rules (0072) ───────────────────────────────────────────────
 {

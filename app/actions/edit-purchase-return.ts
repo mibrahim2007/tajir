@@ -7,6 +7,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
+import { normalizeFormula, tracksGradeLot } from '@/lib/item-formula'
 import { measureReturnLine, returnLineFields, checkPositionStock } from '@/lib/inventory/return-line'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import {
@@ -50,7 +51,7 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
 
   const { data: existing } = await admin
     .from('purchase_returns')
-    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, supplier_id, currency_code, serial_number, purchase_order_id, location_id, grade_id, lot_no')
+    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, supplier_id, currency_code, serial_number, purchase_order_id, location_id, grade_id, lot_no, rate_basis')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
@@ -61,13 +62,13 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
   const { data: originalLine } = existing.purchase_order_id
     ? await admin
         .from('purchase_orders')
-        .select('grade_id, lot_no, weight_per_carton')
+        .select('grade_id, lot_no, weight_per_carton, rate_basis')
         .eq('id', existing.purchase_order_id)
         .eq('tenant_id', tenantId)
         .maybeSingle()
     : { data: null }
 
-  // Measured by the item type's formula: carton lines derive quantity from
+  // Measured by the line's rate basis: carton lines derive quantity from
   // Nos Carton × Weight, yarn lines apply Multiply By.
   const measured = await measureReturnLine(admin, tenantId, {
     stockItemId,
@@ -79,6 +80,7 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
     weightPerCarton: parsed.data.weightPerCarton,
     gradeId:         parsed.data.gradeId,
     lotNo:           parsed.data.lotNo,
+    rateBasis:       parsed.data.rateBasis,
     original:        originalLine,
   })
   if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
@@ -87,7 +89,9 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
   // The row as saved and as edited, as grade / lot stock positions.
   const oldPosition = {
     stockItemId: existing.stock_item_id, locationId: existing.location_id, gradeId: existing.grade_id,
-    lotNo: existing.lot_no, quantity: existing.quantity, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
+    lotNo: existing.lot_no, quantity: existing.quantity,
+    // The saved row is checked at the basis it was saved with.
+    trackGrade: tracksGradeLot(normalizeFormula(existing.rate_basis)), trackLot: tracksGradeLot(normalizeFormula(existing.rate_basis)),
   }
   const newPosition = {
     stockItemId, locationId: locationId || null, gradeId: measured.line.gradeId,
@@ -140,6 +144,7 @@ export async function editPurchaseReturnAction(input: unknown): Promise<ActionRe
       qty_lbs:           measured.line.qtyLbs,
       grade_id:          measured.line.gradeId,
       lot_no:            measured.line.lotNo,
+      rate_basis:        measured.line.rateBasis,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

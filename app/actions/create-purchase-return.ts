@@ -63,13 +63,13 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
   const { data: originalLine } = purchaseOrderId
     ? await admin
         .from('purchase_orders')
-        .select('grade_id, lot_no, weight_per_carton')
+        .select('grade_id, lot_no, weight_per_carton, rate_basis')
         .eq('id', purchaseOrderId)
         .eq('tenant_id', tenantId)
         .maybeSingle()
     : { data: null }
 
-  // Measured by the item type's formula: carton lines derive quantity from
+  // Measured by the line's rate basis: carton lines derive quantity from
   // Nos Carton × Weight, yarn lines apply Multiply By.
   const measured = await measureReturnLine(admin, tenantId, {
     stockItemId,
@@ -81,6 +81,7 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     weightPerCarton: parsed.data.weightPerCarton,
     gradeId:         parsed.data.gradeId,
     lotNo:           parsed.data.lotNo,
+    rateBasis:       parsed.data.rateBasis,
     original:        originalLine,
   })
   if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
@@ -186,6 +187,7 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
       qty_lbs:           measured.line.qtyLbs,
       grade_id:          measured.line.gradeId,
       lot_no:            measured.line.lotNo,
+      rate_basis:        measured.line.rateBasis,
     })
     .select('id')
     .single()

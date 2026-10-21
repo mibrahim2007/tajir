@@ -1,9 +1,7 @@
-// Item-type formulas, shared by the item-type screens, trading forms, server
-// actions and prints.
-//
-// Every stock item has an Item Type, and the type's `formula` decides how a
-// trading line is measured and billed (migration 0071). This replaced the old
-// name rules ("Yarn" → yarn fields, "...polyester..." → cartons / QTY LBS).
+// Rate basis of a stock line, shared by the trading forms, server actions and
+// prints. Each purchase / sale / return / opening-stock line carries its own
+// `rate_basis` (migration 0074); the item type's stored formula is only the
+// default for an item that has never been traded.
 //
 //   standard  amount = qty × rate
 //   yarn      amount = qty × rate × multiply_by, plus the yarn fields
@@ -22,6 +20,21 @@ export const FORMULA_LABELS: Record<ItemFormula, string> = {
   per_lb:   'Weighed, rate per lb — Cartons × kg → lbs × Rate',
   per_kg:   'Weighed, rate per kg — Cartons × kg × Rate',
   per_pack: 'Packed, rate per pack — Packs × Rate',
+}
+
+// Labels for the Rate Basis list on a line.
+export const RATE_BASIS_LABELS: Record<ItemFormula, string> = {
+  standard: 'Qty × Rate',
+  yarn:     'Yarn (× Multiply)',
+  per_lb:   'Per lb',
+  per_kg:   'Per kg',
+  per_pack: 'Per bag / pack',
+}
+
+// Grade and lot are required on weighed / packed / yarn lines; a plain
+// Qty × Rate line (count items) never asks for them.
+export function tracksGradeLot(basis?: ItemFormula | null): boolean {
+  return !!basis && basis !== 'standard'
 }
 
 // Short label for tables and summaries.

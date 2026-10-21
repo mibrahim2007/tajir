@@ -9,8 +9,8 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
 import { normalizeMultiplyBy } from '@/lib/yarn'
-import { usesYarnFields, usesCartons, needsWeight, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
-import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { ITEM_FORMULAS, usesYarnFields, usesCartons, needsWeight, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, lineProfileOf } from '@/lib/inventory/item-profiles'
 import { resolveLineTracking } from '@/lib/inventory/line-tracking'
 import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
@@ -33,6 +33,9 @@ const lineSchema = z.object({
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
   // Carton line fields, used only when the item type's formula is per lb / per
   // kg / per pack (lib/item-formula.ts); they derive stock and the billed qty.
+  // How this line is measured and billed (0074); defaults to the item's last
+  // used basis when not sent.
+  rateBasis:       z.enum(ITEM_FORMULAS).optional().nullable(),
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
   // Grade / lot (0072): required when the item type tracks them; a tracked lot
@@ -98,7 +101,7 @@ export async function createPurchaseInvoiceAction(
   // Grade / lot rules per line (item type flags). Lot numbers are generated
   // after the serial is known; this pass only catches missing grades.
   for (let i = 0; i < lines.length; i++) {
-    const t = resolveLineTracking(profileOf(profiles, lines[i].stockItemId), lines[i], {
+    const t = resolveLineTracking(lineProfileOf(profiles, lines[i]), lines[i], {
       lineLabel: `Line ${i + 1}`, generateLot: { serialNumber: null, lineIndex: i },
     })
     if (!t.ok) return { success: false, error: t.error, code: 'VALIDATION_ERROR' }
@@ -116,8 +119,8 @@ export async function createPurchaseInvoiceAction(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const formula = profileOf(profiles, line.stockItemId).formula
-    const tracking = resolveLineTracking(profileOf(profiles, line.stockItemId), line, {
+    const formula = lineProfileOf(profiles, line).formula
+    const tracking = resolveLineTracking(lineProfileOf(profiles, line), line, {
       lineLabel: `Line ${i + 1}`, generateLot: { serialNumber, lineIndex: i },
     })
     const gradeId = tracking.ok ? tracking.gradeId : null
@@ -152,6 +155,7 @@ export async function createPurchaseInvoiceAction(
       yarn_type:      isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:    isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:    multiplyBy,
+      rate_basis:     formula,
       nos_carton:        isCarton ? (line.nosCarton ?? null) : null,
       weight_per_carton: isCarton ? (line.weightPerCarton ?? null) : null,
       qty_lbs:           qtyLbs,

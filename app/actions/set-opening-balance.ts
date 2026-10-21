@@ -6,9 +6,9 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { planOpeningStock, openingLineKey, type OpeningStockLine } from '@/lib/inventory/opening-stock'
-import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { loadProfilesFor, profileOf, profileAt } from '@/lib/inventory/item-profiles'
 import { resolveLineTracking } from '@/lib/inventory/line-tracking'
-import { cartonStockQty, usesCartons } from '@/lib/item-formula'
+import { cartonStockQty, usesCartons, ITEM_FORMULAS } from '@/lib/item-formula'
 import type { ActionResult } from '@/lib/types'
 
 const optionalNumber = z.preprocess(
@@ -21,10 +21,12 @@ const stockLineSchema = z.object({
   quantity:   z.coerce.number().min(0, 'Quantity must be 0 or greater'),
   // Cost per STOCK unit (per kg for weighed yarn, per piece / bag otherwise).
   rate:       z.coerce.number().min(0, 'Rate must be 0 or greater').default(0),
-  // Grade / lot, required when the item's type tracks them (0072).
+  // How this line is measured (0074); defaults to the item's last-used basis.
+  rateBasis:  z.enum(ITEM_FORMULAS).optional(),
+  // Grade / lot, required when the line's basis is not Qty × Rate.
   gradeId:    z.string().uuid().nullable().optional(),
   lotNo:      z.string().trim().max(60).nullable().optional(),
-  // Carton formulas: the quantity is derived from these.
+  // Carton bases (per lb / kg / pack): the quantity is derived from these.
   nosCarton:       optionalNumber,
   weightPerCarton: optionalNumber,
 })
@@ -116,16 +118,17 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
     lotNo:      r.lot_no,
   }))
 
-  // The item type's formula derives carton quantities; its flags require a
-  // grade / lot. A tracked lot left blank gets "OB/<line>".
-  const profile = profileOf(await loadProfilesFor(admin, tenantId, [lotId]), lotId)
-  const carton = usesCartons(profile.formula)
+  // Each line's rate basis derives carton quantities and requires a grade /
+  // lot when it isn't Qty × Rate. A tracked lot left blank gets "OB/<line>".
+  const itemProfile = profileOf(await loadProfilesFor(admin, tenantId, [lotId]), lotId)
   const prepared: OpeningStockLine[] = []
   for (let i = 0; i < submitted.length; i++) {
     const l = submitted[i]
+    const profile = profileAt(itemProfile, l.rateBasis ?? itemProfile.formula)
+    const carton = usesCartons(profile.formula)
     const quantity = carton ? (cartonStockQty(profile.formula, l) ?? 0) : l.quantity
     // Blank rows are dropped by planOpeningStock; don't demand a grade for them.
-    if (!(quantity > 0) && !(l.rate > 0)) { prepared.push({ ...l, quantity, gradeId: null, lotNo: null }); continue }
+    if (!(quantity > 0) && !(l.rate > 0)) { prepared.push({ ...l, quantity, gradeId: null, lotNo: null, rateBasis: profile.formula }); continue }
     const tracked = resolveLineTracking(profile, l, {
       lineLabel: `Line ${i + 1}`,
       generateLot: { serialNumber: 'OB', lineIndex: i },
@@ -139,6 +142,7 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
       lotNo:           tracked.lotNo,
       nosCarton:       carton ? (l.nosCarton ?? null) : null,
       weightPerCarton: carton ? (l.weightPerCarton ?? null) : null,
+      rateBasis:       profile.formula,
     })
   }
 
@@ -173,6 +177,7 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
       rate:              l.rate,
       nos_carton:        l.nosCarton ?? null,
       weight_per_carton: l.weightPerCarton ?? null,
+      rate_basis:        l.rateBasis ?? 'standard',
       updated_at:        now,
     }
     if (match) {
@@ -200,6 +205,7 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
         rate:              l.rate,
         nos_carton:        l.nosCarton ?? null,
         weight_per_carton: l.weightPerCarton ?? null,
+        rate_basis:        l.rateBasis ?? 'standard',
         updated_at:        now,
       })))
       .select('id')

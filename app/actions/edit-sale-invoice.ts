@@ -9,8 +9,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
 import { normalizeMultiplyBy } from '@/lib/yarn'
-import { usesYarnFields, usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
-import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { ITEM_FORMULAS, usesYarnFields, usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, lineProfileOf } from '@/lib/inventory/item-profiles'
 import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/line-tracking'
 import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
@@ -33,6 +33,9 @@ const lineSchema = z.object({
   yarnType:    z.string().optional().nullable(),
   yarnWeight:  z.coerce.number().min(0).optional().nullable(),
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
+  // How this line is measured and billed (0074); defaults to the item's last
+  // used basis when not sent.
+  rateBasis:       z.enum(ITEM_FORMULAS).optional().nullable(),
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
   // Grade / lot (0072): required when the item type tracks them, and picked
@@ -95,7 +98,7 @@ export async function editSaleInvoiceAction(
   const profiles = await loadProfilesFor(admin, tenantId, parsed.data.lines.map((l) => l.stockItemId))
   const lines = parsed.data.lines.map((l) => ({
     ...l,
-    quantity: cartonStockQty(profileOf(profiles, l.stockItemId).formula, l) ?? l.quantity,
+    quantity: cartonStockQty(lineProfileOf(profiles, l).formula, l) ?? l.quantity,
   }))
   const badLine = lines.findIndex((l) => !(l.quantity > 0))
   if (badLine >= 0) return { success: false, error: `Line ${badLine + 1}: enter Nos Carton and Weight`, code: 'VALIDATION_ERROR' }
@@ -103,7 +106,7 @@ export async function editSaleInvoiceAction(
   // Existing lines for this invoice — the basis for reversing inventory & GL.
   const { data: existingLines } = await admin
     .from('sales_orders')
-    .select('id, serial_number, stock_item_id, quantity, location_id, grade_id, lot_no')
+    .select('id, serial_number, stock_item_id, quantity, location_id, grade_id, lot_no, rate_basis')
     .eq('invoice_id', invoiceId)
     .eq('tenant_id', tenantId)
 
@@ -171,7 +174,7 @@ export async function editSaleInvoiceAction(
   // oversell overrides this too.
   const tracking: { gradeId: string | null; lotNo: string | null }[] = []
   for (let i = 0; i < lines.length; i++) {
-    const t = resolveLineTracking(profileOf(profiles, lines[i].stockItemId), lines[i], { lineLabel: `Line ${i + 1}` })
+    const t = resolveLineTracking(lineProfileOf(profiles, lines[i]), lines[i], { lineLabel: `Line ${i + 1}` })
     if (!t.ok) return { success: false, error: t.error, code: 'VALIDATION_ERROR' }
     tracking.push({ gradeId: t.gradeId, lotNo: t.lotNo })
   }
@@ -179,7 +182,7 @@ export async function editSaleInvoiceAction(
   if (refError) return { success: false, error: refError, code: 'VALIDATION_ERROR' }
   if (!(parsed.data.allowOversell)) {
     const outgoing = lines.map((l, i) => {
-      const p = profileOf(profiles, l.stockItemId)
+      const p = lineProfileOf(profiles, l)
       return {
         stockItemId: l.stockItemId,
         locationId:  serviceIds.has(l.stockItemId) ? null : (locationId ?? null),
@@ -192,7 +195,7 @@ export async function editSaleInvoiceAction(
     })
     const positions = await loadStockPositions(admin, tenantId, { stockItemIds: stockIds, locationId: locationId ?? null })
     const shortfalls = findPositionShortfalls(positions, outgoing, (existingLines ?? []).map((l) => {
-      const p = profileOf(profiles, l.stock_item_id)
+      const p = lineProfileOf(profiles, { stockItemId: l.stock_item_id, rateBasis: l.rate_basis })
       return {
         stockItemId: l.stock_item_id, locationId: l.location_id, gradeId: l.grade_id, lotNo: l.lot_no,
         quantity: l.quantity, trackGrade: p.trackGrade, trackLot: p.trackLot,
@@ -207,7 +210,7 @@ export async function editSaleInvoiceAction(
   // date (lib/inventory/costing.ts); service lines carry none.
   const costData = await loadCostReceipts(admin, tenantId, stockIds, date)
   const lineCosts = costLines(costData, lines.map((l, i) => {
-    const p = profileOf(profiles, l.stockItemId)
+    const p = lineProfileOf(profiles, l)
     return {
       stockItemId: l.stockItemId, gradeId: tracking[i].gradeId, lotNo: tracking[i].lotNo,
       trackGrade: p.trackGrade, trackLot: p.trackLot,
@@ -223,7 +226,7 @@ export async function editSaleInvoiceAction(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const isService = serviceIds.has(line.stockItemId)
-    const formula = profileOf(profiles, line.stockItemId).formula
+    const formula = lineProfileOf(profiles, line).formula
     const isYarn = usesYarnFields(formula)
     const isCarton = usesCartons(formula)
     const multiplyBy = isYarn ? normalizeMultiplyBy(line.multiplyBy) : 1
@@ -251,6 +254,7 @@ export async function editSaleInvoiceAction(
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:     multiplyBy,
+      rate_basis:      formula,
       cost_rate:       isService ? null : lineCosts[i].costRate,
       cost_amount:     isService ? 0 : lineCosts[i].costAmount,
       grade_id:        tracking[i].gradeId,

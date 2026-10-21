@@ -16,7 +16,7 @@ export default async function EditPurchaseReturnPage({ params }: { params: Promi
 
   const [{ data: r }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }, profiles, { data: rawGrades }, positions] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, supplier_id, stock_item_id, reason, location_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, purchase_order_id')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, supplier_id, stock_item_id, reason, location_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, rate_basis, purchase_order_id')
       .eq('id', id).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
@@ -37,7 +37,7 @@ export default async function EditPurchaseReturnPage({ params }: { params: Promi
         <p className="text-sm text-muted-foreground mt-1">Update the goods returned to a supplier.</p>
       </div>
       <EditPurchaseReturnForm
-        ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null, nosCarton: r.nos_carton ?? null, weightPerCarton: r.weight_per_carton ?? null, gradeId: r.grade_id ?? null, lotNo: r.lot_no ?? null, linked: !!r.purchase_order_id }}
+        ret={{ id: r.id, supplierId: r.supplier_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null, nosCarton: r.nos_carton ?? null, weightPerCarton: r.weight_per_carton ?? null, gradeId: r.grade_id ?? null, lotNo: r.lot_no ?? null, rateBasis: r.rate_basis ?? null, linked: !!r.purchase_order_id }}
         suppliers={rawSuppliers ?? []}
         lots={lotList}
         locations={rawLocs ?? []}

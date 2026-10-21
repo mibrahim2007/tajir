@@ -13,8 +13,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { NumericInput } from '@/components/numeric-input'
-import { usesCartons, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
-import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { usesCartons, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount, normalizeFormula } from '@/lib/item-formula'
+import { STANDARD_PROFILE, profileAt, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { RateBasisSelect } from '@/components/rate-basis-select'
 import { editPurchaseAction } from '@/app/actions/edit-purchase'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 import { todayPKT } from '@/lib/utils/dates'
@@ -34,6 +35,8 @@ const schema = z.object({
   date:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   advancePaid:  z.number().min(0).default(0),
   locationId:   z.string().optional(),
+  // How the line is measured and billed (0074).
+  rateBasis:        z.string().optional().default('standard'),
   nosCarton:        optionalNumber,
   weightPerCarton:  optionalNumber,
 })
@@ -53,6 +56,7 @@ type Purchase = {
   locationId: string | null
   nosCarton?: number | null
   weightPerCarton?: number | null
+  rateBasis?: string | null
 }
 
 type Props = {
@@ -83,11 +87,16 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
       locationId:   purchase.locationId ?? '',
       nosCarton:        purchase.nosCarton ?? undefined,
       weightPerCarton:  purchase.weightPerCarton ?? undefined,
+      rateBasis:        normalizeFormula(purchase.rateBasis),
     },
   })
 
   // The item type's formula decides the carton fields and the billed quantity.
-  const profile = lots.find((l) => l.id === form.watch('stockItemId'))?.profile ?? STANDARD_PROFILE
+  // The item's units at the line's own rate basis.
+  const profile = profileAt(
+    lots.find((l) => l.id === form.watch('stockItemId'))?.profile ?? STANDARD_PROFILE,
+    normalizeFormula(form.watch('rateBasis')),
+  )
   const isCarton = usesCartons(profile.formula)
   const watchedNos = form.watch('nosCarton')
   const watchedWt  = form.watch('weightPerCarton')
@@ -156,7 +165,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             )} />
 
             <FormField control={form.control} name="stockItemId" render={() => (
-              <FormItem className="md:col-span-6">
+              <FormItem className="md:col-span-4">
                 <FormLabel>Stock Item <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
                   <select
@@ -167,6 +176,15 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
                   </select>
                 </FormControl>
                 <FormMessage />
+              </FormItem>
+            )} />
+
+            <FormField control={form.control} name="rateBasis" render={({ field }) => (
+              <FormItem className="md:col-span-2">
+                <FormLabel>Rate Basis</FormLabel>
+                <FormControl>
+                  <RateBasisSelect value={field.value} onChange={field.onChange} className="h-11 w-full" />
+                </FormControl>
               </FormItem>
             )} />
             </div>

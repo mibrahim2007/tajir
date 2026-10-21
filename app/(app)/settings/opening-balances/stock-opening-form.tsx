@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { GradeSelect } from '@/components/grade-select'
 import { setStockOpeningBalances } from '@/app/actions/set-opening-balance'
 import type { GradeOption } from '@/app/actions/grades'
-import { cartonStockQty, needsWeight, usesCartons } from '@/lib/item-formula'
+import { cartonStockQty, needsWeight, normalizeFormula, usesCartons, type ItemFormula } from '@/lib/item-formula'
 import { openingLineKey } from '@/lib/inventory/opening-stock'
-import type { ItemProfile } from '@/lib/inventory/item-profiles'
+import { profileAt, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { RateBasisSelect } from '@/components/rate-basis-select'
 import type { OpeningLot, LocationOption } from './stock-balance-table'
 
 const RETURN_PATH = '/settings/opening-balances'
@@ -23,6 +24,8 @@ const RETURN_PATH = '/settings/opening-balances'
 type DraftLine = {
   key: number; locationId: string; quantity: string; rate: string
   gradeId: string | null; lotNo: string; nosCarton: string; weightPerCarton: string
+  /** How this line is measured (0074); decides carton fields and grade / lot. */
+  rateBasis: ItemFormula
 }
 
 function fmtPKR(n: number) {
@@ -32,6 +35,7 @@ function fmtPKR(n: number) {
 const blankLine = (key: number, profile: ItemProfile): DraftLine => ({
   key, locationId: '', quantity: '', rate: '', gradeId: null, lotNo: '', nosCarton: '',
   weightPerCarton: profile.stdPackWeight ? String(profile.stdPackWeight) : '',
+  rateBasis: profile.formula,
 })
 
 function toDraft(lot: OpeningLot, profile: ItemProfile): DraftLine[] {
@@ -45,6 +49,7 @@ function toDraft(lot: OpeningLot, profile: ItemProfile): DraftLine[] {
     lotNo: l.lotNo ?? '',
     nosCarton: l.nosCarton == null ? '' : String(l.nosCarton),
     weightPerCarton: l.weightPerCarton == null ? '' : String(l.weightPerCarton),
+    rateBasis: normalizeFormula(l.rateBasis ?? profile.formula),
   }))
 }
 
@@ -52,7 +57,7 @@ type Props = {
   lot: OpeningLot
   locations: LocationOption[]
   grades: GradeOption[]
-  /** The item type's formula profile: carton fields, grade and lot tracking. */
+  /** The item's defaults: last-used rate basis, units, standard pack weight. */
   profile: ItemProfile
 }
 
@@ -65,12 +70,16 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
-  const carton = usesCartons(profile.formula)
   const unit = profile.stockUnit || 'unit'
   const num = (v: string) => parseFloat(v) || 0
-  // Carton formulas derive the stock quantity (cartons × kg; per pack: packs).
+  // Each line's rate basis decides its carton fields and grade / lot rules.
+  const lineProfile = (l: DraftLine) => profileAt(profile, l.rateBasis)
+  // Carton bases derive the stock quantity (cartons × kg; per pack: packs).
   const qtyOf = (l: DraftLine) =>
-    carton ? (cartonStockQty(profile.formula, { nosCarton: num(l.nosCarton), weightPerCarton: num(l.weightPerCarton) }) ?? 0) : num(l.quantity)
+    usesCartons(l.rateBasis)
+      ? (cartonStockQty(l.rateBasis, { nosCarton: num(l.nosCarton), weightPerCarton: num(l.weightPerCarton) }) ?? 0)
+      : num(l.quantity)
+  const anyTracked = lines.some((l) => lineProfile(l).trackGrade || lineProfile(l).trackLot)
 
   const setLine = (key: number, patch: Partial<DraftLine>) =>
     setLines((prev) => prev.map((l) => (l.key === key ? { ...l, ...patch } : l)))
@@ -90,7 +99,7 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
     const filled = lines.filter((l) => l.locationId || l.quantity || l.rate || l.nosCarton)
 
     if (filled.some((l) => !l.locationId)) { setError('Pick a location for every line'); return }
-    if (profile.trackGrade && filled.some((l) => !l.gradeId && (qtyOf(l) > 0 || num(l.rate) > 0))) {
+    if (filled.some((l) => lineProfile(l).trackGrade && !l.gradeId && (qtyOf(l) > 0 || num(l.rate) > 0))) {
       setError('Pick a grade for every line'); return
     }
 
@@ -98,7 +107,7 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
     const keys = filled.map((l) => openingLineKey({
       locationId: l.locationId,
       gradeId: l.gradeId,
-      lotNo: l.lotNo.trim() || (profile.trackLot ? `#auto-${l.key}` : ''),
+      lotNo: l.lotNo.trim() || (lineProfile(l).trackLot ? `#auto-${l.key}` : ''),
     }))
     if (new Set(keys).size !== keys.length) { setError('Each location, grade and lot can only be listed once'); return }
 
@@ -106,15 +115,20 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
       setError(null)
       const result = await setStockOpeningBalances({
         lotId: lot.id,
-        lines: filled.map((l) => ({
-          locationId: l.locationId,
-          quantity: qtyOf(l),
-          rate: num(l.rate),
-          gradeId: profile.trackGrade ? l.gradeId : null,
-          lotNo: profile.trackLot ? (l.lotNo.trim() || null) : null,
-          nosCarton: carton && l.nosCarton !== '' ? num(l.nosCarton) : undefined,
-          weightPerCarton: carton && l.weightPerCarton !== '' ? num(l.weightPerCarton) : undefined,
-        })),
+        lines: filled.map((l) => {
+          const p = lineProfile(l)
+          const carton = usesCartons(l.rateBasis)
+          return {
+            locationId: l.locationId,
+            rateBasis: l.rateBasis,
+            quantity: qtyOf(l),
+            rate: num(l.rate),
+            gradeId: p.trackGrade ? l.gradeId : null,
+            lotNo: p.trackLot ? (l.lotNo.trim() || null) : null,
+            nosCarton: carton && l.nosCarton !== '' ? num(l.nosCarton) : undefined,
+            weightPerCarton: carton && l.weightPerCarton !== '' ? num(l.weightPerCarton) : undefined,
+          }
+        }),
       })
       if (!result.success) { setError(result.error); return }
       // Back to Opening Balances, which re-renders with the new figures. No
@@ -138,8 +152,10 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
             <>
               <div className="space-y-3">
                 {lines.map((line) => {
+                  const lp = lineProfile(line)
+                  const carton = usesCartons(line.rateBasis)
                   // Without grade / lot a location can only appear once.
-                  const takenElsewhere = profile.trackGrade || profile.trackLot
+                  const takenElsewhere = anyTracked
                     ? new Set<string>()
                     : new Set(lines.filter((l) => l.key !== line.key).map((l) => l.locationId))
                   const derivedQty = qtyOf(line)
@@ -160,7 +176,21 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
                           </Select>
                         </div>
 
-                        {profile.trackGrade && (
+                        <div className="md:col-span-4 space-y-1">
+                          <Label className="text-xs">Rate Basis</Label>
+                          <RateBasisSelect
+                            className="w-full"
+                            value={line.rateBasis}
+                            onChange={(rateBasis) => setLine(line.key, {
+                              rateBasis,
+                              // Pre-fill the standard pack weight when switching to a carton basis.
+                              weightPerCarton: usesCartons(rateBasis) && !line.weightPerCarton && profile.stdPackWeight
+                                ? String(profile.stdPackWeight) : line.weightPerCarton,
+                            })}
+                          />
+                        </div>
+
+                        {lp.trackGrade && (
                           <div className="md:col-span-4 space-y-1">
                             <Label className="text-xs">Grade</Label>
                             <GradeSelect
@@ -172,7 +202,7 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
                           </div>
                         )}
 
-                        {profile.trackLot && (
+                        {lp.trackLot && (
                           <div className="md:col-span-4 space-y-1">
                             <Label className="text-xs">Lot No.</Label>
                             <Input
@@ -195,7 +225,7 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
                               />
                             </div>
                             <div className="md:col-span-3 space-y-1">
-                              <Label className="text-xs">Weight / {profile.packUnit || 'Carton'} (kg){!needsWeight(profile.formula) && ' — optional'}</Label>
+                              <Label className="text-xs">Weight / {profile.packUnit || 'Carton'} (kg){!needsWeight(line.rateBasis) && ' — optional'}</Label>
                               <Input
                                 type="number" min={0} step="0.0001" inputMode="decimal"
                                 value={line.weightPerCarton}
@@ -248,7 +278,7 @@ export function StockOpeningForm({ lot, locations, grades: initialGrades, profil
               </div>
 
               <Button type="button" variant="outline" size="sm" className="min-h-[44px]" onClick={addLine}>
-                <Plus className="h-4 w-4 mr-2" /> {profile.trackGrade || profile.trackLot ? 'Add line' : 'Add location'}
+                <Plus className="h-4 w-4 mr-2" /> {anyTracked ? 'Add line' : 'Add location'}
               </Button>
             </>
           )}

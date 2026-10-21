@@ -24,8 +24,9 @@ import { YarnLineFields } from '@/components/yarn-line-fields'
 import { StockPositionFields } from '@/components/stock-position-fields'
 import type { StockPosition } from '@/lib/inventory/stock-position'
 import type { GradeOption } from '@/app/actions/grades'
-import { usesCartons, usesYarnFields, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
-import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { usesCartons, usesYarnFields, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount, normalizeFormula, ITEM_FORMULAS } from '@/lib/item-formula'
+import { STANDARD_PROFILE, profileAt, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { RateBasisSelect } from '@/components/rate-basis-select'
 import { todayPKT } from '@/lib/utils/dates'
 
 const lineSchema = z.object({
@@ -42,6 +43,8 @@ const lineSchema = z.object({
   // Grade / lot, used only when the item type tracks them.
   gradeId:     z.string().nullable().optional(),
   lotNo:       z.string().nullable().optional(),
+  // How the line is measured and billed (0074); defaults from the item.
+  rateBasis:   z.enum(ITEM_FORMULAS).default('standard'),
 })
 
 const schema = z.object({
@@ -61,7 +64,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 type PurchaseOrder = { id: string; date: string; supplierId: string; stockItemId: string; quantity: number; rate: number; currencyCode: string
-  gradeId?: string | null; lotNo?: string | null; weightPerCarton?: number | null }
+  gradeId?: string | null; lotNo?: string | null; weightPerCarton?: number | null; rateBasis?: string | null }
 
 type Props = {
   today:          string
@@ -87,7 +90,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
     defaultValues: {
       purchaseOrderId: '', supplierId: '', date: today, reason: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: null, lotNo: null }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: null, lotNo: null, rateBasis: 'standard' }],
     },
   })
 
@@ -105,11 +108,14 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
   // Each item's formula profile comes from its item type (lib/item-formula.ts).
   const profileById = useMemo(() => new Map(lots.map((l) => [l.id, l.profile ?? STANDARD_PROFILE])), [lots])
   const profileFor = (id?: string) => (id && profileById.get(id)) || STANDARD_PROFILE
-  // Pre-discount amount for a line, by its item type's formula.
+  // Each line's own rate basis decides its maths and grade / lot rules (0074).
+  const basisOf = (l: { rateBasis?: string | null }) => normalizeFormula(l.rateBasis)
+  const lineProfile = (l: { stockItemId?: string; rateBasis?: string | null }) => profileAt(profileFor(l.stockItemId), basisOf(l))
+  // Pre-discount amount for a line, by its own rate basis.
   const lineGross = (l: {
-    stockItemId?: string; quantity?: number | null; rate?: number | null
+    stockItemId?: string; quantity?: number | null; rate?: number | null; rateBasis?: string | null
     multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
-  }) => lineGrossAmount(profileFor(l.stockItemId).formula, l, l.rate || 0, er)
+  }) => lineGrossAmount(basisOf(l), l, l.rate || 0, er)
 
   const { subtotal, discountTotal, netTotal } = useMemo(() => {
     const sub  = watchedLines.reduce((s, l) => s + lineGross(l), 0)
@@ -119,14 +125,14 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
   }, [watchedLines, er, profileById])
 
   // Show the Nos Carton / Weight / Billed Qty columns only when a line needs them.
-  const hasCarton = watchedLines.some((l) => usesCartons(profileFor(l.stockItemId).formula))
+  const hasCarton = watchedLines.some((l) => usesCartons(basisOf(l)))
 
   // A carton line picks up its type's standard weight per pack while its weight
   // is still empty. Keyed on the item ids so it runs when an item is picked.
-  const itemSig = watchedLines.map((l) => l.stockItemId ?? '').join('|')
+  const itemSig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.rateBasis}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
-      const p = profileFor(l.stockItemId)
+      const p = lineProfile(l)
       if (!usesCartons(p.formula) || !p.stdPackWeight) return
       if (Number.isFinite(Number(form.getValues(`lines.${i}.weightPerCarton`)))) return
       form.setValue(`lines.${i}.weightPerCarton`, p.stdPackWeight, { shouldDirty: true })
@@ -137,10 +143,10 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
   // For carton lines, Quantity is derived (Nos Carton × Weight; per pack: the
   // packs); keep the form field in sync so it drives validation. Keyed on a
   // value signature since watch() mutates the lines array in place.
-  const cartonQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
+  const cartonQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.rateBasis}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
-      const q = cartonStockQty(profileFor(l.stockItemId).formula, l)
+      const q = cartonStockQty(basisOf(l), l)
       if (q === null) return
       const cur = Number(form.getValues(`lines.${i}.quantity`))
       const next = q > 0 ? q : NaN
@@ -172,6 +178,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
         if (po.weightPerCarton) form.setValue('lines.0.weightPerCarton', po.weightPerCarton)
         form.setValue('lines.0.gradeId', po.gradeId ?? null)
         form.setValue('lines.0.lotNo', po.lotNo ?? null)
+        form.setValue('lines.0.rateBasis', normalizeFormula(po.rateBasis ?? profileFor(po.stockItemId).formula))
       }
     }
   }
@@ -221,6 +228,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
           weightPerCarton: Number.isFinite(line.weightPerCarton) ? line.weightPerCarton : undefined,
           gradeId:         line.gradeId || undefined,
           lotNo:           line.lotNo?.trim() || undefined,
+          rateBasis:       line.rateBasis,
         })
         if (!result.success) { setServerError(`Line ${i + 1}: ${result.error}`); return }
         if (i === 0) firstEntryId = result.data.id
@@ -383,7 +391,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                       <tbody className="divide-y">
                         {fields.map((field, index) => {
                           const line   = watchedLines[index] ?? {}
-                          const profile = profileFor(line.stockItemId)
+                          const profile = lineProfile(line)
                           const isYarnLine = usesYarnFields(profile.formula)
                           const isCartonLine = usesCartons(profile.formula)
                           const tracksStock = profile.trackGrade || profile.trackLot
@@ -404,11 +412,21 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                                       <ItemPickerDialog
                                         items={lotPickerItems}
                                         value={f.value}
-                                        onSelect={f.onChange}
+                                        onSelect={(id) => {
+                                          f.onChange(id)
+                                          // A new item starts on the basis last used for it.
+                                          form.setValue(`lines.${index}.rateBasis`, profileFor(id).formula, { shouldDirty: true })
+                                        }}
                                         placeholder="Select item…"
                                         title="Select Stock Item"
                                       />
                                       {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
+                                      <div className="mt-1.5">
+                                        <RateBasisSelect
+                                          value={line.rateBasis}
+                                          onChange={(b) => form.setValue(`lines.${index}.rateBasis`, b, { shouldDirty: true })}
+                                        />
+                                      </div>
                                     </div>
                                   )}
                                 />
@@ -518,7 +536,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
                 </div>
                 <div className="mt-3">
                   <Button type="button" variant="outline" size="sm"
-                    onClick={() => append({ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: null, lotNo: null })}
+                    onClick={() => append({ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: null, lotNo: null, rateBasis: 'standard' })}
                     className="gap-1.5">
                     <Plus className="size-4" /> Add Line
                   </Button>

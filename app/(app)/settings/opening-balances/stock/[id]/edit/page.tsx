@@ -17,7 +17,7 @@ export default async function EditStockOpeningPage({ params }: { params: Promise
     admin.from('inventory_lots').select('id, name').eq('id', id).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
     admin.from('stock_opening_balances')
-      .select('location_id, quantity, rate, grade_id, lot_no, nos_carton, weight_per_carton')
+      .select('location_id, quantity, rate, grade_id, lot_no, nos_carton, weight_per_carton, rate_basis')
       .eq('tenant_id', tenantId).eq('stock_item_id', id),
     admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
     loadProfilesFor(admin, tenantId, [id]),
@@ -46,6 +46,7 @@ export default async function EditStockOpeningPage({ params }: { params: Promise
         lotNo:           row.lot_no,
         nosCarton:       row.nos_carton == null ? null : num(row.nos_carton),
         weightPerCarton: row.weight_per_carton == null ? null : num(row.weight_per_carton),
+        rateBasis:       row.rate_basis,
       }))
       .sort((a, b) => a.locationName.localeCompare(b.locationName) || (a.lotNo ?? '').localeCompare(b.lotNo ?? '')),
   }
@@ -55,7 +56,7 @@ export default async function EditStockOpeningPage({ params }: { params: Promise
       <div className="mb-6">
         <h1 className="text-2xl font-extrabold tracking-tight">Opening Stock — {lot.name}</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          List every warehouse that held this item on day one — one line per location, and per grade / lot where the item tracks them.
+          List every warehouse that held this item on day one — one line per location, and per grade / lot for weighed or packed lines.
         </p>
       </div>
       <StockOpeningForm lot={lot} locations={locations} grades={grades} profile={profileOf(profiles, id)} />

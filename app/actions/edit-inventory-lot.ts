@@ -8,9 +8,6 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 import { parseCount } from '@/lib/parse-count'
 
-// Trading tables whose lines were billed with the item's current formula.
-const LINE_TABLES = ['purchase_orders', 'sales_orders', 'purchase_returns', 'sale_returns'] as const
-
 const schema = z.object({
   id:            z.string().uuid(),
   name:          z.string().min(1, 'Name is required'),
@@ -46,33 +43,17 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   if (!existing) return { success: false, error: 'Stock item not found', code: 'NOT_FOUND' }
 
-  // Moving a traded item to a type with a different formula would re-bill its
-  // existing lines on their next edit, so that is refused.
   // Fiber now carries the sub type's name; an item left on a top-level type
   // (from before sub types were mandatory) keeps what it had.
   let subTypeName: string | null = null
   if (itemTypeId !== existing.item_type_id) {
     const { data: types } = await admin
-      .from('item_types').select('id, name, parent_id, formula').eq('tenant_id', tenantId).in('id', [itemTypeId, existing.item_type_id])
+      .from('item_types').select('id, name, parent_id').eq('tenant_id', tenantId).eq('id', itemTypeId)
     const next = types?.find((t) => t.id === itemTypeId)
     if (!next) return { success: false, error: 'Sub type not found', code: 'VALIDATION_ERROR' }
     // Moving to another type must land on a sub type.
     if (!next.parent_id) return { success: false, error: 'Select a sub type', code: 'VALIDATION_ERROR' }
     subTypeName = next.name
-    const prev = types?.find((t) => t.id === existing.item_type_id)
-    if (prev && prev.formula !== next.formula) {
-      for (const table of LINE_TABLES) {
-        const { count: used } = await admin
-          .from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('stock_item_id', id)
-        if ((used ?? 0) > 0) {
-          return {
-            success: false,
-            error: 'This item already has invoices or returns, so it can only move to an item type with the same formula.',
-            code: 'FORMULA_LOCKED',
-          }
-        }
-      }
-    }
   }
 
   if (subTypeName === null) {

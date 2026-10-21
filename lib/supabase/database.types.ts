@@ -3105,6 +3105,7 @@ export type Database = {
           qty_lbs: number | null
           quantity: number
           rate: number
+          rate_basis: string
           serial_number: string | null
           stock_item_id: string
           supplier_id: string
@@ -3134,6 +3135,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity: number
           rate: number
+          rate_basis?: string
           serial_number?: string | null
           stock_item_id: string
           supplier_id: string
@@ -3163,6 +3165,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           serial_number?: string | null
           stock_item_id?: string
           supplier_id?: string
@@ -3234,6 +3237,7 @@ export type Database = {
           qty_lbs: number | null
           quantity: number
           rate: number
+          rate_basis: string
           reason: string | null
           serial_number: string | null
           stock_item_id: string
@@ -3259,6 +3263,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity: number
           rate: number
+          rate_basis?: string
           reason?: string | null
           serial_number?: string | null
           stock_item_id: string
@@ -3284,6 +3289,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           reason?: string | null
           serial_number?: string | null
           stock_item_id?: string
@@ -3364,6 +3370,7 @@ export type Database = {
           qty_lbs: number | null
           quantity: number
           rate: number
+          rate_basis: string
           reason: string | null
           sale_order_id: string | null
           serial_number: string | null
@@ -3391,6 +3398,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity: number
           rate: number
+          rate_basis?: string
           reason?: string | null
           sale_order_id?: string | null
           serial_number?: string | null
@@ -3418,6 +3426,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           reason?: string | null
           sale_order_id?: string | null
           serial_number?: string | null
@@ -3506,6 +3515,7 @@ export type Database = {
           qty_lbs: number | null
           quantity: number
           rate: number
+          rate_basis: string
           serial_number: string | null
           stock_item_id: string
           tenant_id: string
@@ -3539,6 +3549,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity: number
           rate: number
+          rate_basis?: string
           serial_number?: string | null
           stock_item_id: string
           tenant_id: string
@@ -3572,6 +3583,7 @@ export type Database = {
           qty_lbs?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           serial_number?: string | null
           stock_item_id?: string
           tenant_id?: string
@@ -3634,6 +3646,7 @@ export type Database = {
           nos_carton: number | null
           quantity: number
           rate: number
+          rate_basis: string
           stock_item_id: string
           tenant_id: string
           updated_at: string
@@ -3648,6 +3661,7 @@ export type Database = {
           nos_carton?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           stock_item_id: string
           tenant_id: string
           updated_at?: string
@@ -3662,6 +3676,7 @@ export type Database = {
           nos_carton?: number | null
           quantity?: number
           rate?: number
+          rate_basis?: string
           stock_item_id?: string
           tenant_id?: string
           updated_at?: string

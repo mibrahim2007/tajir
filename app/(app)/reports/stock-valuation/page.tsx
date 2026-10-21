@@ -2,7 +2,6 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PrintButton } from '@/components/print-button'
 import { getTenant } from '@/lib/auth/get-tenant'
-import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
 import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { loadCostReceipts, unitCostFor } from '@/lib/inventory/costing'
 
@@ -10,46 +9,44 @@ export default async function StockValuationPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawLots }, profiles, tenant] = await Promise.all([
+  const [{ data: rawLots }, tenant] = await Promise.all([
     admin
       .from('inventory_lots')
       .select('id, name, code, count, current_quantity, unit_of_measure, opening_rate, item_type_id, item_types(name)')
       .eq('tenant_id', tenantId)
       .order('name'),
-    loadItemProfiles(admin, tenantId),
     getTenant(tenantId),
   ])
 
   const parse = (v: unknown) => parseFloat(String(v ?? 0)) || 0
   const lotIds = (rawLots ?? []).map((l) => String(l.id))
 
-  // Same costing as cost of goods sold (lib/inventory/costing.ts): items whose
-  // type tracks lot / grade are valued lot by lot at each lot's receipt cost,
-  // the rest at the item's average receipt cost (opening + purchases − returns).
-  const trackedIds = lotIds.filter((id) => { const p = profileOf(profiles, id); return p.trackGrade || p.trackLot })
+  // Same costing as cost of goods sold (lib/inventory/costing.ts): stock held
+  // by grade / lot is valued position by position at that grade's / lot's
+  // receipt cost, the rest at the item's average receipt cost (opening +
+  // purchases − returns). Since the rate basis is per line (0074), whether an
+  // item is lot-wise is read from its stock, not from its type.
   const [costData, positions] = await Promise.all([
     loadCostReceipts(admin, tenantId, lotIds),
-    trackedIds.length ? loadStockPositions(admin, tenantId, { stockItemIds: trackedIds }) : Promise.resolve([]),
+    loadStockPositions(admin, tenantId),
   ])
 
   const rows = (rawLots ?? []).map(lot => {
     const id          = String(lot.id)
     const qty         = parse(lot.current_quantity)
-    const profile     = profileOf(profiles, id)
     const hasReceipts = costData.receipts.some((r) => r.stockItemId === id && r.quantity > 0)
     const average     = unitCostFor(costData.receipts, { stockItemId: id }, costData.openingRates.get(id)) ?? 0
     let value = qty * average
     let rateSource: 'lot' | 'average' | 'opening' | 'none' = average > 0 ? (hasReceipts ? 'average' : 'opening') : 'none'
-    if (profile.trackGrade || profile.trackLot) {
-      // Lot-by-lot; any stock not attributed to a godown / lot stays at average.
-      const mine = positions.filter((p) => p.stockItemId === id && p.quantity > 0)
+    // Lot-by-lot for positions carrying a grade / lot; any stock not held that
+    // way stays at average.
+    const mine = positions.filter((p) => p.stockItemId === id && p.quantity > 0 && (p.gradeId || p.lotNo))
+    if (mine.length > 0) {
       const placed = mine.reduce((sum, p) => sum + p.quantity, 0)
-      if (mine.length > 0) {
-        value = mine.reduce((sum, p) => sum + p.quantity * (unitCostFor(costData.receipts, {
-          stockItemId: id, gradeId: p.gradeId, lotNo: p.lotNo, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
-        }, costData.openingRates.get(id)) ?? 0), 0) + Math.max(0, qty - placed) * average
-        rateSource = 'lot'
-      }
+      value = mine.reduce((sum, p) => sum + p.quantity * (unitCostFor(costData.receipts, {
+        stockItemId: id, gradeId: p.gradeId, lotNo: p.lotNo, trackGrade: !!p.gradeId, trackLot: !!p.lotNo,
+      }, costData.openingRates.get(id)) ?? 0), 0) + Math.max(0, qty - placed) * average
+      rateSource = 'lot'
     }
     const effectiveRate = qty > 0 ? value / qty : average
     const typeName    = Array.isArray(lot.item_types)
@@ -80,7 +77,7 @@ export default async function StockValuationPage() {
           <h1 className="text-xl font-bold">Stock Valuation</h1>
           <p className="text-xs text-muted-foreground">
             {withStock.length} item{withStock.length !== 1 ? 's' : ''} in stock
-            &nbsp;·&nbsp; Valued at cost: lot by lot where the item type tracks lots, else average receipt cost
+            &nbsp;·&nbsp; Valued at cost: lot by lot where stock is held by grade / lot, else average receipt cost
           </p>
         </div>
         <PrintButton />

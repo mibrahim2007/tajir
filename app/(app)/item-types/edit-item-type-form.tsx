@@ -11,8 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { ItemTypeProfileFields, type ItemTypeProfileValue } from '@/components/item-type-profile-fields'
-import { FORMULA_SHORT } from '@/lib/item-formula'
 import { editItemTypeAction } from '@/app/actions/edit-item-type'
 
 type SubType = { id: string; name: string }
@@ -24,16 +22,10 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 // Full-page form at /item-types/[id]/edit (was a drawer in the item type row actions).
-export function EditItemTypeForm({ id, name, subTypes = [], profile: initialProfile, formulaLocked = false }: {
-  id: string; name: string; subTypes?: SubType[]
-  profile: ItemTypeProfileValue
-  /** Items of this type already have invoices/returns, so the formula is fixed. */
-  formulaLocked?: boolean
-}) {
+export function EditItemTypeForm({ id, name, subTypes = [] }: { id: string; name: string; subTypes?: SubType[] }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [profile, setProfile] = useState<ItemTypeProfileValue>(initialProfile)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -45,7 +37,7 @@ export function EditItemTypeForm({ id, name, subTypes = [], profile: initialProf
   const onEdit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
-      const result = await editItemTypeAction({ id, name: values.name, subTypes: values.subTypes, ...profile })
+      const result = await editItemTypeAction({ id, name: values.name, subTypes: values.subTypes })
       if (!result.success) { setError(result.error); return }
       // Back to the list, which re-renders with the change. No
       // router.refresh() inside the transition — it keeps isPending stuck.
@@ -72,14 +64,11 @@ export function EditItemTypeForm({ id, name, subTypes = [], profile: initialProf
                 </FormItem>
               )} />
 
-              <div className="md:col-span-12">
-                <ItemTypeProfileFields value={profile} onChange={setProfile} formulaLocked={formulaLocked} />
-              </div>
 
               <div className="md:col-span-12 flex flex-col gap-2">
                 <FormLabel>Sub Types</FormLabel>
                 <p className="text-xs text-muted-foreground -mt-1">
-                  Optional. Sub-types appear under this type when creating a stock item, and follow this type&apos;s formula.
+                  Sub-types appear in the Sub Type list when creating a stock item; an item must be given one.
                 </p>
                 {fields.map((f, index) => (
                   <div key={f.id} className="flex gap-2 md:max-w-[50%]">
@@ -110,10 +99,6 @@ export function EditItemTypeForm({ id, name, subTypes = [], profile: initialProf
                   <div className="flex justify-between gap-3">
                     <span className="text-muted-foreground">Name</span>
                     <span className="font-medium text-right truncate">{watched.name || '—'}</span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-muted-foreground">Formula</span>
-                    <span className="text-right">{FORMULA_SHORT[profile.formula]}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Sub types</span>

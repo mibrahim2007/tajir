@@ -17,7 +17,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
     { data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }, { data: rawGrades },
   ] = await Promise.all([
     admin.from('purchase_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, agent_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, agent_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, rate_basis')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -68,6 +68,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
       multiplyBy:      l.multiply_by ?? 1,
       nosCarton:       l.nos_carton ?? NaN,
       weightPerCarton: l.weight_per_carton ?? NaN,
+      rateBasis:       l.rate_basis ?? 'standard',
       gradeId:         l.grade_id ?? '',
       lotNo:           l.lot_no ?? '',
       // Blank = same as the invoice's Receive At (the first line's godown).

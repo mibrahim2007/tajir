@@ -10,6 +10,8 @@ export type OpeningLine = {
   locationId: string; locationName: string; quantity: number; rate: number
   gradeId?: string | null; gradeName?: string | null; lotNo?: string | null
   nosCarton?: number | null; weightPerCarton?: number | null
+  /** How the line is measured (0074). */
+  rateBasis?: string | null
 }
 export type OpeningLot  = { id: string; name: string; lines: OpeningLine[] }
 export type LocationOption = { id: string; name: string }

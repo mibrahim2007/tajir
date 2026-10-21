@@ -1,13 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { normalizeMultiplyBy } from '@/lib/yarn'
-import { usesCartons, usesYarnFields, cartonStockQty, lineQtyLbs, lineGrossAmount, needsWeight } from '@/lib/item-formula'
-import { loadProfilesFor, profileOf, type ItemProfile } from './item-profiles'
+import { ITEM_FORMULAS, normalizeFormula, usesCartons, usesYarnFields, cartonStockQty, lineQtyLbs, lineGrossAmount, needsWeight, type ItemFormula } from '@/lib/item-formula'
+import { loadProfilesFor, profileOf, profileAt, type ItemProfile } from './item-profiles'
 import { resolveLineTracking, findPositionShortfalls, type OutgoingLine } from './line-tracking'
 import { loadStockPositions } from './stock-position'
 
 // Shared by the four sale / purchase return actions: measures a return line by
-// its item type's formula (cartons, weight, QTY LBS, yarn multiplier), settles
+// its own rate basis (0074: cartons, weight, QTY LBS, yarn multiplier), settles
 // its grade / lot, and checks grade / lot stock when goods go OUT.
 
 const blankToNull = (v: unknown) =>
@@ -19,6 +19,8 @@ export const returnLineFields = {
   weightPerCarton: z.preprocess(blankToNull, z.coerce.number().min(0).nullable()).optional(),
   gradeId:         z.preprocess(blankToNull, z.string().uuid().nullable()).optional(),
   lotNo:           z.preprocess(blankToNull, z.string().trim().max(60).nullable()).optional(),
+  // Blank → the linked invoice line's basis, else the item's default.
+  rateBasis:       z.preprocess(blankToNull, z.enum(ITEM_FORMULAS).nullable()).optional(),
 }
 
 // The original invoice line a return is booked against. Its grade and lot are
@@ -27,10 +29,13 @@ export type OriginalLine = {
   grade_id: string | null
   lot_no: string | null
   weight_per_carton: number | null
+  rate_basis?: string | null
 }
 
 export type MeasuredReturnLine = {
+  /** The item's profile at this line's basis (grade / lot rules follow the basis). */
   profile:         ItemProfile
+  rateBasis:       ItemFormula
   isYarn:          boolean
   multiplyBy:      number
   quantity:        number
@@ -55,11 +60,14 @@ export async function measureReturnLine(
     weightPerCarton?: number | null
     gradeId?: string | null
     lotNo?: string | null
+    rateBasis?: string | null
     original?: OriginalLine | null
   },
 ): Promise<{ ok: true; line: MeasuredReturnLine } | { ok: false; error: string }> {
-  const profile = profileOf(await loadProfilesFor(admin, tenantId, [input.stockItemId]), input.stockItemId)
-  const formula = profile.formula
+  const itemProfile = profileOf(await loadProfilesFor(admin, tenantId, [input.stockItemId]), input.stockItemId)
+  // The line's own basis; a linked return defaults to the invoice line's.
+  const formula = normalizeFormula(input.rateBasis ?? input.original?.rate_basis ?? itemProfile.formula)
+  const profile = profileAt(itemProfile, formula)
   const isYarn = usesYarnFields(formula)
   const isCarton = usesCartons(formula)
   const multiplyBy = isYarn ? normalizeMultiplyBy(input.multiplyBy) : 1
@@ -93,6 +101,7 @@ export async function measureReturnLine(
     ok: true,
     line: {
       profile,
+      rateBasis: formula,
       isYarn,
       multiplyBy,
       quantity,

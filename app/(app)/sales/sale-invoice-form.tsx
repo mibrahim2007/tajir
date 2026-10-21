@@ -26,8 +26,9 @@ import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { editSaleInvoiceAction } from '@/app/actions/edit-sale-invoice'
 import { getCustomerBalanceAction } from '@/app/actions/get-customer-balance'
 import { YarnLineFields } from '@/components/yarn-line-fields'
-import { usesCartons, usesYarnFields, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
-import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { usesCartons, usesYarnFields, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount, normalizeFormula } from '@/lib/item-formula'
+import { STANDARD_PROFILE, profileAt, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { RateBasisSelect } from '@/components/rate-basis-select'
 import type { StockPosition } from '@/lib/inventory/stock-position'
 import type { GradeOption } from '@/app/actions/grades'
 import { StockPositionFields } from '@/components/stock-position-fields'
@@ -60,6 +61,9 @@ const lineSchema = z.object({
   yarnWeight:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
   multiplyBy:  z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
   // Carton line fields, used only for per lb / per kg / per pack item types.
+  // How the line is measured and billed (0074); set from the item's last used
+  // basis when the item is picked, and changeable per line.
+  rateBasis:       z.string().optional().default('standard'),
   nosCarton:       optionalNumber,
   weightPerCarton: optionalNumber,
   // Grade / lot, picked from the stock at the invoice's location for items
@@ -152,12 +156,15 @@ export function SaleInvoiceForm({
     [stockItems],
   )
   const profileFor = (id?: string) => (id && profileById.get(id)) || STANDARD_PROFILE
-  // Pre-discount, exchange-applied amount for a line, by its item type's
-  // formula: carton formulas bill on the cartons, yarn applies Multiply By.
+  // A line's effective profile: the item's units at the line's own rate basis.
+  const lineProfile = (l: { stockItemId?: string; rateBasis?: string | null }) =>
+    profileAt(profileFor(l.stockItemId), normalizeFormula(l.rateBasis))
+  // Pre-discount, exchange-applied amount for a line, by its rate basis:
+  // carton bases bill on the cartons, yarn applies Multiply By.
   const lineGross = (l: {
-    stockItemId?: string; quantity?: number | null; rate?: number | null
+    stockItemId?: string; rateBasis?: string | null; quantity?: number | null; rate?: number | null
     multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
-  }, erFactor: number) => lineGrossAmount(profileFor(l.stockItemId).formula, l, l.rate || 0, erFactor)
+  }, erFactor: number) => lineGrossAmount(normalizeFormula(l.rateBasis), l, l.rate || 0, erFactor)
 
   // A line sells below cost when its net amount is under cost × stock qty.
   // Both figures are shown per BILLING unit (per lb, per kg, per bag, per
@@ -165,7 +172,7 @@ export function SaleInvoiceForm({
   const costCheck = (l: SaleFormValues['lines'][number]) => {
     const cost = l.stockItemId ? costMap[l.stockItemId] : undefined
     if (cost === undefined || !(l.rate > 0)) return null
-    const formula = profileFor(l.stockItemId).formula
+    const formula = normalizeFormula(l.rateBasis)
     const stockQty = cartonStockQty(formula, l) ?? (Number(l.quantity) || 0)
     const billed = billingQty(formula, l)
     if (!(stockQty > 0) || !(billed > 0)) return null
@@ -204,7 +211,7 @@ export function SaleInvoiceForm({
       poNo: '', dcNo: '',
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       agentId: '', agentCommissionType: '', agentCommissionRate: null,
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, rateBasis: 'standard', nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' }],
     },
   })
 
@@ -257,7 +264,7 @@ export function SaleInvoiceForm({
 
   // Show the Nos Carton / Weight / Billed Qty columns only when the invoice has
   // at least one carton-formula line, so ordinary invoices stay unchanged.
-  const hasCarton = watchedLines.some((l) => usesCartons(profileFor(l.stockItemId).formula))
+  const hasCarton = watchedLines.some((l) => usesCartons(normalizeFormula(l.rateBasis)))
 
   // Commission base, mirroring the server: goods only, since a service line is a
   // freight pass-through and earns the agent nothing.
@@ -268,11 +275,11 @@ export function SaleInvoiceForm({
   const commissionQty = goodsLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
 
   // A carton line picks up its type's standard weight per pack while its weight
-  // is still empty. Keyed on the item ids so it runs when an item is picked.
-  const itemSig = watchedLines.map((l) => l.stockItemId ?? '').join('|')
+  // is still empty. Keyed on item + basis so it runs when either changes.
+  const itemSig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.rateBasis ?? ''}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
-      const p = profileFor(l.stockItemId)
+      const p = lineProfile(l)
       if (!usesCartons(p.formula) || !p.stdPackWeight) return
       if (Number.isFinite(Number(form.getValues(`lines.${i}.weightPerCarton`)))) return
       form.setValue(`lines.${i}.weightPerCarton`, p.stdPackWeight, { shouldDirty: true })
@@ -284,10 +291,10 @@ export function SaleInvoiceForm({
   // packs); keep the form field in sync so it drives stock and validation.
   // watch() mutates the lines array in place, so key the effect on a value
   // signature (not the array ref). The equality guard stops a loop.
-  const cartonQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
+  const cartonQtySig = watchedLines.map((l) => `${l.rateBasis ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
-      const q = cartonStockQty(profileFor(l.stockItemId).formula, l)
+      const q = cartonStockQty(normalizeFormula(l.rateBasis), l)
       if (q === null) return
       const cur = Number(form.getValues(`lines.${i}.quantity`))
       const next = q > 0 ? q : NaN
@@ -355,7 +362,7 @@ export function SaleInvoiceForm({
       form.setValue(`lines.${emptyIdx}.stockItemId`, match.id)
       if (rate) form.setValue(`lines.${emptyIdx}.rate`, rate)
     } else {
-      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' })
+      append({ stockItemId: match.id, quantity: 0, rate, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, rateBasis: profileFor(match.id).formula, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stockItems, pricingRules, append])
@@ -401,6 +408,7 @@ export function SaleInvoiceForm({
           weightPerCarton: Number.isFinite(l.weightPerCarton) ? l.weightPerCarton : undefined,
           gradeId:         l.gradeId || undefined,
           lotNo:           l.lotNo || undefined,
+          rateBasis:       normalizeFormula(l.rateBasis),
         })),
       }
 
@@ -677,6 +685,7 @@ export function SaleInvoiceForm({
                           <tr>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                             <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
+                            <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Rate Basis</th>
                             {hasCarton && <>
                               <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Nos Carton</th>
                               <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Weight (kg)</th>
@@ -697,7 +706,7 @@ export function SaleInvoiceForm({
                             const amount    = lineGross(line, er) * (1 - (line.discountPct || 0) / 100)
                             const item      = stockItems.find((s) => s.id === line.stockItemId)
                             const isServiceLine = item?.itemNature === 'service'
-                            const profile   = profileFor(line.stockItemId)
+                            const profile   = lineProfile(line)
                             const isYarnLine = usesYarnFields(profile.formula)
                             const isCartonLine = usesCartons(profile.formula)
                             const billed    = billingQty(profile.formula, line)
@@ -724,6 +733,8 @@ export function SaleInvoiceForm({
                                           value={f.value}
                                           onSelect={(v) => {
                                             f.onChange(v)
+                                            // Start the line on the basis last used for this item.
+                                            form.setValue(`lines.${index}.rateBasis`, profileFor(v).formula, { shouldDirty: true })
                                             const r = getPricedRate(watchedCustomer, v)
                                             if (r) form.setValue(`lines.${index}.rate`, r)
                                           }}
@@ -742,6 +753,11 @@ export function SaleInvoiceForm({
                                       </div>
                                     )}
                                   />
+                                </td>
+                                <td className="px-3 py-2">
+                                  <Controller control={form.control} name={`lines.${index}.rateBasis`} render={({ field: f }) => (
+                                    <RateBasisSelect value={f.value} onChange={f.onChange} />
+                                  )} />
                                 </td>
                                 {hasCarton && (isCartonLine ? <>
                                   <td className="px-3 py-2">
@@ -810,7 +826,7 @@ export function SaleInvoiceForm({
                               {isYarnLine && (
                                 <tr>
                                   <td />
-                                  <td colSpan={hasCarton ? 9 : 6} className="px-3 pb-3">
+                                  <td colSpan={hasCarton ? 10 : 7} className="px-3 pb-3">
                                     <YarnLineFields index={index} />
                                   </td>
                                 </tr>
@@ -818,7 +834,7 @@ export function SaleInvoiceForm({
                               {isTrackedLine && (
                                 <tr>
                                   <td />
-                                  <td colSpan={hasCarton ? 9 : 6} className="px-3 pb-3">
+                                  <td colSpan={hasCarton ? 10 : 7} className="px-3 pb-3">
                                     <div className="max-w-xl">
                                       <StockPositionFields
                                         positions={positions}
@@ -849,7 +865,7 @@ export function SaleInvoiceForm({
                   </div>
                   <div className="mt-3">
                     <Button type="button" variant="outline" size="sm"
-                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' })}
+                      onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, rateBasis: 'standard', nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '' })}
                       className="gap-1.5">
                       <Plus className="size-4" /> Add Line
                     </Button>

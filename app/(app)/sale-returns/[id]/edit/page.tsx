@@ -15,7 +15,7 @@ export default async function EditSaleReturnPage({ params }: { params: Promise<{
 
   const [{ data: r }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }, profiles, { data: rawGrades }] = await Promise.all([
     admin.from('sale_returns')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, customer_id, stock_item_id, reason, location_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, sale_order_id')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, customer_id, stock_item_id, reason, location_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, rate_basis, sale_order_id')
       .eq('id', id).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
@@ -35,7 +35,7 @@ export default async function EditSaleReturnPage({ params }: { params: Promise<{
         <p className="text-sm text-muted-foreground mt-1">Update the goods a customer returned.</p>
       </div>
       <EditSaleReturnForm
-        ret={{ id: r.id, customerId: r.customer_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null, nosCarton: r.nos_carton ?? null, weightPerCarton: r.weight_per_carton ?? null, gradeId: r.grade_id ?? null, lotNo: r.lot_no ?? null, linked: !!r.sale_order_id }}
+        ret={{ id: r.id, customerId: r.customer_id, stockItemId: r.stock_item_id, quantity: r.quantity, rate: r.rate, currencyCode: r.currency_code, exchangeRate: r.exchange_rate, date: r.date, reason: r.reason ?? null, locationId: r.location_id ?? null, yarnType: r.yarn_type ?? null, yarnWeight: r.yarn_weight ?? null, multiplyBy: r.multiply_by ?? null, nosCarton: r.nos_carton ?? null, weightPerCarton: r.weight_per_carton ?? null, gradeId: r.grade_id ?? null, lotNo: r.lot_no ?? null, rateBasis: r.rate_basis ?? null, linked: !!r.sale_order_id }}
         customers={rawCustomers ?? []}
         lots={lotList}
         locations={rawLocs ?? []}

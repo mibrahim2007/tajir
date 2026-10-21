@@ -16,7 +16,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
 
   const [{ data: order }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }, profiles] = await Promise.all([
     admin.from('purchase_orders')
-      .select('id, date, quantity, rate, currency_code, exchange_rate, advance_paid, supplier_id, stock_item_id, location_id, nos_carton, weight_per_carton')
+      .select('id, date, quantity, rate, currency_code, exchange_rate, advance_paid, supplier_id, stock_item_id, location_id, nos_carton, weight_per_carton, rate_basis')
       .eq('id', id).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
@@ -35,7 +35,7 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
         <p className="text-sm text-muted-foreground mt-1">Update the quantity, rate, advance, date or location of this purchase.</p>
       </div>
       <EditPurchaseForm
-        purchase={{ id: order.id, supplierId: order.supplier_id, stockItemId: order.stock_item_id, quantity: order.quantity, rate: order.rate, currencyCode: order.currency_code, exchangeRate: order.exchange_rate, advancePaid: order.advance_paid, date: order.date, locationId: order.location_id, nosCarton: order.nos_carton, weightPerCarton: order.weight_per_carton }}
+        purchase={{ id: order.id, supplierId: order.supplier_id, stockItemId: order.stock_item_id, quantity: order.quantity, rate: order.rate, currencyCode: order.currency_code, exchangeRate: order.exchange_rate, advancePaid: order.advance_paid, date: order.date, locationId: order.location_id, nosCarton: order.nos_carton, weightPerCarton: order.weight_per_carton, rateBasis: order.rate_basis }}
         suppliers={rawSuppliers ?? []}
         lots={lotList}
         locations={rawLocs ?? []}

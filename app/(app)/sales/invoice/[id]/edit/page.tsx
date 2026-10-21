@@ -21,7 +21,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, agent_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, agent_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no, rate_basis')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -114,6 +114,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
       multiplyBy:  l.multiply_by ?? 1,
       nosCarton:       l.nos_carton ?? NaN,
       weightPerCarton: l.weight_per_carton ?? NaN,
+      rateBasis:       l.rate_basis ?? 'standard',
       gradeId:         l.grade_id ?? '',
       lotNo:           l.lot_no ?? '',
     })),

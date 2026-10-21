@@ -16,7 +16,7 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('sales_orders')
-      .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, grade_id, lot_no, weight_per_carton')
+      .select('id, date, customer_id, stock_item_id, quantity, rate, currency_code, grade_id, lot_no, weight_per_carton, rate_basis')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
@@ -43,6 +43,7 @@ export default async function NewSaleReturnPage({ searchParams }: { searchParams
     gradeId: o.grade_id,
     lotNo: o.lot_no,
     weightPerCarton: o.weight_per_carton,
+    rateBasis: o.rate_basis,
   }))
   const locations = rawLocs ?? []
   const sp = await searchParams

@@ -46,9 +46,18 @@ export async function createStockTransferAction(input: unknown): Promise<ActionR
   const { fromLocationId, toLocationId, stockItemId, date, notes } = parsed.data
   const admin = createAdminClient()
 
-  // The item type's formula derives a carton line's quantity (cartons × kg;
-  // per pack: the packs); its flags require the grade / lot being moved.
-  const profile = profileOf(await loadProfilesFor(admin, tenantId, [stockItemId]), stockItemId)
+  // Transfers have no rate basis of their own: the item's default (last-used)
+  // basis derives a carton line's quantity (cartons × kg; per pack: packs).
+  // Grade / lot are required when that basis tracks them, or when the stock at
+  // the from-location is held by grade / lot (bought per lb, moved lot by lot).
+  const itemProfile = profileOf(await loadProfilesFor(admin, tenantId, [stockItemId]), stockItemId)
+  const positions = await loadStockPositions(admin, tenantId, { stockItemIds: [stockItemId], locationId: fromLocationId })
+  const held = positions.filter((p) => p.quantity > 0)
+  const profile = {
+    ...itemProfile,
+    trackGrade: itemProfile.trackGrade || held.some((p) => p.gradeId),
+    trackLot:   itemProfile.trackLot || held.some((p) => p.lotNo),
+  }
   const carton = usesCartons(profile.formula)
   const quantity = cartonStockQty(profile.formula, parsed.data) ?? parsed.data.quantity ?? 0
   if (!(quantity > 0)) {
@@ -61,7 +70,6 @@ export async function createStockTransferAction(input: unknown): Promise<ActionR
 
   // A tracked grade / lot can only be moved out of a godown that holds it.
   if (profile.trackGrade || profile.trackLot) {
-    const positions = await loadStockPositions(admin, tenantId, { stockItemIds: [stockItemId], locationId: fromLocationId })
     const short = findPositionShortfalls(positions, [{
       stockItemId, locationId: fromLocationId, gradeId, lotNo, quantity,
       trackGrade: profile.trackGrade, trackLot: profile.trackLot,
