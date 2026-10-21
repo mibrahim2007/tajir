@@ -1,8 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
 import { getAgentOptions } from '@/lib/agents/options'
 import { CreatePurchaseForm } from './create-purchase-form'
 
@@ -11,21 +10,21 @@ export default async function NewPurchasePage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
+  const [{ data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }, { data: rawGrades }] = await Promise.all([
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
   ])
 
-  const [yarnLotIds, polyesterLotIds, agents] = await Promise.all([
-    loadYarnLotIds(admin, tenantId),
-    loadPolyesterLotIds(admin, tenantId),
+  const [profiles, agents] = await Promise.all([
+    loadItemProfiles(admin, tenantId),
     getAgentOptions(admin, tenantId),
   ])
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id), isPolyester: polyesterLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, profile: profileOf(profiles, l.id) }))
   const locationList = rawLocs ?? []
 
   return (
@@ -35,7 +34,8 @@ export default async function NewPurchasePage() {
         <h1 className="text-2xl font-extrabold tracking-tight">New Purchase</h1>
         <p className="text-sm text-muted-foreground mt-1">Record a purchase from a supplier.</p>
       </div>
-      <CreatePurchaseForm today={today} suppliers={supplierList} customers={customerList} lots={lotList} locations={locationList} agents={agents} />
+      <CreatePurchaseForm today={today} suppliers={supplierList} customers={customerList} lots={lotList} locations={locationList}
+        grades={rawGrades ?? []} agents={agents} />
     </div>
   )
 }

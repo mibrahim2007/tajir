@@ -13,15 +13,16 @@ export default async function PurchaseReturnsPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }] = await Promise.all([
+  const [{ data: rawReturns }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }, { data: rawGrades }] = await Promise.all([
     admin.from('purchase_returns')
-      .select('id, serial_number, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id, yarn_type, yarn_weight, multiply_by')
+      .select('id, serial_number, date, quantity, rate, currency_code, exchange_rate, pkr_equivalent, supplier_id, stock_item_id, purchase_order_id, reason, location_id, yarn_type, yarn_weight, multiply_by, nos_carton, grade_id, lot_no')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(200),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const returns = rawReturns ?? []
@@ -31,6 +32,10 @@ export default async function PurchaseReturnsPage() {
   const lotMap = new Map(lotList.map((l) => [l.id, l.name]))
   const locationList = rawLocs ?? []
   const locationMap = new Map(locationList.map((l) => [l.id, l.name]))
+  const gradeMap = new Map((rawGrades ?? []).map((g) => [g.id, g.name]))
+  // "Grade AA-Even · Lot PI-2026-0012/1" under the item, when the line has them.
+  const gradeLot = (r: { grade_id: string | null; lot_no: string | null }) =>
+    [r.grade_id ? gradeMap.get(r.grade_id) : null, r.lot_no ? `Lot ${r.lot_no}` : null].filter(Boolean).join(' · ')
 
   const rowActions = (r: (typeof returns)[number]) => (
     <RoleGate allowedRoles={['owner']}>
@@ -79,7 +84,8 @@ export default async function PurchaseReturnsPage() {
                   <dt className="text-muted-foreground">Supplier</dt>
                   <dd className="text-right break-words">{supplierMap.get(r.supplier_id) ?? '—'}</dd>
                   <dt className="text-muted-foreground">Item</dt>
-                  <dd className="text-right break-words">{lotMap.get(r.stock_item_id) ?? '—'} × {r.quantity}</dd>
+                  <dd className="text-right break-words">{lotMap.get(r.stock_item_id) ?? '—'} × {r.quantity}{r.nos_carton ? ` (${r.nos_carton} ctn)` : ''}
+                    {gradeLot(r) && <span className="block text-xs text-muted-foreground">{gradeLot(r)}</span>}</dd>
                   <dt className="text-muted-foreground">Rate</dt>
                   <dd className="text-right tabular-nums">{r.currency_code} {r.rate}</dd>
                   <dt className="text-muted-foreground">Amount</dt>
@@ -124,8 +130,14 @@ export default async function PurchaseReturnsPage() {
                     <td className="px-2 py-3 font-medium tabular-nums whitespace-nowrap">{r.serial_number ?? '—'}</td>
                     <td className="px-2 py-3 whitespace-nowrap">{formatPKTDate(new Date(r.date))}</td>
                     <td className="px-2 py-3 break-words">{supplierMap.get(r.supplier_id) ?? '—'}</td>
-                    <td className="px-2 py-3 break-words">{lotMap.get(r.stock_item_id) ?? '—'}</td>
-                    <td className="px-2 py-3 text-right tabular-nums">{r.quantity}</td>
+                    <td className="px-2 py-3 break-words">
+                      {lotMap.get(r.stock_item_id) ?? '—'}
+                      {gradeLot(r) && <span className="block text-xs text-muted-foreground">{gradeLot(r)}</span>}
+                    </td>
+                    <td className="px-2 py-3 text-right tabular-nums">
+                      {r.quantity}
+                      {r.nos_carton ? <span className="block text-xs text-muted-foreground">{r.nos_carton} ctn</span> : null}
+                    </td>
                     <td className="max-xl:hidden px-2 py-3 text-right tabular-nums whitespace-nowrap">{r.currency_code} {r.rate}</td>
                     <td className="px-2 py-3 text-right tabular-nums whitespace-nowrap">{formatPKR(r.pkr_equivalent)}</td>
                     <td className="max-xl:hidden px-2 py-3 text-muted-foreground text-xs break-words">{r.location_id ? locationMap.get(r.location_id) ?? '—' : '—'}</td>

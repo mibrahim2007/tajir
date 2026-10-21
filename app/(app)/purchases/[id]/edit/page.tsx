@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
 import { EditPurchaseForm } from '../../edit-purchase-form'
 
 // Quick edit of a single purchase order (a solo order or a one-line invoice).
@@ -14,19 +14,19 @@ export default async function EditPurchasePage({ params }: { params: Promise<{ i
 
   const admin = createAdminClient()
 
-  const [{ data: order }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }, polyesterLotIds] = await Promise.all([
+  const [{ data: order }, { data: rawSuppliers }, { data: rawLots }, { data: rawLocs }, profiles] = await Promise.all([
     admin.from('purchase_orders')
       .select('id, date, quantity, rate, currency_code, exchange_rate, advance_paid, supplier_id, stock_item_id, location_id, nos_carton, weight_per_carton')
       .eq('id', id).eq('tenant_id', tenantId).maybeSingle(),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
-    loadPolyesterLotIds(admin, tenantId),
+    loadItemProfiles(admin, tenantId),
   ])
 
   if (!order) notFound()
 
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isPolyester: polyesterLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, profile: profileOf(profiles, l.id) }))
 
   return (
     <div className="p-6 max-w-[1440px] mx-auto">

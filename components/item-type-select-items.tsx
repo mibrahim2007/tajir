@@ -8,7 +8,7 @@ export type ItemTypeOption = { id: string; name: string; parentId?: string | nul
 // Renders the item-type options for a stock-item Select as "sub-types only":
 // a top-level type that HAS sub-types becomes a non-selectable group header and
 // only its sub-types are pickable; a top-level type with no sub-types stays
-// directly selectable. Place inside a <SelectContent> (after any "No type" item).
+// directly selectable. Place inside a <SelectContent> (before any "+ Add item type" item).
 //
 // keepSelectableId: when editing an item already assigned to a parent type that
 // now has sub-types, pass its id so the parent stays selectable — otherwise its

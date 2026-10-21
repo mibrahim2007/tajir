@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins, Receipt, FileSpreadsheet } from 'lucide-react'
+import { Package, TrendingDown, TrendingUp, ArrowLeftRight, Scale, BookOpen, BarChart2, Landmark, Wallet, MapPin, ClipboardList, BookMarked, DollarSign, PieChart, Link2, HandCoins, Receipt, FileSpreadsheet, Layers } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { ReportsGuide } from './reports-guide'
 
@@ -14,6 +14,7 @@ const reports = [
   { href: '/reports/stock-summary', label: 'Stock Summary', description: 'All stock items with current quantities. Filterable and exportable.', icon: Package },
   { href: '/reports/stock-valuation', label: 'Stock Valuation', description: 'Current stock with rate (from latest purchase or opening rate) and total value in PKR. Printable.', icon: DollarSign },
   { href: '/reports/location-stock', label: 'Location-wise Stock', description: 'Stock quantities per location, computed from purchases, sales, returns, and transfers. Filterable and printable.', icon: MapPin },
+  { href: '/reports/stock-position', label: 'Stock by Grade & Lot', description: 'On-hand stock per location, item, grade and lot, in the stock unit and in cartons / bags. Filter by location or item type.', icon: Layers },
   { href: '/reports/receivables-aging', label: 'Receivables Aging', description: 'Outstanding customer balances by 0–30, 31–60, 61–90, 90+ day buckets, plus unrecovered employee loans and advances aged from their due date.', icon: TrendingUp },
   { href: '/reports/pending-receivables', label: 'Pending Receivables (Invoice-wise)', description: 'Every unpaid sale invoice with its amount, returns, receipts applied to it, FIFO adjustments and balance — grouped by customer, with overdue days and an age profile.', icon: Receipt },
   { href: '/reports/payables-aging', label: 'Payables Aging', description: 'Outstanding supplier balances by aging bucket.', icon: TrendingDown },

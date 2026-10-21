@@ -24,7 +24,10 @@ import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoi
 import { editPurchaseInvoiceAction } from '@/app/actions/edit-purchase-invoice'
 import { FileUploader, type FileUploaderHandle } from '@/components/file-uploader'
 import { YarnLineFields } from '@/components/yarn-line-fields'
-import { computeQtyLbs } from '@/lib/polyester'
+import { usesCartons, usesYarnFields, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
+import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { GradeSelect } from '@/components/grade-select'
+import type { GradeOption } from '@/app/actions/grades'
 import { todayPKT } from '@/lib/utils/dates'
 
 // Larger, comfortable line-item inputs: ~48px tall, 16px text (md:text-base
@@ -46,10 +49,15 @@ const lineSchema = z.object({
   yarnType:     z.string().optional().default(''),
   yarnWeight:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
   multiplyBy:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
-  // Polyester-only line fields (cartons + weight per carton in kg). QTY LBS is
-  // derived and drives the amount; stock still uses `quantity`.
+  // Carton-formula line fields (per lb / per kg / per pack): cartons + weight
+  // per carton in kg. They derive the stock quantity and the billed quantity.
   nosCarton:        optionalNumber,
   weightPerCarton:  optionalNumber,
+  // Grade / lot / godown, shown for items whose type tracks grade or lot. A
+  // tracked lot left blank gets a number from the invoice serial on save.
+  gradeId:          z.string().optional().default(''),
+  lotNo:            z.string().max(60).optional().default(''),
+  locationId:       z.string().optional().default(''),
 })
 
 const schema = z.object({
@@ -83,15 +91,17 @@ type Props = {
   agents?:   AgentOption[]
   suppliers: { id: string; name: string }[]
   customers?: { id: string; name: string }[]
-  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; isYarn?: boolean; isPolyester?: boolean }[]
+  /** Each item's formula profile comes from its item type. */
+  lots:      { id: string; name: string; count: string; unitOfMeasure: string | null; profile?: ItemProfile }[]
   locations: { id: string; name: string }[]
+  grades?:   GradeOption[]
   // Edit mode: pre-fill the form and save via editPurchaseInvoiceAction.
   mode?:          'create' | 'edit'
   invoiceId?:     string
   initialValues?: FormValues
 }
 
-export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations, agents = [], mode = 'create', invoiceId, initialValues }: Props) {
+export function CreatePurchaseForm({ today, suppliers, customers = [], lots, locations, grades = [], agents = [], mode = 'create', invoiceId, initialValues }: Props) {
   const isEdit = mode === 'edit'
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -113,8 +123,17 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     [customers, supplierList],
   )
   const lotPickerItems      = lotList
-  const yarnLotIds = useMemo(() => new Set(lots.filter((l) => l.isYarn).map((l) => l.id)), [lots])
-  const polyesterLotIds = useMemo(() => new Set(lots.filter((l) => l.isPolyester).map((l) => l.id)), [lots])
+  // Formula profile per item; items made from the line's quick-create are added
+  // as they're created.
+  const [createdProfiles, setCreatedProfiles] = useState<Record<string, ItemProfile>>({})
+  // Grades added from a line's "+ Add grade" appear in every line at once.
+  const [gradeList, setGradeList] = useState<GradeOption[]>(grades)
+  const profileById = useMemo(() => {
+    const m = new Map(lots.map((l) => [l.id, l.profile ?? STANDARD_PROFILE]))
+    for (const [id, p] of Object.entries(createdProfiles)) m.set(id, p)
+    return m
+  }, [lots, createdProfiles])
+  const profileFor = (id?: string) => (id && profileById.get(id)) || STANDARD_PROFILE
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as Resolver<FormValues>,
@@ -122,7 +141,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
       supplierId: '', supplierInvoiceNo: '', date: today, notes: '', advancePaid: 0,
       currencyCode: 'PKR', exchangeRate: 1, locationId: '',
       agentId: '', agentCommissionType: '', agentCommissionRate: null,
-      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN }],
+      lines: [{ stockItemId: '', quantity: NaN, rate: NaN, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '', locationId: '' }],
     },
   })
 
@@ -134,54 +153,56 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
   const er = watchedCurrency === 'USD' ? (watchedExchangeRate || 1) : 1
 
-  // Yarn lines multiply the money amount by their Multiply By (default 1).
-  const lineMult = (l: { stockItemId?: string; multiplyBy?: number | null }) =>
-    l.stockItemId && yarnLotIds.has(l.stockItemId) ? (Number(l.multiplyBy) || 1) : 1
-
-  // Pre-discount amount for a line. Polyester lines bill on QTY LBS
-  // (nos_carton * weight / 2.2046) instead of the plain quantity; every other
-  // line keeps quantity * rate * yarn-multiplier.
+  // Pre-discount amount for a line, by its item type's formula: per lb / per kg
+  // / per pack bill on the cartons, yarn applies Multiply By, the rest Qty × Rate.
   const lineGross = (l: {
     stockItemId?: string; quantity?: number | null; rate?: number | null
     multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
-  }) => {
-    const rate = (l.rate || 0) * er
-    if (l.stockItemId && polyesterLotIds.has(l.stockItemId)) {
-      return computeQtyLbs(l.nosCarton, l.weightPerCarton) * rate
-    }
-    return (l.quantity || 0) * rate * lineMult(l)
-  }
+  }) => lineGrossAmount(profileFor(l.stockItemId).formula, l, l.rate || 0, er)
 
   const { subtotal, discountTotal, netTotal } = useMemo(() => {
     const sub  = watchedLines.reduce((s, l) => s + lineGross(l), 0)
     const disc = watchedLines.reduce((s, l) => s + lineGross(l) * ((l.discountPct || 0) / 100), 0)
     return { subtotal: sub, discountTotal: disc, netTotal: sub - disc }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedLines, er, yarnLotIds, polyesterLotIds])
+  }, [watchedLines, er, profileById])
 
   // Base for a per-unit commission rate; the percentage basis is netTotal.
   const commissionQty = watchedLines.reduce((s, l) => s + (Number(l.quantity) || 0), 0)
 
-  // Show the Nos_Carton / Wt/Carton / QTY LBS columns only when the invoice has
-  // at least one polyester line, so ordinary invoices stay unchanged.
-  const hasPolyester = watchedLines.some((l) => !!l.stockItemId && polyesterLotIds.has(l.stockItemId))
+  // Show the Nos Carton / Weight / Billed Qty columns only when the invoice has
+  // at least one carton-formula line, so ordinary invoices stay unchanged.
+  const hasCarton = watchedLines.some((l) => usesCartons(profileFor(l.stockItemId).formula))
 
-  // For polyester lines, Quantity is derived = Nos Carton × Weight; keep the form
-  // field in sync so it drives stock and validation. watch() mutates the lines
-  // array in place, so key the effect on a value signature (not the array ref)
-  // so it re-runs when carton/weight change. The equality guard stops a loop.
-  const polyQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
+  // A carton line picks up its type's standard weight per pack while its weight
+  // is still empty. Keyed on the item ids so it runs when an item is picked.
+  const itemSig = watchedLines.map((l) => l.stockItemId ?? '').join('|')
   useEffect(() => {
     watchedLines.forEach((l, i) => {
-      if (!l.stockItemId || !polyesterLotIds.has(l.stockItemId)) return
-      const q = (Number(l.nosCarton) || 0) * (Number(l.weightPerCarton) || 0)
+      const p = profileFor(l.stockItemId)
+      if (!usesCartons(p.formula) || !p.stdPackWeight) return
+      if (Number.isFinite(Number(form.getValues(`lines.${i}.weightPerCarton`)))) return
+      form.setValue(`lines.${i}.weightPerCarton`, p.stdPackWeight, { shouldDirty: true })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemSig, profileById])
+
+  // For carton lines, Quantity is derived (Nos Carton × Weight; per pack: the
+  // packs); keep the form field in sync so it drives stock and validation.
+  // watch() mutates the lines array in place, so key the effect on a value
+  // signature (not the array ref). The equality guard stops a loop.
+  const cartonQtySig = watchedLines.map((l) => `${l.stockItemId ?? ''}:${l.nosCarton}:${l.weightPerCarton}`).join('|')
+  useEffect(() => {
+    watchedLines.forEach((l, i) => {
+      const q = cartonStockQty(profileFor(l.stockItemId).formula, l)
+      if (q === null) return
       const cur = Number(form.getValues(`lines.${i}.quantity`))
       const next = q > 0 ? q : NaN
       const same = q > 0 ? cur === q : Number.isNaN(cur)
       if (!same) form.setValue(`lines.${i}.quantity`, next, { shouldDirty: true })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [polyQtySig, polyesterLotIds])
+  }, [cartonQtySig, profileById])
 
   const fmt = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 0 })
   const fmt4 = (n: number) => n.toLocaleString('en-PK', { maximumFractionDigits: 4 })
@@ -222,6 +243,9 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
           multiplyBy:  Number.isFinite(l.multiplyBy) ? l.multiplyBy : undefined,
           nosCarton:       Number.isFinite(l.nosCarton) ? l.nosCarton : undefined,
           weightPerCarton: Number.isFinite(l.weightPerCarton) ? l.weightPerCarton : undefined,
+          gradeId:         l.gradeId || undefined,
+          lotNo:           l.lotNo?.trim() || undefined,
+          locationId:      l.locationId || undefined,
         })),
       }
 
@@ -377,13 +401,13 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                         <tr>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-8">#</th>
                           <th className="text-left px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Item</th>
-                          {hasPolyester && <>
+                          {hasCarton && <>
                             <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Nos Carton</th>
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Weight</th>
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-32">Weight (kg)</th>
                           </>}
-                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">{hasPolyester ? 'Quantity' : 'Qty'}</th>
-                          {hasPolyester && (
-                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">LBS Qty</th>
+                          <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">{hasCarton ? 'Quantity' : 'Qty'}</th>
+                          {hasCarton && (
+                            <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-36">Billed Qty</th>
                           )}
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-40">Rate</th>
                           <th className="text-right px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground w-28">Disc %</th>
@@ -394,10 +418,12 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                       <tbody className="divide-y">
                         {fields.map((field, index) => {
                           const line = watchedLines[index] ?? {}
-                          const isYarnLine = !!line.stockItemId && yarnLotIds.has(line.stockItemId)
-                          const isPolyesterLine = !!line.stockItemId && polyesterLotIds.has(line.stockItemId)
-                          const qtyLbs = computeQtyLbs(line.nosCarton, line.weightPerCarton)
-                          const qtyKg  = (Number(line.nosCarton) || 0) * (Number(line.weightPerCarton) || 0)
+                          const profile = profileFor(line.stockItemId)
+                          const isYarnLine = usesYarnFields(profile.formula)
+                          const isCartonLine = usesCartons(profile.formula)
+                          const billed = billingQty(profile.formula, line)
+                          const stockQty = cartonStockQty(profile.formula, line) ?? 0
+                          const isTrackedLine = profile.trackGrade || profile.trackLot
                           const gross  = lineGross(line)
                           const amount = gross * (1 - (line.discountPct || 0) / 100)
                           return (
@@ -419,7 +445,8 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                         createLabel="New Stock Item"
                                         onCreateSuccess={(item) => setLotList((prev) => [...prev, item])}
                                         quickCreate={(onSuccess, onCancel) => (
-                                          <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel} />
+                                          <QuickCreateLot onSuccess={onSuccess} onCancel={onCancel}
+                                            onCreatedProfile={(id, p) => setCreatedProfiles((prev) => ({ ...prev, [id]: p }))} />
                                         )}
                                       />
                                       {fieldState.error && <p className="text-xs text-destructive mt-1">{fieldState.error.message}</p>}
@@ -427,13 +454,13 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                   )}
                                 />
                               </td>
-                              {hasPolyester && (isPolyesterLine ? <>
+                              {hasCarton && (isCartonLine ? <>
                                 <td className="px-3 py-3">
                                   <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
                                     {...form.register(`lines.${index}.nosCarton`, { valueAsNumber: true })} />
                                 </td>
                                 <td className="px-3 py-3">
-                                  <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
+                                  <NumericInput min={0} step="0.0001" placeholder={needsWeight(profile.formula) ? '' : 'optional'} className={LINE_INPUT_CLS}
                                     {...form.register(`lines.${index}.weightPerCarton`, { valueAsNumber: true })} />
                                 </td>
                               </> : <>
@@ -441,10 +468,10 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>
                               </>)}
                               <td className="px-3 py-3">
-                                {isPolyesterLine ? (
-                                  <div title="Auto = Nos Carton × Weight"
+                                {isCartonLine ? (
+                                  <div title={profile.formula === 'per_pack' ? 'Auto = Nos Carton' : 'Auto = Nos Carton × Weight'}
                                     className="flex h-12 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-base tabular-nums text-muted-foreground">
-                                    {qtyKg > 0 ? fmt4(qtyKg) : '—'}
+                                    {stockQty > 0 ? fmt4(stockQty) : '—'}
                                   </div>
                                 ) : (
                                   <>
@@ -457,8 +484,11 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                                 )}
                                 {(() => { const uom = lots.find(l => l.id === line.stockItemId)?.unitOfMeasure; return uom ? <p className="text-xs text-muted-foreground mt-0.5 text-right">{uom}</p> : null })()}
                               </td>
-                              {hasPolyester && (isPolyesterLine
-                                ? <td className="px-3 py-3 text-right tabular-nums text-base text-muted-foreground">{qtyLbs > 0 ? fmt4(qtyLbs) : '—'}</td>
+                              {hasCarton && (isCartonLine
+                                ? <td className="px-3 py-3 text-right tabular-nums text-base text-muted-foreground">
+                                    {billed > 0 ? fmt4(billed) : '—'}
+                                    <p className="text-xs mt-0.5">{billingUnitLabel(profile.formula, profile.packUnit)}</p>
+                                  </td>
                                 : <td className="px-3 py-3 text-right text-base text-muted-foreground">—</td>)}
                               <td className="px-3 py-3">
                                 <NumericInput min={0} step="0.0001" placeholder="" className={LINE_INPUT_CLS}
@@ -485,8 +515,48 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
                             {isYarnLine && (
                               <tr>
                                 <td />
-                                <td colSpan={hasPolyester ? 9 : 6} className="px-3 pb-3">
+                                <td colSpan={hasCarton ? 9 : 6} className="px-3 pb-3">
                                   <YarnLineFields index={index} />
+                                </td>
+                              </tr>
+                            )}
+                            {isTrackedLine && (
+                              <tr>
+                                <td />
+                                <td colSpan={hasCarton ? 9 : 6} className="px-3 pb-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 max-w-3xl">
+                                    {profile.trackGrade && (
+                                      <Controller control={form.control} name={`lines.${index}.gradeId`} render={({ field: f }) => (
+                                        <div>
+                                          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Grade <span className="text-destructive">*</span></p>
+                                          <GradeSelect
+                                            grades={gradeList}
+                                            value={f.value}
+                                            onChange={(v) => f.onChange(v ?? '')}
+                                            onGradeCreated={(g) => setGradeList((prev) => [...prev, g])}
+                                          />
+                                        </div>
+                                      )} />
+                                    )}
+                                    {profile.trackLot && (
+                                      <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Lot No</p>
+                                        <Input className="h-9" placeholder="Auto if blank" {...form.register(`lines.${index}.lotNo`)} />
+                                      </div>
+                                    )}
+                                    <Controller control={form.control} name={`lines.${index}.locationId`} render={({ field: f }) => (
+                                      <div>
+                                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Godown</p>
+                                        <Select value={f.value || '_header_'} onValueChange={(v) => f.onChange(v === '_header_' ? '' : v)}>
+                                          <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="_header_">Same as Receive At</SelectItem>
+                                            {locations.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    )} />
+                                  </div>
                                 </td>
                               </tr>
                             )}
@@ -500,7 +570,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
 
                 <div className="mt-3">
                   <Button type="button" variant="outline" size="sm"
-                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN })}
+                    onClick={() => append({ stockItemId: '', quantity: 0, rate: 0, discountPct: 0, yarnType: '', yarnWeight: NaN, multiplyBy: 1, nosCarton: NaN, weightPerCarton: NaN, gradeId: '', lotNo: '', locationId: '' })}
                     className="gap-1.5">
                     <Plus className="size-4" /> Add Line
                   </Button>

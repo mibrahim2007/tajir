@@ -13,7 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { NumericInput } from '@/components/numeric-input'
-import { computeQtyLbs } from '@/lib/polyester'
+import { usesCartons, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
+import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
 import { editPurchaseAction } from '@/app/actions/edit-purchase'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 import { todayPKT } from '@/lib/utils/dates'
@@ -57,7 +58,8 @@ type Purchase = {
 type Props = {
   purchase: Purchase
   suppliers: { id: string; name: string }[]
-  lots: { id: string; name: string; count: string; unitOfMeasure: string | null; isPolyester?: boolean }[]
+  /** Each item's formula profile comes from its item type. */
+  lots: { id: string; name: string; count: string; unitOfMeasure: string | null; profile?: ItemProfile }[]
   locations: { id: string; name: string }[]
 }
 
@@ -84,12 +86,15 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
     },
   })
 
-  const selectedIsPolyester = !!lots.find((l) => l.id === form.watch('stockItemId'))?.isPolyester
+  // The item type's formula decides the carton fields and the billed quantity.
+  const profile = lots.find((l) => l.id === form.watch('stockItemId'))?.profile ?? STANDARD_PROFILE
+  const isCarton = usesCartons(profile.formula)
   const watchedNos = form.watch('nosCarton')
   const watchedWt  = form.watch('weightPerCarton')
-  const qtyLbs = computeQtyLbs(watchedNos, watchedWt)
+  const billedQty = billingQty(profile.formula, { quantity: Number(form.watch('quantity')) || 0, nosCarton: watchedNos, weightPerCarton: watchedWt })
+  const billedUnit = billingUnitLabel(profile.formula, profile.packUnit)
 
-  // Summary values (display only) — polyester lines are priced per lb.
+  // Summary values (display only).
   const watchedSupplierId = form.watch('supplierId')
   const watchedStockId    = form.watch('stockItemId')
   const watchedQty        = Number(form.watch('quantity')) || 0
@@ -100,20 +105,19 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
   const watchedDate       = form.watch('date')
   const selectedLot       = lots.find((l) => l.id === watchedStockId)
   const supplierName      = suppliers.find((s) => s.id === watchedSupplierId)?.name
-  const pricedQty         = selectedIsPolyester ? qtyLbs : watchedQty
-  const lineAmount        = pricedQty * rateNum
+  const lineAmount        = lineGrossAmount(profile.formula, { quantity: watchedQty, nosCarton: watchedNos, weightPerCarton: watchedWt }, rateNum)
   const totalPKR          = lineAmount * (watchedCurrency === 'USD' ? watchedER : 1)
 
-  // For a polyester item, Quantity is derived = Nos Carton × Weight.
+  // For a carton item, Quantity is derived (Nos Carton × Weight; per pack: packs).
   useEffect(() => {
-    if (!selectedIsPolyester) return
-    const q = (Number(watchedNos) || 0) * (Number(watchedWt) || 0)
+    const q = cartonStockQty(profile.formula, { nosCarton: watchedNos, weightPerCarton: watchedWt })
+    if (q === null) return
     const cur = Number(form.getValues('quantity'))
     const next = q > 0 ? q : NaN
     const same = q > 0 ? cur === q : Number.isNaN(cur)
     if (!same) form.setValue('quantity', next, { shouldDirty: true })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIsPolyester, watchedNos, watchedWt])
+  }, [profile.formula, watchedNos, watchedWt])
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -168,7 +172,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-            {selectedIsPolyester && (
+            {isCarton && (
               <>
                 <FormItem className="md:col-span-3">
                   <FormLabel>Nos Carton</FormLabel>
@@ -178,7 +182,7 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
                   </FormControl>
                 </FormItem>
                 <FormItem className="md:col-span-3">
-                  <FormLabel>Weight</FormLabel>
+                  <FormLabel>Weight (kg){profile.formula === 'per_pack' && <span className="ml-1 text-muted-foreground font-normal">(optional)</span>}</FormLabel>
                   <FormControl>
                     <NumericInput step="0.0001" min="0" className="text-right"
                       {...form.register('weightPerCarton', { valueAsNumber: true })} />
@@ -190,29 +194,29 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
-                <FormItem className={selectedIsPolyester ? 'md:col-span-3' : 'md:col-span-4'}>
-                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}{selectedIsPolyester && <span className="ml-1 text-muted-foreground font-normal">(auto = Nos Carton × Weight)</span>}</FormLabel>
-                  <FormControl><Input type="number" step="0.001" min="0" value={value} readOnly={selectedIsPolyester} tabIndex={selectedIsPolyester ? -1 : undefined} className={selectedIsPolyester ? 'bg-muted/40 text-muted-foreground cursor-default' : undefined} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
+                <FormItem className={isCarton ? 'md:col-span-3' : 'md:col-span-4'}>
+                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}{isCarton && <span className="ml-1 text-muted-foreground font-normal">(auto)</span>}</FormLabel>
+                  <FormControl><Input type="number" step="0.001" min="0" value={value} readOnly={isCarton} tabIndex={isCarton ? -1 : undefined} className={isCarton ? 'bg-muted/40 text-muted-foreground cursor-default' : undefined} {...form.register('quantity', { valueAsNumber: true })} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )
             }} />
 
-            {selectedIsPolyester && (
+            {isCarton && (
               <FormItem className="md:col-span-3">
-                <FormLabel>LBS Qty</FormLabel>
+                <FormLabel>Billed Qty ({billedUnit})</FormLabel>
                 <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
-                  {qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
+                  {billedQty > 0 ? billedQty.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
                 </div>
               </FormItem>
             )}
 
-            <div className={selectedIsPolyester ? 'md:col-span-12' : 'md:col-span-8'}>
+            <div className={isCarton ? 'md:col-span-12' : 'md:col-span-8'}>
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
               exchangeRateName="exchangeRate"
-              label={selectedIsPolyester ? 'Rate per Lb' : 'Rate per Unit'}
+              label={isCarton ? `Rate per ${billedUnit}` : 'Rate per Unit'}
               required
             />
             </div>
@@ -277,14 +281,14 @@ export function EditPurchaseForm({ purchase, suppliers, lots, locations }: Props
                     <span className="text-muted-foreground shrink-0">Quantity</span>
                     <span className="font-medium tabular-nums text-right">{watchedQty.toLocaleString()}{selectedLot?.unitOfMeasure ? ` ${selectedLot.unitOfMeasure}` : ''}</span>
                   </div>
-                  {selectedIsPolyester && (
+                  {isCarton && (
                     <div className="flex justify-between gap-2">
-                      <span className="text-muted-foreground shrink-0">LBS Qty</span>
-                      <span className="font-medium tabular-nums text-right">{qtyLbs > 0 ? qtyLbs.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}</span>
+                      <span className="text-muted-foreground shrink-0">Billed Qty</span>
+                      <span className="font-medium tabular-nums text-right">{billedQty > 0 ? `${billedQty.toLocaleString('en-PK', { maximumFractionDigits: 4 })} ${billedUnit}` : '—'}</span>
                     </div>
                   )}
                   <div className="flex justify-between gap-2">
-                    <span className="text-muted-foreground shrink-0">{selectedIsPolyester ? 'Rate / Lb' : 'Rate'}</span>
+                    <span className="text-muted-foreground shrink-0">{isCarton ? `Rate / ${billedUnit}` : 'Rate'}</span>
                     <span className="font-medium tabular-nums text-right">{formatCurrency(rateNum, watchedCurrency)}</span>
                   </div>
                   {watchedCurrency === 'USD' && (

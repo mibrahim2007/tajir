@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { lineDetails } from '@/lib/print/line-details'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -23,7 +24,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, grade_id, lot_no, nos_carton, weight_per_carton')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -36,6 +37,11 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
   const poNo = lines.find((l) => l.po_no && l.po_no.trim())?.po_no?.trim() ?? null
   const dcNo = lines.find((l) => l.dc_no && l.dc_no.trim())?.dc_no?.trim() ?? null
   const stockIds    = [...new Set(lines.map((l) => l.stock_item_id))]
+  const gradeIds    = [...new Set(lines.map((l) => l.grade_id).filter(Boolean) as string[])]
+  const { data: gradeRows } = gradeIds.length > 0
+    ? await admin.from('grades').select('id, name').in('id', gradeIds)
+    : { data: [] as { id: string; name: string }[] }
+  const gradeNames  = new Map((gradeRows ?? []).map((g) => [g.id, g.name]))
   const customerIds = [...new Set(lines.map((l) => l.customer_id))]
 
   const [{ data: stockItems }, { data: customers }, { data: journalEntry }, { data: rawPurchases }] = await Promise.all([
@@ -181,14 +187,8 @@ ${shareUrl}`
                   <td className="px-3 py-2.5 border-r border-gray-200 text-gray-500 tabular-nums">{i + 1}</td>
                   <td className="px-3 py-2.5 border-r border-gray-200 font-medium">
                     {stockMap.get(line.stock_item_id)?.name ?? '—'}
-                    {(line.yarn_type || line.yarn_weight != null || (line.multiply_by != null && Number(line.multiply_by) !== 1)) && (
-                      <span className="block text-[10px] text-gray-500 font-normal">
-                        {[
-                          line.yarn_type,
-                          line.yarn_weight != null ? `Wt ${fmt(Number(line.yarn_weight))}` : null,
-                          line.multiply_by != null && Number(line.multiply_by) !== 1 ? `× ${fmt(Number(line.multiply_by))}` : null,
-                        ].filter(Boolean).join(' · ')}
-                      </span>
+                    {lineDetails(line, gradeNames) && (
+                      <span className="block text-[10px] text-gray-500 font-normal">{lineDetails(line, gradeNames)}</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums">{qty.toLocaleString(undefined, { maximumFractionDigits: 3 })}{stockMap.get(line.stock_item_id)?.uom ? <span className="ml-1 text-gray-500 text-xs">{stockMap.get(line.stock_item_id)!.uom}</span> : null}</td>

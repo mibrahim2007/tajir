@@ -4,6 +4,11 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ActionResult } from '@/lib/types'
+import { itemTypeProfileSchema, profileColumns } from './item-type-profile-schema'
+
+// Trading tables whose lines would be re-billed differently if the formula of
+// their item's type changed.
+const LINE_TABLES = ['purchase_orders', 'sales_orders', 'purchase_returns', 'sale_returns'] as const
 
 const schema = z.object({
   id:   z.string().uuid(),
@@ -14,7 +19,7 @@ const schema = z.object({
     id:   z.string().uuid().optional(),
     name: z.string().max(100),
   })).optional().default([]),
-})
+}).merge(itemTypeProfileSchema)
 
 export async function editItemTypeAction(input: unknown): Promise<ActionResult<void>> {
   const parsed = schema.safeParse(input)
@@ -25,10 +30,40 @@ export async function editItemTypeAction(input: unknown): Promise<ActionResult<v
 
   const admin = createAdminClient()
   const { id } = parsed.data
+  const profile = profileColumns(parsed.data)
+
+  const { data: current } = await admin
+    .from('item_types').select('formula').eq('id', id).eq('tenant_id', tenantId).is('parent_id', null).maybeSingle()
+  if (!current) return { success: false, error: 'Item type not found', code: 'NOT_FOUND' }
+
+  const { data: childRows } = await admin
+    .from('item_types').select('id').eq('tenant_id', tenantId).eq('parent_id', id)
+  const familyIds = [id, ...(childRows ?? []).map((r) => r.id)]
+
+  // The formula is locked once any item of this type (or its sub-types) has
+  // been traded: changing it would re-bill those lines on their next edit.
+  if (current.formula !== profile.formula) {
+    const { data: lots } = await admin
+      .from('inventory_lots').select('id').eq('tenant_id', tenantId).in('item_type_id', familyIds)
+    const lotIds = (lots ?? []).map((l) => l.id)
+    if (lotIds.length > 0) {
+      for (const table of LINE_TABLES) {
+        const { count } = await admin
+          .from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).in('stock_item_id', lotIds)
+        if ((count ?? 0) > 0) {
+          return {
+            success: false,
+            error: "The formula can't be changed: items of this type already have invoices or returns. Create a new item type instead.",
+            code: 'FORMULA_LOCKED',
+          }
+        }
+      }
+    }
+  }
 
   const { error } = await admin
     .from('item_types')
-    .update({ name: parsed.data.name.trim() })
+    .update({ name: parsed.data.name.trim(), ...profile })
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .is('parent_id', null)
@@ -48,18 +83,21 @@ export async function editItemTypeAction(input: unknown): Promise<ActionResult<v
   const existingIds = new Set((existing ?? []).map((r) => r.id))
   const keptIds = new Set(desired.map((s) => s.id).filter(Boolean) as string[])
 
-  // Delete children that are no longer desired (their items are unlinked via
-  // inventory_lots.item_type_id ON DELETE SET NULL).
+  // Delete children that are no longer desired. An item must always have a
+  // type, so their items move up to this (parent) type first.
   const toDelete = [...existingIds].filter((cid) => !keptIds.has(cid))
   if (toDelete.length > 0) {
+    const { error: moveErr } = await admin
+      .from('inventory_lots').update({ item_type_id: id }).eq('tenant_id', tenantId).in('item_type_id', toDelete)
+    if (moveErr) return { success: false, error: 'Failed to move items off a removed sub-type', code: 'INTERNAL_ERROR' }
     await admin.from('item_types').delete().in('id', toDelete).eq('tenant_id', tenantId)
   }
 
-  // Rename existing children.
+  // Rename existing children; they always carry the parent's profile.
   for (const s of desired) {
     if (s.id && existingIds.has(s.id)) {
       const { error: upErr } = await admin
-        .from('item_types').update({ name: s.name }).eq('id', s.id).eq('tenant_id', tenantId)
+        .from('item_types').update({ name: s.name, ...profile }).eq('id', s.id).eq('tenant_id', tenantId)
       if (upErr) {
         if (upErr.code === '23505') return { success: false, error: `Sub-type name "${s.name}" is already used`, code: 'DUPLICATE' }
         return { success: false, error: 'Failed to update a sub-type', code: 'INTERNAL_ERROR' }
@@ -71,7 +109,7 @@ export async function editItemTypeAction(input: unknown): Promise<ActionResult<v
   const newNames = [...new Set(desired.filter((s) => !s.id).map((s) => s.name))]
   if (newNames.length > 0) {
     const { error: insErr } = await admin
-      .from('item_types').insert(newNames.map((name) => ({ tenant_id: tenantId, name, parent_id: id })))
+      .from('item_types').insert(newNames.map((name) => ({ tenant_id: tenantId, name, parent_id: id, ...profile })))
     if (insErr) {
       if (insErr.code === '23505') return { success: false, error: 'A sub-type name is already used by another item type', code: 'DUPLICATE' }
       return { success: false, error: 'Failed to add a sub-type', code: 'INTERNAL_ERROR' }

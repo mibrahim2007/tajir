@@ -64,6 +64,7 @@ const ALL_COMMANDS: CommandItem[] = [
   { href: '/reports/custom',       label: 'Custom Reports',   group: 'Pages', icon: BarChart2, ownerOnly: true },
   // Settings
   { href: '/item-types',              label: 'Item Types',          group: 'Settings', icon: Layers, ownerOnly: true },
+  { href: '/grades',                  label: 'Grades',              group: 'Settings', icon: Tag, ownerOnly: true },
   { href: '/settings/team',           label: 'Team',                group: 'Settings', icon: UsersRound, ownerOnly: true },
   { href: '/settings/opening-balances', label: 'Opening Balances', group: 'Settings', icon: Wallet, ownerOnly: true },
   { href: '/settings/period-lock',    label: 'Close the Books',    group: 'Settings', icon: Lock, ownerOnly: true },

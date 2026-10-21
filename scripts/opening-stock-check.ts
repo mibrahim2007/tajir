@@ -1,6 +1,7 @@
 // Opening stock maths check — run with `npm run check:opening-stock`.
 //
-// An item's opening quantity is now split across the warehouses that held it,
+// An item's opening quantity is now split across the warehouses (and, since
+// 0072, the grades and lots) that held it,
 // which means two figures have to stay in step with each other:
 //
 //   • stock_opening_balances — the per-location baseline the
@@ -142,6 +143,48 @@ console.log('\n— Refusals —')
     lines: [line(A, 90, 250)],
   })
   check('the boundary case still saves', ok.ok && ok.plan.currentQuantity === 0)
+}
+
+console.log('\n— Grade and lot split one location (0072) —')
+{
+  const G1 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+  const G2 = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
+  const p = plan({
+    currentQuantity: 0,
+    existing: [],
+    lines: [
+      { locationId: A, quantity: 3300, rate: 650, gradeId: G1, lotNo: 'L-1' },
+      { locationId: A, quantity: 2950, rate: 640, gradeId: G2, lotNo: 'L-2' },
+    ],
+  })
+  check('two grades at one location are both stored', p.lines.length === 2)
+  check('total spans both grades', p.openingTotal === 6250, `${p.openingTotal}`)
+
+  const sameGradeTwoLots = planOpeningStock({
+    currentQuantity: 0, existing: [],
+    lines: [
+      { locationId: A, quantity: 10, rate: 1, gradeId: G1, lotNo: 'L-1' },
+      { locationId: A, quantity: 10, rate: 1, gradeId: G1, lotNo: 'L-2' },
+    ],
+  })
+  check('same grade, different lots is fine', sameGradeTwoLots.ok)
+
+  const dupe = planOpeningStock({
+    currentQuantity: 0, existing: [],
+    lines: [
+      { locationId: A, quantity: 10, rate: 1, gradeId: G1, lotNo: 'L-1' },
+      { locationId: A, quantity: 5, rate: 1, gradeId: G1, lotNo: ' L-1 ' },
+    ],
+  })
+  check('same location + grade + lot twice is refused', !dupe.ok)
+
+  const regraded = plan({
+    currentQuantity: 100,
+    existing: [{ locationId: A, quantity: 60 }, { locationId: A, quantity: 40 }],
+    lines: [{ locationId: A, quantity: 100, rate: 1, gradeId: G1 }],
+  })
+  check('location keeping a line is not removed', regraded.removedLocationIds.length === 0)
+  check('running total unchanged', regraded.currentQuantity === 100, `${regraded.currentQuantity}`)
 }
 
 console.log('\n— Decimals stay inside the column scale —')

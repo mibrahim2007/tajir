@@ -8,8 +8,11 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
-import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
-import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { normalizeMultiplyBy } from '@/lib/yarn'
+import { usesYarnFields, usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { resolveLineTracking } from '@/lib/inventory/line-tracking'
+import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveAgentCommission,
@@ -29,6 +32,12 @@ const lineSchema = z.object({
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
+  // Grade / lot (0072): required when the item type tracks them; a tracked lot
+  // left blank is numbered from the invoice serial.
+  gradeId:         z.string().uuid().optional().nullable(),
+  lotNo:           z.string().trim().max(60).optional().nullable(),
+  // Godown for this line; blank means the invoice's Receive At location.
+  locationId:      z.string().uuid().optional().nullable(),
 })
 
 const schema = z.object({
@@ -64,10 +73,34 @@ export async function editPurchaseInvoiceAction(
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { invoiceId, supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, notes, lines,
+  const { invoiceId, supplierId, supplierInvoiceNo, date, currencyCode, exchangeRate, advancePaid, locationId, notes,
           agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
   const er = currencyCode === 'USD' ? exchangeRate : 1
+
+  // Each line follows its item type's formula (lib/item-formula.ts). Carton
+  // lines derive their stock quantity from cartons × weight (per pack: packs).
+  const profiles = await loadProfilesFor(admin, tenantId, parsed.data.lines.map((l) => l.stockItemId))
+  const lines = parsed.data.lines.map((l) => ({
+    ...l,
+    quantity: cartonStockQty(profileOf(profiles, l.stockItemId).formula, l) ?? l.quantity,
+  }))
+  const badLine = lines.findIndex((l) => !(l.quantity > 0))
+  if (badLine >= 0) return { success: false, error: `Line ${badLine + 1}: enter Nos Carton and Weight`, code: 'VALIDATION_ERROR' }
+
+  // Grade / lot rules per line (item type flags). Lot numbers are generated
+  // after the serial is known; this pass only catches missing grades.
+  for (let i = 0; i < lines.length; i++) {
+    const t = resolveLineTracking(profileOf(profiles, lines[i].stockItemId), lines[i], {
+      lineLabel: `Line ${i + 1}`, generateLot: { serialNumber: null, lineIndex: i },
+    })
+    if (!t.ok) return { success: false, error: t.error, code: 'VALIDATION_ERROR' }
+  }
+  const refError = await checkTenantRefs(admin, tenantId, {
+    gradeIds:    lines.map((l) => l.gradeId),
+    locationIds: [locationId, ...lines.map((l) => l.locationId)],
+  })
+  if (refError) return { success: false, error: refError, code: 'VALIDATION_ERROR' }
 
   // Existing lines for this invoice — the basis for reversing inventory & GL.
   const { data: existingLines } = await admin
@@ -118,29 +151,24 @@ export async function editPurchaseInvoiceAction(
     }
   }
 
-  // Resolve which new-line items are yarn / polyester (by their type name).
-  const typeIds = [...new Set((lots ?? []).map((l) => l.item_type_id).filter(Boolean) as string[])]
-  const { data: itemTypes } = typeIds.length
-    ? await admin.from('item_types').select('id, name').eq('tenant_id', tenantId).in('id', typeIds)
-    : { data: [] as { id: string; name: string }[] }
-  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => isYarnItemType(t.name)).map((t) => t.id))
-  const polyTypeIds = new Set((itemTypes ?? []).filter((t) => isPolyesterItemType(t.name)).map((t) => t.id))
-  const typeByLot = new Map((lots ?? []).map((l) => [l.id, l.item_type_id]))
-  const isYarn = (itemId: string) => { const t = typeByLot.get(itemId); return !!t && yarnTypeIds.has(t) }
-  const isPolyester = (itemId: string) => { const t = typeByLot.get(itemId); return !!t && polyTypeIds.has(t) }
-
   // Insert the new lines FIRST (same invoice_id & serial) so the old rows stay
   // intact if an insert fails; only then delete the old rows.
   const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number }[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const yarn = isYarn(line.stockItemId)
-    const poly = isPolyester(line.stockItemId)
+    const formula = profileOf(profiles, line.stockItemId).formula
+    const tracking = resolveLineTracking(profileOf(profiles, line.stockItemId), line, {
+      lineLabel: `Line ${i + 1}`, generateLot: { serialNumber, lineIndex: i },
+    })
+    const gradeId = tracking.ok ? tracking.gradeId : null
+    const lotNo = tracking.ok ? tracking.lotNo : null
+    const yarn = usesYarnFields(formula)
+    const carton = usesCartons(formula)
     const multiplyBy = yarn ? normalizeMultiplyBy(line.multiplyBy) : 1
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
-    const qtyLbs = poly ? computeQtyLbs(line.nosCarton, line.weightPerCarton) : null
-    const pkrEquivalent = poly ? (qtyLbs ?? 0) * effectiveRate * er : line.quantity * effectiveRate * er * multiplyBy
+    const qtyLbs = lineQtyLbs(formula, line)
+    const pkrEquivalent = lineGrossAmount(formula, line, effectiveRate, er)
 
     const { data: order, error } = await admin.from('purchase_orders').insert({
       tenant_id:      tenantId,
@@ -158,10 +186,12 @@ export async function editPurchaseInvoiceAction(
       yarn_type:      yarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:    yarn ? (line.yarnWeight ?? null) : null,
       multiply_by:    multiplyBy,
-      nos_carton:        poly ? (line.nosCarton ?? null) : null,
-      weight_per_carton: poly ? (line.weightPerCarton ?? null) : null,
-      qty_lbs:           poly ? qtyLbs : null,
-      location_id:    locationId,
+      nos_carton:        carton ? (line.nosCarton ?? null) : null,
+      weight_per_carton: carton ? (line.weightPerCarton ?? null) : null,
+      qty_lbs:           qtyLbs,
+      location_id:    line.locationId || locationId,
+      grade_id:       gradeId,
+      lot_no:         lotNo,
       // Stamped on every row of the invoice, like serial_number.
       agent_id:       agentId ?? null,
       invoice_id:     invoiceId,

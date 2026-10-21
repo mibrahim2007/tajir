@@ -6,7 +6,8 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
 import type { ActionResult } from '@/lib/types'
 
 const schema = z.object({
@@ -34,22 +35,19 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, advancePaid, date, locationId, nosCarton, weightPerCarton } = parsed.data
+  const { id, supplierId, stockItemId, rate, currencyCode, exchangeRate, advancePaid, date, locationId, nosCarton, weightPerCarton } = parsed.data
   const er = currencyCode === 'USD' ? exchangeRate : 1
 
   const admin = createAdminClient()
 
-  // Determine whether the edited item is a Polyester type — those bill on QTY LBS.
-  const { data: lotRow } = await admin
-    .from('inventory_lots').select('item_type_id').eq('id', stockItemId).eq('tenant_id', tenantId).single()
-  let isPolyester = false
-  if (lotRow?.item_type_id) {
-    const { data: typeRow } = await admin
-      .from('item_types').select('name').eq('id', lotRow.item_type_id).eq('tenant_id', tenantId).single()
-    isPolyester = isPolyesterItemType(typeRow?.name)
-  }
-  const qtyLbs = isPolyester ? computeQtyLbs(nosCarton, weightPerCarton) : null
-  const pkrEquivalent = isPolyester ? (qtyLbs ?? 0) * rate * er : quantity * rate * er
+  // The item type's formula decides the billed quantity (lib/item-formula.ts);
+  // carton lines derive stock from cartons × weight (per pack: packs).
+  const formula = profileOf(await loadProfilesFor(admin, tenantId, [stockItemId]), stockItemId).formula
+  const isCarton = usesCartons(formula)
+  const quantity = cartonStockQty(formula, { nosCarton, weightPerCarton }) ?? parsed.data.quantity
+  if (!(quantity > 0)) return { success: false, error: 'Enter Nos Carton and Weight', code: 'VALIDATION_ERROR' }
+  const qtyLbs = lineQtyLbs(formula, { nosCarton, weightPerCarton })
+  const pkrEquivalent = lineGrossAmount(formula, { quantity, nosCarton, weightPerCarton }, rate, er)
 
   const { data: existing } = await admin
     .from('purchase_orders')
@@ -94,9 +92,9 @@ export async function editPurchaseAction(input: unknown): Promise<ActionResult<v
       advance_paid: advancePaid,
       date,
       location_id: locationId || null,
-      nos_carton:        isPolyester ? (nosCarton ?? null) : null,
-      weight_per_carton: isPolyester ? (weightPerCarton ?? null) : null,
-      qty_lbs:           isPolyester ? qtyLbs : null,
+      nos_carton:        isCarton ? (nosCarton ?? null) : null,
+      weight_per_carton: isCarton ? (weightPerCarton ?? null) : null,
+      qty_lbs:           qtyLbs,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

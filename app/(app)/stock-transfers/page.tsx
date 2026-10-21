@@ -12,18 +12,20 @@ export default async function StockTransfersPage() {
 
   const { data: transfers } = await admin
     .from('stock_transfers')
-    .select('id, date, quantity, notes, from_location_id, to_location_id, stock_item_id, created_at')
+    .select('id, date, quantity, notes, from_location_id, to_location_id, stock_item_id, created_at, grade_id, lot_no, nos_carton')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
 
-  const [{ data: locs }, { data: items }] = await Promise.all([
+  const [{ data: locs }, { data: items }, { data: grades }] = await Promise.all([
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
     admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId),
   ])
 
   const locMap  = new Map((locs  ?? []).map(l => [l.id, l.name]))
   const itemMap = new Map((items ?? []).map(i => [i.id, i.name]))
+  const gradeMap = new Map((grades ?? []).map(g => [g.id, g.name]))
 
   return (
     <div className="p-6 max-w-5xl mx-auto">
@@ -56,7 +58,18 @@ export default async function StockTransfersPage() {
             ) : (transfers ?? []).map((t) => (
               <tr key={t.id} className="hover:bg-secondary/50 transition-colors">
                 <Td muted>{formatPKTDate(t.date as string)}</Td>
-                <Td strong>{itemMap.get(t.stock_item_id as string) ?? '—'}</Td>
+                <Td strong>
+                  {itemMap.get(t.stock_item_id as string) ?? '—'}
+                  {(t.grade_id || t.lot_no || t.nos_carton) && (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {[
+                        t.grade_id && gradeMap.get(t.grade_id),
+                        t.lot_no && `Lot ${t.lot_no}`,
+                        t.nos_carton && `${Number(t.nos_carton).toLocaleString()} ctn`,
+                      ].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </Td>
                 <Td>{locMap.get(t.from_location_id as string) ?? '—'}</Td>
                 <Td>{locMap.get(t.to_location_id as string) ?? '—'}</Td>
                 <Td right mono>{t.quantity.toLocaleString('en-PK')}</Td>

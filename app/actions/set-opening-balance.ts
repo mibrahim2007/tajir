@@ -5,19 +5,34 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
-import { planOpeningStock } from '@/lib/inventory/opening-stock'
+import { planOpeningStock, openingLineKey, type OpeningStockLine } from '@/lib/inventory/opening-stock'
+import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { resolveLineTracking } from '@/lib/inventory/line-tracking'
+import { cartonStockQty, usesCartons } from '@/lib/item-formula'
 import type { ActionResult } from '@/lib/types'
+
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+  z.coerce.number().min(0).optional(),
+)
 
 const stockLineSchema = z.object({
   locationId: z.string().uuid('Location is required'),
   quantity:   z.coerce.number().min(0, 'Quantity must be 0 or greater'),
+  // Cost per STOCK unit (per kg for weighed yarn, per piece / bag otherwise).
   rate:       z.coerce.number().min(0, 'Rate must be 0 or greater').default(0),
+  // Grade / lot, required when the item's type tracks them (0072).
+  gradeId:    z.string().uuid().nullable().optional(),
+  lotNo:      z.string().trim().max(60).nullable().optional(),
+  // Carton formulas: the quantity is derived from these.
+  nosCarton:       optionalNumber,
+  weightPerCarton: optionalNumber,
 })
 
 const stockSchema = z.object({
   lotId: z.string().uuid(),
-  // One line per warehouse holding the item on day one. An empty array (or one
-  // that is all zeroes) clears the item's opening stock entirely.
+  // One line per warehouse × grade × lot holding the item on day one. An empty
+  // array (or one that is all zeroes) clears the item's opening stock entirely.
   lines: z.array(stockLineSchema),
 })
 
@@ -36,9 +51,11 @@ const supplierSchema = z.object({
 })
 
 /**
- * Sets an item's opening stock across any number of locations at once.
+ * Sets an item's opening stock across any number of locations at once, split
+ * by grade and lot where the item's type tracks them.
  *
- * The per-location figures live in `stock_opening_balances`;
+ * The per-location figures live in `stock_opening_balances` (one row per
+ * location × grade × lot);
  * `inventory_lots.current_quantity` stays the item's running total, so it is
  * moved by the DIFFERENCE between the old and new opening totals rather than
  * overwritten — transactions posted since the opening was first entered keep
@@ -84,56 +101,120 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
 
   const { data: existingRows } = await admin
     .from('stock_opening_balances')
-    .select('location_id, quantity, rate')
+    .select('id, location_id, quantity, rate, grade_id, lot_no')
     .eq('tenant_id', tenantId)
     .eq('stock_item_id', lotId)
 
   const num = (v: unknown) => parseFloat(String(v ?? '0')) || 0
 
   const existing = (existingRows ?? []).map((r) => ({
+    id:         r.id,
     locationId: r.location_id,
     quantity:   num(r.quantity),
     rate:       num(r.rate),
+    gradeId:    r.grade_id,
+    lotNo:      r.lot_no,
   }))
+
+  // The item type's formula derives carton quantities; its flags require a
+  // grade / lot. A tracked lot left blank gets "OB/<line>".
+  const profile = profileOf(await loadProfilesFor(admin, tenantId, [lotId]), lotId)
+  const carton = usesCartons(profile.formula)
+  const prepared: OpeningStockLine[] = []
+  for (let i = 0; i < submitted.length; i++) {
+    const l = submitted[i]
+    const quantity = carton ? (cartonStockQty(profile.formula, l) ?? 0) : l.quantity
+    // Blank rows are dropped by planOpeningStock; don't demand a grade for them.
+    if (!(quantity > 0) && !(l.rate > 0)) { prepared.push({ ...l, quantity, gradeId: null, lotNo: null }); continue }
+    const tracked = resolveLineTracking(profile, l, {
+      lineLabel: `Line ${i + 1}`,
+      generateLot: { serialNumber: 'OB', lineIndex: i },
+    })
+    if (!tracked.ok) return { success: false, error: tracked.error, code: 'VALIDATION_ERROR' }
+    prepared.push({
+      locationId:      l.locationId,
+      quantity,
+      rate:            l.rate,
+      gradeId:         tracked.gradeId,
+      lotNo:           tracked.lotNo,
+      nosCarton:       carton ? (l.nosCarton ?? null) : null,
+      weightPerCarton: carton ? (l.weightPerCarton ?? null) : null,
+    })
+  }
+
+  const gradeIds = [...new Set(prepared.map((l) => l.gradeId).filter(Boolean) as string[])]
+  if (gradeIds.length > 0) {
+    const { data: grades } = await admin.from('grades').select('id').eq('tenant_id', tenantId).in('id', gradeIds)
+    if ((grades ?? []).length !== gradeIds.length) return { success: false, error: 'Grade not found', code: 'NOT_FOUND' }
+  }
 
   const planned = planOpeningStock({
     currentQuantity: num(lot.current_quantity),
     existing,
-    lines: submitted,
+    lines: prepared,
   })
 
   if (!planned.ok) return { success: false, error: planned.error, code: 'VALIDATION_ERROR' }
 
-  const { lines, removedLocationIds, currentQuantity, openingRate, primaryLocationId } = planned.plan
+  const { lines, currentQuantity, openingRate, primaryLocationId } = planned.plan
   const now = new Date().toISOString()
 
-  if (lines.length > 0) {
-    const { error: upsertError } = await admin
-      .from('stock_opening_balances')
-      .upsert(
-        lines.map((l) => ({
-          tenant_id:     tenantId,
-          stock_item_id: lotId,
-          location_id:   l.locationId,
-          quantity:      l.quantity,
-          rate:          l.rate,
-          updated_at:    now,
-        })),
-        { onConflict: 'tenant_id,stock_item_id,location_id' },
-      )
-
-    if (upsertError) return { success: false, error: 'Failed to save opening stock', code: 'INTERNAL_ERROR' }
+  // Rows are identified by location × grade × lot. The unique index on that is
+  // an expression index, so upsert can't target it: update the rows whose key
+  // survives, insert the new keys, then delete the keys that are gone.
+  const existingByKey = new Map(existing.map((r) => [openingLineKey(r), r]))
+  const keptIds = new Set<string>()
+  const toInsert: OpeningStockLine[] = []
+  for (const l of lines) {
+    const match = existingByKey.get(openingLineKey(l))
+    if (match) keptIds.add(match.id)
+    const row = {
+      quantity:          l.quantity,
+      rate:              l.rate,
+      nos_carton:        l.nosCarton ?? null,
+      weight_per_carton: l.weightPerCarton ?? null,
+      updated_at:        now,
+    }
+    if (match) {
+      const { error: updateError } = await admin
+        .from('stock_opening_balances').update(row).eq('id', match.id).eq('tenant_id', tenantId)
+      if (updateError) return { success: false, error: 'Failed to save opening stock', code: 'INTERNAL_ERROR' }
+    } else {
+      toInsert.push(l)
+    }
   }
 
-  if (removedLocationIds.length > 0) {
-    const { error: deleteError } = await admin
+  // New keys can't collide with existing rows, so insert them first; the old
+  // keys are only deleted once the replacements exist.
+  let insertedIds: string[] = []
+  if (toInsert.length > 0) {
+    const { data: inserted, error: insertError } = await admin
       .from('stock_opening_balances')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('stock_item_id', lotId)
-      .in('location_id', removedLocationIds)
+      .insert(toInsert.map((l) => ({
+        tenant_id:         tenantId,
+        stock_item_id:     lotId,
+        location_id:       l.locationId,
+        grade_id:          l.gradeId ?? null,
+        lot_no:            l.lotNo ?? null,
+        quantity:          l.quantity,
+        rate:              l.rate,
+        nos_carton:        l.nosCarton ?? null,
+        weight_per_carton: l.weightPerCarton ?? null,
+        updated_at:        now,
+      })))
+      .select('id')
+    if (insertError) return { success: false, error: 'Failed to save opening stock', code: 'INTERNAL_ERROR' }
+    insertedIds = (inserted ?? []).map((r) => r.id)
+  }
 
-    if (deleteError) return { success: false, error: 'Failed to save opening stock', code: 'INTERNAL_ERROR' }
+  const removedIds = existing.map((r) => r.id).filter((id) => !keptIds.has(id))
+  if (removedIds.length > 0) {
+    const { error: deleteError } = await admin
+      .from('stock_opening_balances').delete().eq('tenant_id', tenantId).in('id', removedIds)
+    if (deleteError) {
+      if (insertedIds.length > 0) await admin.from('stock_opening_balances').delete().in('id', insertedIds)
+      return { success: false, error: 'Failed to save opening stock', code: 'INTERNAL_ERROR' }
+    }
   }
 
   const { error } = await admin
@@ -154,13 +235,13 @@ export async function setStockOpeningBalances(input: unknown): Promise<ActionRes
       currentQuantity: lot.current_quantity,
       openingRate: lot.opening_rate,
       locationId: lot.location_id,
-      lines: existing,
+      lines: existing.map((r) => ({ locationId: r.locationId, gradeId: r.gradeId, lotNo: r.lotNo, quantity: r.quantity, rate: r.rate })),
     },
     after: {
       currentQuantity,
       openingRate,
       locationId: primaryLocationId,
-      lines: lines.map((l) => ({ locationId: l.locationId, quantity: l.quantity, rate: l.rate })),
+      lines: lines.map((l) => ({ locationId: l.locationId, gradeId: l.gradeId ?? null, lotNo: l.lotNo ?? null, quantity: l.quantity, rate: l.rate })),
     },
   })
 

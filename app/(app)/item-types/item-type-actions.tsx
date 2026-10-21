@@ -15,9 +15,11 @@ export function ItemTypeActions({ id, name, subTypes = [] }: { id: string; name:
 
   const onDelete = () => {
     const extra = subTypes.length > 0 ? ` Its ${subTypes.length} sub-type${subTypes.length > 1 ? 's' : ''} will also be removed.` : ''
-    if (!confirm(`Delete item type "${name}"? Stock items using this type will be unlinked.${extra}`)) return
+    if (!confirm(`Delete item type "${name}"?${extra}`)) return
     startTransition(async () => {
-      await deleteItemTypeAction(id)
+      const result = await deleteItemTypeAction(id)
+      // A type still used by stock items can't be deleted (every item needs one).
+      if (!result.success) { alert(result.error); return }
       router.refresh()
     })
   }

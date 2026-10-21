@@ -10,6 +10,7 @@
 // removed cleanly, in reverse dependency order.
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { suggestFormula } from '@/lib/item-formula'
 import { createSaleInvoiceAction } from '@/app/actions/create-sale-invoice'
 import { createPurchaseInvoiceAction } from '@/app/actions/create-purchase-invoice'
 import { deleteSaleInvoiceAction } from '@/app/actions/delete-sale-invoice'
@@ -85,7 +86,7 @@ export async function runGeneration(
     let id = existing?.id as string | undefined
     if (!id) {
       const { data: created } = await admin
-        .from('item_types').insert({ tenant_id: tenantId, name: template.name }).select('id').single()
+        .from('item_types').insert({ tenant_id: tenantId, name: template.name, formula: suggestFormula(template.name) }).select('id').single()
       if (!created) continue
       id = created.id as string
       rec('item_type', id); summary.itemTypes++

@@ -1,7 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
+import { ItemTypeSelect } from '@/components/item-type-select'
+import { listItemTypesAction, type ItemTypeWithProfile } from '@/app/actions/list-item-types'
+import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
 import { createSupplierAction } from '@/app/actions/create-supplier'
 import { createCustomerAction } from '@/app/actions/create-customer'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
@@ -105,18 +108,30 @@ export function QuickCreateCustomer({ onSuccess, onCancel }: QuickCreateProps) {
 
 // ── Inventory Lot (Stock Item) ────────────────────────────────────────────────
 
-export function QuickCreateLot({ onSuccess, onCancel }: QuickCreateProps) {
+// onCreatedProfile reports the new item's formula profile (from its type) so a
+// trading form can bill the line correctly without reloading.
+export function QuickCreateLot({ onSuccess, onCancel, onCreatedProfile }: QuickCreateProps & {
+  onCreatedProfile?: (lotId: string, profile: ItemProfile) => void
+}) {
   const [name, setName]       = useState('')
   const [count, setCount]     = useState('')
+  const [itemTypeId, setItemTypeId] = useState<string | undefined>()
+  const [types, setTypes]     = useState<ItemTypeWithProfile[]>([])
   const [isPending, start]    = useTransition()
   const [error, setError]     = useState<string | null>(null)
 
+  useEffect(() => {
+    listItemTypesAction().then((r) => { if (r.success) setTypes(r.data) })
+  }, [])
+
   const submit = () => {
     if (!name.trim()) { setError('Name is required'); return }
+    if (!itemTypeId) { setError('Item type is required'); return }
     start(async () => {
       setError(null)
-      const result = await createInventoryLotAction({ name: name.trim(), itemNature: 'inventory', count: count.trim() || undefined })
+      const result = await createInventoryLotAction({ name: name.trim(), itemNature: 'inventory', itemTypeId, count: count.trim() || undefined })
       if (!result.success) { setError(result.error); return }
+      onCreatedProfile?.(result.data.id, types.find((t) => t.id === itemTypeId)?.profile ?? STANDARD_PROFILE)
       onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() || undefined })
     })
   }
@@ -142,6 +157,21 @@ export function QuickCreateLot({ onSuccess, onCancel }: QuickCreateProps) {
           onChange={(e) => setCount(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
         />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Item Type <span className="text-destructive">*</span></label>
+        <div className="mt-1">
+          <ItemTypeSelect
+            className="h-10 w-full"
+            itemTypes={types}
+            value={itemTypeId}
+            onChange={setItemTypeId}
+            onTypeCreated={() => {
+              // Reload so the new type arrives with its formula profile.
+              listItemTypesAction().then((r) => { if (r.success) setTypes(r.data) })
+            }}
+          />
+        </div>
       </div>
       <p className="text-xs text-muted-foreground">Additional details (fiber, lot no.) can be added from Inventory.</p>
       {error && <p className="text-xs text-destructive">{error}</p>}

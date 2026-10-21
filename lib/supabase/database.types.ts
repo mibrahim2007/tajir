@@ -2192,6 +2192,38 @@ export type Database = {
           },
         ]
       }
+      grades: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          tenant_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          tenant_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grades_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_lots: {
         Row: {
           code: string | null
@@ -2202,7 +2234,7 @@ export type Database = {
           fiber: string | null
           id: string
           item_nature: string
-          item_type_id: string | null
+          item_type_id: string
           location_id: string | null
           lot: string | null
           name: string
@@ -2221,7 +2253,7 @@ export type Database = {
           fiber?: string | null
           id?: string
           item_nature?: string
-          item_type_id?: string | null
+          item_type_id: string
           location_id?: string | null
           lot?: string | null
           name: string
@@ -2240,7 +2272,7 @@ export type Database = {
           fiber?: string | null
           id?: string
           item_nature?: string
-          item_type_id?: string | null
+          item_type_id?: string
           location_id?: string | null
           lot?: string | null
           name?: string
@@ -2291,24 +2323,42 @@ export type Database = {
       item_types: {
         Row: {
           created_at: string
+          formula: string
           id: string
           name: string
+          pack_unit: string | null
           parent_id: string | null
+          std_pack_weight: number | null
+          stock_unit: string | null
           tenant_id: string
+          track_grade: boolean
+          track_lot: boolean
         }
         Insert: {
           created_at?: string
+          formula?: string
           id?: string
           name: string
+          pack_unit?: string | null
           parent_id?: string | null
+          std_pack_weight?: number | null
+          stock_unit?: string | null
           tenant_id: string
+          track_grade?: boolean
+          track_lot?: boolean
         }
         Update: {
           created_at?: string
+          formula?: string
           id?: string
           name?: string
+          pack_unit?: string | null
           parent_id?: string | null
+          std_pack_weight?: number | null
+          stock_unit?: string | null
           tenant_id?: string
+          track_grade?: boolean
+          track_lot?: boolean
         }
         Relationships: [
           {
@@ -3043,9 +3093,11 @@ export type Database = {
           currency_code: string
           date: string
           exchange_rate: number
+          grade_id: string | null
           id: string
           invoice_id: string | null
           location_id: string | null
+          lot_no: string | null
           multiply_by: number
           nos_carton: number | null
           payment_due_date: string | null
@@ -3070,9 +3122,11 @@ export type Database = {
           currency_code: string
           date: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
           nos_carton?: number | null
           payment_due_date?: string | null
@@ -3097,9 +3151,11 @@ export type Database = {
           currency_code?: string
           date?: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
           nos_carton?: number | null
           payment_due_date?: string | null
@@ -3167,11 +3223,15 @@ export type Database = {
           currency_code: string
           date: string
           exchange_rate: number
+          grade_id: string | null
           id: string
           location_id: string | null
+          lot_no: string | null
           multiply_by: number
+          nos_carton: number | null
           pkr_equivalent: number
           purchase_order_id: string | null
+          qty_lbs: number | null
           quantity: number
           rate: number
           reason: string | null
@@ -3179,6 +3239,7 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          weight_per_carton: number | null
           yarn_type: string | null
           yarn_weight: number | null
         }
@@ -3187,11 +3248,15 @@ export type Database = {
           currency_code?: string
           date: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           pkr_equivalent: number
           purchase_order_id?: string | null
+          qty_lbs?: number | null
           quantity: number
           rate: number
           reason?: string | null
@@ -3199,6 +3264,7 @@ export type Database = {
           stock_item_id: string
           supplier_id: string
           tenant_id: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -3207,11 +3273,15 @@ export type Database = {
           currency_code?: string
           date?: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           pkr_equivalent?: number
           purchase_order_id?: string | null
+          qty_lbs?: number | null
           quantity?: number
           rate?: number
           reason?: string | null
@@ -3219,6 +3289,7 @@ export type Database = {
           stock_item_id?: string
           supplier_id?: string
           tenant_id?: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -3281,10 +3352,14 @@ export type Database = {
           customer_id: string
           date: string
           exchange_rate: number
+          grade_id: string | null
           id: string
           location_id: string | null
+          lot_no: string | null
           multiply_by: number
+          nos_carton: number | null
           pkr_equivalent: number
+          qty_lbs: number | null
           quantity: number
           rate: number
           reason: string | null
@@ -3292,6 +3367,7 @@ export type Database = {
           serial_number: string | null
           stock_item_id: string
           tenant_id: string
+          weight_per_carton: number | null
           yarn_type: string | null
           yarn_weight: number | null
         }
@@ -3301,10 +3377,14 @@ export type Database = {
           customer_id: string
           date: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           pkr_equivalent: number
+          qty_lbs?: number | null
           quantity: number
           rate: number
           reason?: string | null
@@ -3312,6 +3392,7 @@ export type Database = {
           serial_number?: string | null
           stock_item_id: string
           tenant_id: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -3321,10 +3402,14 @@ export type Database = {
           customer_id?: string
           date?: string
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
+          nos_carton?: number | null
           pkr_equivalent?: number
+          qty_lbs?: number | null
           quantity?: number
           rate?: number
           reason?: string | null
@@ -3332,6 +3417,7 @@ export type Database = {
           serial_number?: string | null
           stock_item_id?: string
           tenant_id?: string
+          weight_per_carton?: number | null
           yarn_type?: string | null
           yarn_weight?: number | null
         }
@@ -3398,9 +3484,11 @@ export type Database = {
           dc_no: string | null
           due_days: number | null
           exchange_rate: number
+          grade_id: string | null
           id: string
           invoice_id: string | null
           location_id: string | null
+          lot_no: string | null
           multiply_by: number
           nos_carton: number | null
           notes: string | null
@@ -3427,9 +3515,11 @@ export type Database = {
           dc_no?: string | null
           due_days?: number | null
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
           nos_carton?: number | null
           notes?: string | null
@@ -3456,9 +3546,11 @@ export type Database = {
           dc_no?: string | null
           due_days?: number | null
           exchange_rate?: number
+          grade_id?: string | null
           id?: string
           invoice_id?: string | null
           location_id?: string | null
+          lot_no?: string | null
           multiply_by?: number
           nos_carton?: number | null
           notes?: string | null
@@ -3523,33 +3615,45 @@ export type Database = {
       stock_opening_balances: {
         Row: {
           created_at: string
+          grade_id: string | null
           id: string
           location_id: string
+          lot_no: string | null
+          nos_carton: number | null
           quantity: number
           rate: number
           stock_item_id: string
           tenant_id: string
           updated_at: string
+          weight_per_carton: number | null
         }
         Insert: {
           created_at?: string
+          grade_id?: string | null
           id?: string
           location_id: string
+          lot_no?: string | null
+          nos_carton?: number | null
           quantity?: number
           rate?: number
           stock_item_id: string
           tenant_id: string
           updated_at?: string
+          weight_per_carton?: number | null
         }
         Update: {
           created_at?: string
+          grade_id?: string | null
           id?: string
           location_id?: string
+          lot_no?: string | null
+          nos_carton?: number | null
           quantity?: number
           rate?: number
           stock_item_id?: string
           tenant_id?: string
           updated_at?: string
+          weight_per_carton?: number | null
         }
         Relationships: [
           {
@@ -3594,7 +3698,10 @@ export type Database = {
           created_at: string
           date: string
           from_location_id: string
+          grade_id: string | null
           id: string
+          lot_no: string | null
+          nos_carton: number | null
           notes: string | null
           quantity: number
           stock_item_id: string
@@ -3605,7 +3712,10 @@ export type Database = {
           created_at?: string
           date: string
           from_location_id: string
+          grade_id?: string | null
           id?: string
+          lot_no?: string | null
+          nos_carton?: number | null
           notes?: string | null
           quantity: number
           stock_item_id: string
@@ -3616,7 +3726,10 @@ export type Database = {
           created_at?: string
           date?: string
           from_location_id?: string
+          grade_id?: string | null
           id?: string
+          lot_no?: string | null
+          nos_carton?: number | null
           notes?: string | null
           quantity?: number
           stock_item_id?: string
@@ -4273,6 +4386,18 @@ export type Database = {
       }
     }
     Views: {
+      stock_position: {
+        Row: {
+          grade_id: string | null
+          location_id: string | null
+          lot_no: string | null
+          packs: number | null
+          quantity: number | null
+          stock_item_id: string | null
+          tenant_id: string | null
+        }
+        Relationships: []
+      }
       location_stock_summary: {
         Row: {
           location_id: string | null

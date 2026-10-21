@@ -37,8 +37,9 @@ export const inventoryLots = pgTable(
     defaultSupplierId: uuid('default_supplier_id'),
     currentQuantity: numeric('current_quantity', { precision: 15, scale: 3 }).notNull().default('0'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    // FK to item_types (categories); ON DELETE SET NULL.
-    itemTypeId: uuid('item_type_id').references(() => itemTypes.id, { onDelete: 'set null' }),
+    // FK to item_types; mandatory, and a type in use can't be deleted (0071).
+    // The type's formula decides how the item's trading lines are billed.
+    itemTypeId: uuid('item_type_id').notNull().references(() => itemTypes.id, { onDelete: 'restrict' }),
     // Opening rate captured at item creation.
     openingRate: numeric('opening_rate', { precision: 18, scale: 4 }).notNull().default('0'),
     unitOfMeasure: text('unit_of_measure'),

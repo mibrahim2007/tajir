@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useTransition, useMemo } from 'react'
+import { useState, useTransition, useMemo, useEffect } from 'react'
 
 import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Button } from '@/components/ui/button'
@@ -15,14 +15,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ItemPickerDialog } from '@/components/item-picker-dialog'
 import { NumericInput } from '@/components/numeric-input'
+import { StockPositionFields } from '@/components/stock-position-fields'
 import { createStockTransferAction } from '@/app/actions/create-stock-transfer'
+import type { GradeOption } from '@/app/actions/grades'
+import { cartonStockQty, needsWeight, usesCartons } from '@/lib/item-formula'
+import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
+import { availableAt, type StockPosition } from '@/lib/inventory/stock-position'
 import { todayPKT } from '@/lib/utils/dates'
+
+const optionalNumber = z.preprocess(
+  (v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v),
+  z.coerce.number().min(0).optional(),
+)
 
 const schema = z.object({
   fromLocationId: z.string().uuid('Select from-location'),
   toLocationId:   z.string().uuid('Select to-location'),
   stockItemId:    z.string().uuid('Select stock item'),
+  // Derived for carton formulas (cartons × kg; per pack: packs).
   quantity:       z.number().positive('Quantity must be positive'),
+  gradeId:        z.string().nullable().optional(),
+  lotNo:          z.string().nullable().optional(),
+  nosCarton:       optionalNumber,
+  weightPerCarton: optionalNumber,
   date:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date'),
   notes:          z.string().max(500).optional(),
 }).refine(
@@ -37,19 +52,24 @@ type LocationStock = { stockItemId: string; locationId: string; quantity: number
 type Props = {
   today: string
   locations: { id: string; name: string }[]
-  items: { id: string; name: string; count: string }[]
+  /** Each item's formula profile comes from its item type. */
+  items: { id: string; name: string; count: string; profile?: ItemProfile }[]
   locationStock: LocationStock[]
+  /** Grade / lot positions per item and location (stock_position). */
+  positions: StockPosition[]
+  grades: GradeOption[]
 }
 
-export function CreateStockTransferForm({ today, locations, items, locationStock }: Props) {
+export function CreateStockTransferForm({ today, locations, items, locationStock, positions, grades }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const form = useForm<FormValues>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as Resolver<FormValues>,
     defaultValues: {
       fromLocationId: '', toLocationId: '', stockItemId: '',
       quantity: NaN, date: today, notes: '',
+      gradeId: null, lotNo: null, nosCarton: undefined, weightPerCarton: undefined,
     },
   })
 
@@ -62,6 +82,23 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
   const fromName = locations.find(l => l.id === watchedFrom)?.name
   const toName   = locations.find(l => l.id === watchedTo)?.name
   const itemName = items.find(i => i.id === watchedItem)?.name
+  const profile  = items.find(i => i.id === watchedItem)?.profile ?? STANDARD_PROFILE
+  const carton   = usesCartons(profile.formula)
+  const tracked  = profile.trackGrade || profile.trackLot
+  const watchedGrade  = form.watch('gradeId')
+  const watchedLot    = form.watch('lotNo')
+  const watchedNos    = form.watch('nosCarton')
+  const watchedWeight = form.watch('weightPerCarton')
+
+  // Carton formulas: keep Quantity in sync with Nos Carton × Weight (per pack:
+  // the packs) so validation and the summary see the derived figure.
+  const derivedQty = cartonStockQty(profile.formula, { nosCarton: watchedNos, weightPerCarton: watchedWeight })
+  useEffect(() => {
+    if (derivedQty === null) return
+    const cur = form.getValues('quantity')
+    const next = derivedQty > 0 ? derivedQty : NaN
+    if (!(Number.isNaN(cur) && Number.isNaN(next)) && cur !== next) form.setValue('quantity', next)
+  }, [derivedQty, form])
 
   // Stock at the selected from-location
   const fromLocMap = useMemo<Record<string, number>>(() => {
@@ -73,7 +110,17 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
     return map
   }, [watchedFrom, locationStock])
 
-  const availableQty = watchedItem ? (fromLocMap[watchedItem] ?? 0) : null
+  // A tracked item shows what the chosen grade / lot holds at the from-location.
+  const availableQty = !watchedItem
+    ? null
+    : tracked && watchedFrom && (watchedGrade || watchedLot)
+      ? availableAt(positions, {
+          stockItemId: watchedItem,
+          locationId: watchedFrom,
+          gradeId: profile.trackGrade ? (watchedGrade ?? null) : undefined,
+          lotNo: profile.trackLot ? (watchedLot ?? null) : undefined,
+        }).quantity
+      : (fromLocMap[watchedItem] ?? 0)
 
   // Filter items to those with stock at from-location; show their available qty
   const itemPickerItems = useMemo(() => {
@@ -99,12 +146,21 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
       if ((newMap[currentItem] ?? 0) <= 0) form.setValue('stockItemId', '')
     }
     if (form.getValues('toLocationId') === v) form.setValue('toLocationId', '')
+    // Grade / lot positions belong to a location.
+    form.setValue('gradeId', null)
+    form.setValue('lotNo', null)
   }
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setServerError(null)
-      const result = await createStockTransferAction(values)
+      const result = await createStockTransferAction({
+        ...values,
+        gradeId: profile.trackGrade ? (values.gradeId ?? null) : null,
+        lotNo: profile.trackLot ? (values.lotNo ?? null) : null,
+        nosCarton: carton ? values.nosCarton : undefined,
+        weightPerCarton: carton ? values.weightPerCarton : undefined,
+      })
       if (!result.success) { setServerError(result.error); return }
       router.push('/stock-transfers')
     })
@@ -165,7 +221,15 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
                   <ItemPickerDialog
                     items={itemPickerItems}
                     value={field.value}
-                    onSelect={field.onChange}
+                    onSelect={(v) => {
+                      field.onChange(v)
+                      form.setValue('gradeId', null)
+                      form.setValue('lotNo', null)
+                      const p = items.find(i => i.id === v)?.profile
+                      if (p?.stdPackWeight && !Number.isFinite(Number(form.getValues('weightPerCarton')))) {
+                        form.setValue('weightPerCarton', p.stdPackWeight)
+                      }
+                    }}
                     placeholder={watchedFrom ? 'Select item with stock at this location…' : 'Select from-location first…'}
                     title="Select Stock Item"
                   />
@@ -184,14 +248,60 @@ export function CreateStockTransferForm({ today, locations, items, locationStock
 
             <FormField control={form.control} name="quantity" render={() => (
               <FormItem className="md:col-span-3">
-                <FormLabel>Quantity <span className="text-destructive">*</span></FormLabel>
+                <FormLabel>Quantity{profile.stockUnit ? ` (${profile.stockUnit})` : ''} <span className="text-destructive">*</span></FormLabel>
                 <FormControl>
-                  <NumericInput min={0.001} step="0.001" placeholder=""
-                    {...form.register('quantity', { valueAsNumber: true })} />
+                  {carton ? (
+                    <div title={profile.formula === 'per_pack' ? 'Auto = Nos Carton' : 'Auto = Nos Carton × Weight'}
+                      className="flex h-9 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                      {derivedQty && derivedQty > 0 ? derivedQty.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
+                    </div>
+                  ) : (
+                    <NumericInput min={0.001} step="0.001" placeholder=""
+                      {...form.register('quantity', { valueAsNumber: true })} />
+                  )}
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+
+            {tracked && (
+              <div className="md:col-span-6 space-y-2">
+                <FormLabel>{[profile.trackGrade && 'Grade', profile.trackLot && 'Lot'].filter(Boolean).join(' / ')} <span className="text-destructive">*</span></FormLabel>
+                <StockPositionFields
+                  positions={positions}
+                  stockItemId={watchedItem}
+                  locationId={watchedFrom}
+                  grades={grades}
+                  trackGrade={profile.trackGrade}
+                  trackLot={profile.trackLot}
+                  gradeId={watchedGrade}
+                  lotNo={watchedLot}
+                  stockUnit={profile.stockUnit}
+                  packUnit={profile.packUnit}
+                  className="min-h-[44px] w-full"
+                  onChange={({ gradeId, lotNo }) => { form.setValue('gradeId', gradeId); form.setValue('lotNo', lotNo) }}
+                />
+              </div>
+            )}
+
+            {carton && (
+              <>
+                <FormItem className="md:col-span-3">
+                  <FormLabel>Nos {profile.packUnit || 'Carton'} <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <NumericInput min={0} step="0.0001" placeholder=""
+                      {...form.register('nosCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+                <FormItem className="md:col-span-3">
+                  <FormLabel>Weight / {profile.packUnit || 'Carton'} (kg){!needsWeight(profile.formula) && ' — optional'}</FormLabel>
+                  <FormControl>
+                    <NumericInput min={0} step="0.0001" placeholder=""
+                      {...form.register('weightPerCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+              </>
+            )}
 
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem className="md:col-span-12">

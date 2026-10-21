@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { ItemTypeProfileFields, defaultProfile, type ItemTypeProfileValue } from '@/components/item-type-profile-fields'
+import { FORMULA_SHORT } from '@/lib/item-formula'
 import { createItemTypeAction } from '@/app/actions/create-item-type'
 
 const schema = z.object({
@@ -24,6 +26,7 @@ export function CreateItemTypeForm() {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [profile, setProfile] = useState<ItemTypeProfileValue>(defaultProfile())
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -38,6 +41,7 @@ export function CreateItemTypeForm() {
       const result = await createItemTypeAction({
         name: values.name,
         subTypes: values.subTypes.map((s) => s.name),
+        ...profile,
       })
       if (!result.success) { setError(result.error); return }
       // Back to the list, which re-renders with the new type. No
@@ -65,10 +69,14 @@ export function CreateItemTypeForm() {
                 </FormItem>
               )} />
 
+              <div className="md:col-span-12">
+                <ItemTypeProfileFields value={profile} onChange={setProfile} />
+              </div>
+
               <div className="md:col-span-12 flex flex-col gap-2">
                 <FormLabel>Sub Types</FormLabel>
                 <p className="text-xs text-muted-foreground -mt-1">
-                  Optional. Sub-types appear under this type when creating a stock item.
+                  Optional. Sub-types appear under this type when creating a stock item, and follow this type&apos;s formula.
                 </p>
                 {fields.map((f, index) => (
                   <div key={f.id} className="flex gap-2 md:max-w-[50%]">
@@ -99,6 +107,10 @@ export function CreateItemTypeForm() {
                   <div className="flex justify-between gap-3">
                     <span className="text-muted-foreground">Name</span>
                     <span className="font-medium text-right truncate">{watched.name || '—'}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-muted-foreground">Formula</span>
+                    <span className="text-right">{FORMULA_SHORT[profile.formula]}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Sub types</span>

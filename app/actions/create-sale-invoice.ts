@@ -9,8 +9,13 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
-import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { normalizeMultiplyBy } from '@/lib/yarn'
+import { usesYarnFields, usesCartons, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/line-tracking'
+import { loadStockPositions } from '@/lib/inventory/stock-position'
+import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
+import { describeShortfalls } from '@/lib/inventory/shortfall-message'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveAgentCommission,
@@ -29,9 +34,13 @@ const lineSchema = z.object({
   yarnType:    z.string().optional().nullable(),
   yarnWeight:  z.coerce.number().min(0).optional().nullable(),
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
-  // Polyester-only line fields; QTY LBS drives the amount, stock uses quantity.
+  // Carton line fields, used only for per lb / per kg / per pack item types.
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
+  // Grade / lot (0072): required when the item type tracks them, and picked
+  // from the stock held at the invoice's location.
+  gradeId:         z.string().uuid().optional().nullable(),
+  lotNo:           z.string().trim().max(60).optional().nullable(),
 })
 
 const schema = z.object({
@@ -78,9 +87,19 @@ export async function createSaleInvoiceAction(
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, lines, allowOversell,
+  const { customerId, date, paymentDueDate, dueDays, currencyCode, exchangeRate, locationId, poNo, dcNo, notes, allowOversell,
           agentId, agentCommissionType, agentCommissionRate } = parsed.data
   const admin = createAdminClient()
+
+  // Each line follows its item type's formula (lib/item-formula.ts). Carton
+  // lines derive their stock quantity from cartons × weight (per pack: packs).
+  const profiles = await loadProfilesFor(admin, tenantId, parsed.data.lines.map((l) => l.stockItemId))
+  const lines = parsed.data.lines.map((l) => ({
+    ...l,
+    quantity: cartonStockQty(profileOf(profiles, l.stockItemId).formula, l) ?? l.quantity,
+  }))
+  const badLine = lines.findIndex((l) => !(l.quantity > 0))
+  if (badLine >= 0) return { success: false, error: `Line ${badLine + 1}: enter Nos Carton and Weight`, code: 'VALIDATION_ERROR' }
 
   const { count: coaCount } = await admin
     .from('chart_of_accounts').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId)
@@ -96,15 +115,6 @@ export async function createSaleInvoiceAction(
   const lotMap = new Map((lots ?? []).map((l) => [l.id, l.current_quantity]))
   // Service items are non-stockable: no stock check, deduction, or COGS.
   const serviceIds = new Set((lots ?? []).filter((l) => l.item_nature === 'service').map((l) => l.id))
-  // Yarn items expose the per-line multiplier and yarn attributes.
-  const typeIds = [...new Set((lots ?? []).map((l) => l.item_type_id).filter(Boolean) as string[])]
-  const { data: itemTypes } = typeIds.length
-    ? await admin.from('item_types').select('id, name').eq('tenant_id', tenantId).in('id', typeIds)
-    : { data: [] as { id: string; name: string }[] }
-  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => isYarnItemType(t.name)).map((t) => t.id))
-  const yarnIds = new Set((lots ?? []).filter((l) => l.item_type_id && yarnTypeIds.has(l.item_type_id)).map((l) => l.id))
-  const polyesterTypeIds = new Set((itemTypes ?? []).filter((t) => isPolyesterItemType(t.name)).map((t) => t.id))
-  const polyesterIds = new Set((lots ?? []).filter((l) => l.item_type_id && polyesterTypeIds.has(l.item_type_id)).map((l) => l.id))
 
   // Aggregate requested quantities per stockItemId (same item may appear multiple times)
   const requestedMap = new Map<string, number>()
@@ -129,6 +139,38 @@ export async function createSaleInvoiceAction(
     return { success: false, error: 'Only the Owner can override stock limits', code: 'UNAUTHORIZED' }
   }
 
+
+  // Grade / lot rules per line, then a stock check per grade / lot position at
+  // the dispatch location for items that track them. An owner who confirmed an
+  // oversell overrides this too.
+  const tracking: { gradeId: string | null; lotNo: string | null }[] = []
+  for (let i = 0; i < lines.length; i++) {
+    const t = resolveLineTracking(profileOf(profiles, lines[i].stockItemId), lines[i], { lineLabel: `Line ${i + 1}` })
+    if (!t.ok) return { success: false, error: t.error, code: 'VALIDATION_ERROR' }
+    tracking.push({ gradeId: t.gradeId, lotNo: t.lotNo })
+  }
+  const refError = await checkTenantRefs(admin, tenantId, { gradeIds: tracking.map((t) => t.gradeId) })
+  if (refError) return { success: false, error: refError, code: 'VALIDATION_ERROR' }
+  if (!(allowOversell && role !== 'assistant')) {
+    const outgoing = lines.map((l, i) => {
+      const p = profileOf(profiles, l.stockItemId)
+      return {
+        stockItemId: l.stockItemId,
+        locationId:  serviceIds.has(l.stockItemId) ? null : (locationId ?? null),
+        gradeId:     tracking[i].gradeId,
+        lotNo:       tracking[i].lotNo,
+        quantity:    l.quantity,
+        trackGrade:  p.trackGrade,
+        trackLot:    p.trackLot,
+      }
+    })
+    const positions = await loadStockPositions(admin, tenantId, { stockItemIds: stockIds, locationId: locationId ?? null })
+    const shortfalls = findPositionShortfalls(positions, outgoing)
+    if (shortfalls.length > 0) {
+      return { success: false, error: await describeShortfalls(admin, tenantId, shortfalls), code: 'INSUFFICIENT_STOCK' }
+    }
+  }
+
   const invoiceId = crypto.randomUUID()
   // One serial for the whole invoice — shared across every line row.
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'sale_invoice', date)
@@ -137,18 +179,15 @@ export async function createSaleInvoiceAction(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
     const isService = serviceIds.has(line.stockItemId)
+    const formula = profileOf(profiles, line.stockItemId).formula
     // Yarn lines carry a multiplier that scales the money amount (not the qty).
-    const isYarn = yarnIds.has(line.stockItemId)
-    const isPolyester = polyesterIds.has(line.stockItemId)
+    const isYarn = usesYarnFields(formula)
+    const isCarton = usesCartons(formula)
     const multiplyBy = isYarn ? normalizeMultiplyBy(line.multiplyBy) : 1
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
     const er = currencyCode === 'USD' ? exchangeRate : 1
-    // Polyester lines bill on QTY LBS (nos_carton * weight / 2.2046); stock still
-    // uses `quantity`.
-    const qtyLbs = isPolyester ? computeQtyLbs(line.nosCarton, line.weightPerCarton) : null
-    const pkrEquivalent = isPolyester
-      ? (qtyLbs ?? 0) * effectiveRate * er
-      : line.quantity * effectiveRate * er * multiplyBy
+    const qtyLbs = lineQtyLbs(formula, line)
+    const pkrEquivalent = lineGrossAmount(formula, line, effectiveRate, er)
 
     const { data: order, error } = await admin.from('sales_orders').insert({
       tenant_id:       tenantId,
@@ -169,9 +208,11 @@ export async function createSaleInvoiceAction(
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:     multiplyBy,
-      nos_carton:        isPolyester ? (line.nosCarton ?? null) : null,
-      weight_per_carton: isPolyester ? (line.weightPerCarton ?? null) : null,
-      qty_lbs:           isPolyester ? qtyLbs : null,
+      grade_id:        tracking[i].gradeId,
+      lot_no:          tracking[i].lotNo,
+      nos_carton:        isCarton ? (line.nosCarton ?? null) : null,
+      weight_per_carton: isCarton ? (line.weightPerCarton ?? null) : null,
+      qty_lbs:           qtyLbs,
       // Service lines are not bound to a dispatch location.
       location_id:     isService ? null : (locationId ?? null),
       // Stamped on every row of the invoice, like serial_number, so the agent

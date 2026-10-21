@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -14,6 +14,10 @@ import { Separator } from '@/components/ui/separator'
 import { CurrencyInput } from '@/components/currency-input'
 import { editSaleReturnAction } from '@/app/actions/edit-sale-return'
 import { YARN_TYPES, normalizeMultiplyBy } from '@/lib/yarn'
+import { GradeSelect } from '@/components/grade-select'
+import type { GradeOption } from '@/app/actions/grades'
+import { usesCartons, needsWeight, cartonStockQty, billingQty, billingUnitLabel, lineGrossAmount } from '@/lib/item-formula'
+import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
 import { formatCurrency, formatPKR } from '@/lib/utils/currency'
 import { todayPKT } from '@/lib/utils/dates'
 
@@ -30,6 +34,12 @@ const schema = z.object({
   yarnType:     z.string().optional().default(''),
   yarnWeight:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
   multiplyBy:   z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().positive().optional()),
+  // Carton-formula fields (per lb / per kg / per pack): they derive the quantity.
+  nosCarton:       z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  weightPerCarton: z.preprocess((v) => (v === '' || v === null || v === undefined || (typeof v === 'number' && Number.isNaN(v)) ? undefined : v), z.coerce.number().min(0).optional()),
+  // Grade / lot, used only when the item type tracks them.
+  gradeId:      z.string().nullable().optional(),
+  lotNo:        z.string().nullable().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -48,19 +58,26 @@ type SaleReturn = {
   yarnType: string | null
   yarnWeight: number | null
   multiplyBy: number | null
+  nosCarton: number | null
+  weightPerCarton: number | null
+  gradeId: string | null
+  lotNo: string | null
+  /** Booked against an invoice line: grade / lot come from that line. */
+  linked: boolean
 }
 
 type Props = {
   ret: SaleReturn
   customers: { id: string; name: string }[]
-  lots: { id: string; name: string; unitOfMeasure: string | null; isYarn?: boolean }[]
+  lots: { id: string; name: string; unitOfMeasure: string | null; profile?: ItemProfile }[]
   locations: { id: string; name: string }[]
+  grades?: GradeOption[]
 }
 
 const SELECT_CLS = 'flex h-11 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 // Full-page form at /sale-returns/[id]/edit (was a row drawer on the sale returns list).
-export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
+export function EditSaleReturnForm({ ret, customers, lots, locations, grades: initialGrades = [] }: Props) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -80,10 +97,39 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
       yarnType:     ret.yarnType ?? '',
       yarnWeight:   ret.yarnWeight ?? NaN,
       multiplyBy:   ret.multiplyBy ?? 1,
+      nosCarton:       ret.nosCarton ?? NaN,
+      weightPerCarton: ret.weightPerCarton ?? NaN,
+      gradeId:      ret.gradeId,
+      lotNo:        ret.lotNo,
     },
   })
 
-  const isYarn = !!lots.find((l) => l.id === form.watch('stockItemId'))?.isYarn
+  const [grades, setGrades] = useState<GradeOption[]>(initialGrades)
+  // The item type's formula decides the carton fields and the billed quantity.
+  const profile = lots.find((l) => l.id === form.watch('stockItemId'))?.profile ?? STANDARD_PROFILE
+  const isYarn = profile.formula === 'yarn'
+  const isCarton = usesCartons(profile.formula)
+  const watchedNos = form.watch('nosCarton')
+  const watchedWt  = form.watch('weightPerCarton')
+  const billedUnit = billingUnitLabel(profile.formula, profile.packUnit)
+  const tracksStock = profile.trackGrade || profile.trackLot
+  // An item switched to a carton type picks up its standard weight per pack.
+  useEffect(() => {
+    if (!isCarton || !profile.stdPackWeight) return
+    if (Number.isFinite(Number(form.getValues('weightPerCarton')))) return
+    form.setValue('weightPerCarton', profile.stdPackWeight, { shouldDirty: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch('stockItemId')])
+  // For a carton item, Quantity is derived (Nos Carton × Weight; per pack: packs).
+  useEffect(() => {
+    const q = cartonStockQty(profile.formula, { nosCarton: watchedNos, weightPerCarton: watchedWt })
+    if (q === null) return
+    const cur = Number(form.getValues('quantity'))
+    const next = q > 0 ? q : NaN
+    const same = q > 0 ? cur === q : Number.isNaN(cur)
+    if (!same) form.setValue('quantity', next, { shouldDirty: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.formula, watchedNos, watchedWt])
 
   // Summary values (display only) — mirrors the server's amount formula.
   const watchedPartyId  = form.watch('customerId')
@@ -96,13 +142,22 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
   const watchedMultiply = isYarn ? normalizeMultiplyBy(form.watch('multiplyBy')) : 1
   const selectedLot     = lots.find((l) => l.id === watchedStockId)
   const partyName       = customers.find((p) => p.id === watchedPartyId)?.name
-  const lineAmount      = watchedQty * rateNum * watchedMultiply
+  const billedQty       = billingQty(profile.formula, { quantity: watchedQty, nosCarton: watchedNos, weightPerCarton: watchedWt })
+  const lineAmount      = lineGrossAmount(profile.formula, { quantity: watchedQty, nosCarton: watchedNos, weightPerCarton: watchedWt, multiplyBy: watchedMultiply }, rateNum)
+  const gradeName       = grades.find((g) => g.id === form.watch('gradeId'))?.name
   const totalPKR        = lineAmount * (watchedCurrency === 'USD' ? watchedER : 1)
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
       setError(null)
-      const result = await editSaleReturnAction({ id: ret.id, ...values })
+      const result = await editSaleReturnAction({
+        id: ret.id,
+        ...values,
+        nosCarton:       Number.isFinite(values.nosCarton) ? values.nosCarton : undefined,
+        weightPerCarton: Number.isFinite(values.weightPerCarton) ? values.weightPerCarton : undefined,
+        gradeId:         values.gradeId || undefined,
+        lotNo:           values.lotNo?.trim() || undefined,
+      })
       if (!result.success) { setError(result.error); return }
       // Back to the list, which re-renders with the change. No
       // router.refresh() inside the transition — it keeps isPending stuck.
@@ -146,13 +201,34 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            {isCarton && (
+              <>
+                <FormItem className="md:col-span-3">
+                  <FormLabel>Nos Carton</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.0001" min="0" className="text-right"
+                      {...form.register('nosCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+                <FormItem className="md:col-span-3">
+                  <FormLabel>Weight (kg){!needsWeight(profile.formula) && <span className="ml-1 text-muted-foreground font-normal">(optional)</span>}</FormLabel>
+                  <FormControl>
+                    <Input type="number" step="0.0001" min="0" className="text-right"
+                      {...form.register('weightPerCarton', { valueAsNumber: true })} />
+                  </FormControl>
+                </FormItem>
+              </>
+            )}
+
             <FormField control={form.control} name="quantity" render={({ field: { value } }) => {
               const uom = lots.find(l => l.id === form.watch('stockItemId'))?.unitOfMeasure
               return (
-                <FormItem className="md:col-span-4">
-                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}</FormLabel>
+                <FormItem className={isCarton ? 'md:col-span-3' : 'md:col-span-4'}>
+                  <FormLabel>Quantity <span className="text-destructive">*</span>{uom && <span className="ml-1 text-muted-foreground font-normal">({uom})</span>}{isCarton && <span className="ml-1 text-muted-foreground font-normal">(auto)</span>}</FormLabel>
                   <FormControl>
                     <Input type="number" step="0.0001" min="0" value={value}
+                      readOnly={isCarton} tabIndex={isCarton ? -1 : undefined}
+                      className={isCarton ? 'bg-muted/40 text-muted-foreground cursor-default' : undefined}
                       onFocus={(e) => e.target.select()}
                       {...form.register('quantity', { valueAsNumber: true })} />
                   </FormControl>
@@ -161,12 +237,21 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
               )
             }} />
 
-            <div className="md:col-span-8">
+            {isCarton && (
+              <FormItem className="md:col-span-3">
+                <FormLabel>Billed Qty ({billedUnit})</FormLabel>
+                <div className="flex h-11 items-center justify-end rounded-md border border-input bg-muted/40 px-3 text-sm tabular-nums text-muted-foreground">
+                  {billedQty > 0 ? billedQty.toLocaleString('en-PK', { maximumFractionDigits: 4 }) : '—'}
+                </div>
+              </FormItem>
+            )}
+
+            <div className={isCarton ? 'md:col-span-12' : 'md:col-span-8'}>
             <CurrencyInput
               amountName="rate"
               currencyName="currencyCode"
               exchangeRateName="exchangeRate"
-              label="Rate per Unit"
+              label={isCarton ? `Rate per ${billedUnit}` : 'Rate per Unit'}
               step="0.0001"
               required
             />
@@ -195,6 +280,41 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
                   </FormItem>
                 </div>
                 </div>
+              </div>
+            )}
+
+            {tracksStock && (
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Grade / Lot</p>
+                {ret.linked ? (
+                  <p className="text-sm text-muted-foreground">
+                    From the sale line: {[
+                      profile.trackGrade ? `Grade ${gradeName ?? '—'}` : null,
+                      profile.trackLot ? `Lot ${ret.lotNo ?? '—'}` : null,
+                    ].filter(Boolean).join(' · ')}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
+                    {profile.trackGrade && (
+                      <FormItem className="md:col-span-6">
+                        <FormLabel>Grade <span className="text-destructive">*</span></FormLabel>
+                        <GradeSelect
+                          className="min-h-[44px] w-full"
+                          grades={grades}
+                          value={form.watch('gradeId')}
+                          onChange={(id) => form.setValue('gradeId', id, { shouldDirty: true })}
+                          onGradeCreated={(g) => setGrades((prev) => [...prev, g])}
+                        />
+                      </FormItem>
+                    )}
+                    {profile.trackLot && (
+                      <FormItem className="md:col-span-6">
+                        <FormLabel>Lot No. <span className="text-destructive">*</span></FormLabel>
+                        <Input placeholder="Lot number" {...form.register('lotNo')} />
+                      </FormItem>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -260,6 +380,24 @@ export function EditSaleReturnForm({ ret, customers, lots, locations }: Props) {
                     <span className="text-muted-foreground shrink-0">Quantity</span>
                     <span className="font-medium tabular-nums text-right">{watchedQty.toLocaleString()}{selectedLot?.unitOfMeasure ? ` ${selectedLot.unitOfMeasure}` : ''}</span>
                   </div>
+                  {isCarton && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Billed Qty</span>
+                      <span className="font-medium tabular-nums text-right">{billedQty > 0 ? `${billedQty.toLocaleString('en-PK', { maximumFractionDigits: 4 })} ${billedUnit}` : '—'}</span>
+                    </div>
+                  )}
+                  {profile.trackGrade && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Grade</span>
+                      <span className="font-medium text-right">{gradeName ?? '—'}</span>
+                    </div>
+                  )}
+                  {profile.trackLot && (
+                    <div className="flex justify-between gap-2">
+                      <span className="text-muted-foreground shrink-0">Lot</span>
+                      <span className="font-medium text-right">{form.watch('lotNo') || '—'}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-2">
                     <span className="text-muted-foreground shrink-0">Rate</span>
                     <span className="font-medium tabular-nums text-right">{formatCurrency(rateNum, watchedCurrency)}</span>

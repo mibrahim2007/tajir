@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { normalizeMultiplyBy } from '@/lib/yarn'
+import { measureReturnLine, returnLineFields, checkPositionStock } from '@/lib/inventory/return-line'
 import { checkReturnLimit } from '@/lib/purchases/return-limit'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
@@ -22,7 +22,8 @@ const schema = z.object({
   purchaseOrderId: z.string().uuid().optional(),
   supplierId:      z.string().uuid('Invalid supplier'),
   stockItemId:     z.string().uuid('Invalid stock item'),
-  quantity:        z.coerce.number().positive('Quantity must be positive'),
+  // Carton lines derive their quantity from Nos Carton × Weight on the server.
+  quantity:        z.coerce.number().min(0).optional(),
   rate:            z.coerce.number().positive('Rate must be positive'),
   currencyCode:    z.enum(['PKR', 'USD']),
   exchangeRate:    z.coerce.number().positive().default(1),
@@ -32,6 +33,7 @@ const schema = z.object({
   yarnType:        z.string().optional().nullable(),
   yarnWeight:      z.coerce.number().min(0).optional().nullable(),
   multiplyBy:      z.coerce.number().positive().optional().nullable(),
+  ...returnLineFields,
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
@@ -52,9 +54,37 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { purchaseOrderId, supplierId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight, multiplyBy: rawMultiplyBy } = parsed.data
+  const { purchaseOrderId, supplierId, stockItemId, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight } = parsed.data
 
   const admin = createAdminClient()
+
+  // The purchase line this return is booked against, if any: its grade / lot
+  // are the ones the goods carried.
+  const { data: originalLine } = purchaseOrderId
+    ? await admin
+        .from('purchase_orders')
+        .select('grade_id, lot_no, weight_per_carton')
+        .eq('id', purchaseOrderId)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+    : { data: null }
+
+  // Measured by the item type's formula: carton lines derive quantity from
+  // Nos Carton × Weight, yarn lines apply Multiply By.
+  const measured = await measureReturnLine(admin, tenantId, {
+    stockItemId,
+    quantity:        parsed.data.quantity,
+    rate,
+    fx:              currencyCode === 'USD' ? exchangeRate : 1,
+    multiplyBy:      parsed.data.multiplyBy,
+    nosCarton:       parsed.data.nosCarton,
+    weightPerCarton: parsed.data.weightPerCarton,
+    gradeId:         parsed.data.gradeId,
+    lotNo:           parsed.data.lotNo,
+    original:        originalLine,
+  })
+  if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
+  const { quantity, multiplyBy, isYarn, pkrEquivalent, profile } = measured.line
 
   /* Block if chart of accounts has not been configured */
   const { count: coaCount } = await admin
@@ -66,7 +96,7 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
   /* Guard: purchase return removes goods from stock — block if it would go negative */
   const { data: lot } = await admin
     .from('inventory_lots')
-    .select('current_quantity, item_type_id')
+    .select('current_quantity')
     .eq('id', stockItemId)
     .eq('tenant_id', tenantId)
     .single()
@@ -122,15 +152,13 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
     }
   }
 
-  // Yarn lines (Item Type "Yarn") carry a multiplier that scales the money amount.
-  let isYarn = false
-  if (lot?.item_type_id) {
-    const { data: itemType } = await admin
-      .from('item_types').select('name').eq('id', lot.item_type_id).eq('tenant_id', tenantId).maybeSingle()
-    isYarn = (itemType?.name ?? '').trim().toLowerCase() === 'yarn'
-  }
-  const multiplyBy = isYarn ? normalizeMultiplyBy(rawMultiplyBy) : 1
-  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
+  // Guard: a tracked grade / lot can't give back more than it holds at this
+  // location, even when the item as a whole has enough.
+  const positionCheck = await checkPositionStock(admin, tenantId, [{
+    stockItemId, locationId: locationId ?? null, gradeId: measured.line.gradeId, lotNo: measured.line.lotNo,
+    quantity, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
+  }])
+  if (!positionCheck.ok) return { success: false, error: positionCheck.error, code: 'INSUFFICIENT_STOCK' }
 
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'purchase_return', date)
 
@@ -153,6 +181,11 @@ export async function createPurchaseReturnAction(input: unknown): Promise<Action
       yarn_type:         isYarn ? (yarnType?.trim() || null) : null,
       yarn_weight:       isYarn ? (yarnWeight ?? null) : null,
       multiply_by:       multiplyBy,
+      nos_carton:        measured.line.nosCarton,
+      weight_per_carton: measured.line.weightPerCarton,
+      qty_lbs:           measured.line.qtyLbs,
+      grade_id:          measured.line.gradeId,
+      lot_no:            measured.line.lotNo,
     })
     .select('id')
     .single()

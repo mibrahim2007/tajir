@@ -1,8 +1,8 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
+import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { getAgentOptions } from '@/lib/agents/options'
 import { CreateSaleForm } from './create-sale-form'
 
@@ -46,11 +46,14 @@ export default async function NewSalePage() {
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
-  const [yarnLotIds, polyesterLotIds, agents] = await Promise.all([
-    loadYarnLotIds(admin, tenantId),
-    loadPolyesterLotIds(admin, tenantId),
+  const [profiles, { data: rawGrades }, agents] = await Promise.all([
+    loadItemProfiles(admin, tenantId),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
     getAgentOptions(admin, tenantId),
   ])
+  // Grade / lot stock, only for items whose type tracks them.
+  const trackedIds = [...profiles].filter(([, p]) => p.trackGrade || p.trackLot).map(([id]) => id)
+  const positions = trackedIds.length ? await loadStockPositions(admin, tenantId, { stockItemIds: trackedIds }) : []
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
@@ -60,8 +63,7 @@ export default async function NewSalePage() {
     barcode: l.code ?? null,
     unitOfMeasure: l.unit_of_measure ?? null,
     itemNature: (l.item_nature === 'service' ? 'service' : 'inventory') as 'inventory' | 'service',
-    isYarn: yarnLotIds.has(l.id),
-    isPolyester: polyesterLotIds.has(l.id),
+    profile: profileOf(profiles, l.id),
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({
     customerId: r.customer_id,
@@ -93,6 +95,8 @@ export default async function NewSalePage() {
         isOwner={role === 'owner'}
         locations={locations}
         locationStock={locationStock}
+        positions={positions}
+        grades={rawGrades ?? []}
         costMap={costMap}
         customerBalanceMap={customerBalanceMap}
         agents={agents}

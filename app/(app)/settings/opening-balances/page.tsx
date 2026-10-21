@@ -32,16 +32,18 @@ export default async function OpeningBalancesPage() {
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
     admin.from('pdc_register').select('*').eq('tenant_id', tenantId).eq('source', 'pdc_opening'),
     admin.from('banks').select('id, name').eq('tenant_id', tenantId).order('name'),
-    admin.from('stock_opening_balances').select('stock_item_id, location_id, quantity, rate').eq('tenant_id', tenantId),
+    admin.from('stock_opening_balances').select('stock_item_id, location_id, quantity, rate, grade_id, lot_no, nos_carton').eq('tenant_id', tenantId),
   ])
+  const { data: rawGrades } = await admin.from('grades').select('id, name').eq('tenant_id', tenantId)
+  const gradeNames = new Map((rawGrades ?? []).map((g) => [g.id, g.name]))
 
   const locations = (rawLocations ?? []).map((l) => ({ id: l.id, name: l.name }))
   const locationNames = new Map(locations.map((l) => [l.id, l.name]))
 
   const num = (v: unknown) => parseFloat(String(v ?? '0')) || 0
 
-  // Opening stock is per (item, location); group it under its item so each row
-  // can list every warehouse the item was loaded at.
+  // Opening stock is per (item, location, grade, lot); group it under its item
+  // so each row can list every warehouse / grade / lot the item was loaded at.
   const linesByLot = new Map<string, OpeningLot['lines']>()
   for (const row of rawOpeningStock ?? []) {
     const lines = linesByLot.get(row.stock_item_id) ?? []
@@ -50,6 +52,9 @@ export default async function OpeningBalancesPage() {
       locationName: locationNames.get(row.location_id) ?? '—',
       quantity:     num(row.quantity),
       rate:         num(row.rate),
+      gradeName:    row.grade_id ? gradeNames.get(row.grade_id) ?? null : null,
+      lotNo:        row.lot_no,
+      nosCarton:    row.nos_carton == null ? null : num(row.nos_carton),
     })
     linesByLot.set(row.stock_item_id, lines)
   }

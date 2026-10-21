@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { ActionResult } from '@/lib/types'
+import { suggestFormula, FORMULA_DEFAULTS } from '@/lib/item-formula'
 
 const schema = z.object({ name: z.string().min(1, 'Name is required').max(100) })
 
@@ -32,9 +33,13 @@ export async function ensureItemTypeAction(
 
   if (existing) return { success: true, data: existing }
 
+  // A new type starts on the formula its name suggests (Yarn → yarn,
+  // "…Polyester…" → per lb, else Qty × Rate); the owner can change it under
+  // Item Types until its items are traded.
+  const formula = suggestFormula(name)
   const { data, error } = await admin
     .from('item_types')
-    .insert({ tenant_id: tenantId, name })
+    .insert({ tenant_id: tenantId, name, formula, stock_unit: FORMULA_DEFAULTS[formula].stockUnit, pack_unit: FORMULA_DEFAULTS[formula].packUnit })
     .select('id, name')
     .single()
 

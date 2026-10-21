@@ -8,8 +8,11 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { normalizeMultiplyBy, isYarnItemType } from '@/lib/yarn'
-import { isPolyesterItemType, computeQtyLbs } from '@/lib/polyester'
+import { normalizeMultiplyBy } from '@/lib/yarn'
+import { usesYarnFields, usesCartons, needsWeight, cartonStockQty, lineQtyLbs, lineGrossAmount } from '@/lib/item-formula'
+import { loadProfilesFor, profileOf } from '@/lib/inventory/item-profiles'
+import { resolveLineTracking } from '@/lib/inventory/line-tracking'
+import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveAgentCommission,
@@ -28,10 +31,16 @@ const lineSchema = z.object({
   yarnType:    z.string().optional().nullable(),
   yarnWeight:  z.coerce.number().min(0).optional().nullable(),
   multiplyBy:  z.coerce.number().positive().optional().nullable(),
-  // Polyester-only line fields (stored/applied only when the item's type is a
-  // Polyester type). QTY LBS drives the amount; stock still uses `quantity`.
+  // Carton line fields, used only when the item type's formula is per lb / per
+  // kg / per pack (lib/item-formula.ts); they derive stock and the billed qty.
   nosCarton:       z.coerce.number().min(0).optional().nullable(),
   weightPerCarton: z.coerce.number().min(0).optional().nullable(),
+  // Grade / lot (0072): required when the item type tracks them; a tracked lot
+  // left blank is numbered from the invoice serial.
+  gradeId:         z.string().uuid().optional().nullable(),
+  lotNo:           z.string().trim().max(60).optional().nullable(),
+  // Godown for this line; blank means the invoice's Receive At location.
+  locationId:      z.string().uuid().optional().nullable(),
 })
 
 const schema = z.object({
@@ -81,19 +90,24 @@ export async function createPurchaseInvoiceAction(
     return { success: false, error: 'Chart of accounts is not set up. Go to Accounts and configure it before recording purchases.', code: 'COA_NOT_CONFIGURED' }
   }
 
-  // Resolve which line items are yarn (their type is named "Yarn") so the
-  // per-line multiplier and yarn attributes apply only to those lines.
-  const stockIds = [...new Set(lines.map((l) => l.stockItemId))]
-  const { data: lots } = await admin.from('inventory_lots')
-    .select('id, item_type_id').eq('tenant_id', tenantId).in('id', stockIds)
-  const typeIds = [...new Set((lots ?? []).map((l) => l.item_type_id).filter(Boolean) as string[])]
-  const { data: itemTypes } = typeIds.length
-    ? await admin.from('item_types').select('id, name').eq('tenant_id', tenantId).in('id', typeIds)
-    : { data: [] as { id: string; name: string }[] }
-  const yarnTypeIds = new Set((itemTypes ?? []).filter((t) => isYarnItemType(t.name)).map((t) => t.id))
-  const yarnIds = new Set((lots ?? []).filter((l) => l.item_type_id && yarnTypeIds.has(l.item_type_id)).map((l) => l.id))
-  const polyesterTypeIds = new Set((itemTypes ?? []).filter((t) => isPolyesterItemType(t.name)).map((t) => t.id))
-  const polyesterIds = new Set((lots ?? []).filter((l) => l.item_type_id && polyesterTypeIds.has(l.item_type_id)).map((l) => l.id))
+  // Each line follows its item type's formula (lib/item-formula.ts): yarn
+  // lines take the multiplier and yarn attributes; carton lines (per lb / per
+  // kg / per pack) derive stock and the billed quantity from cartons × weight.
+  const profiles = await loadProfilesFor(admin, tenantId, lines.map((l) => l.stockItemId))
+
+  // Grade / lot rules per line (item type flags). Lot numbers are generated
+  // after the serial is known; this pass only catches missing grades.
+  for (let i = 0; i < lines.length; i++) {
+    const t = resolveLineTracking(profileOf(profiles, lines[i].stockItemId), lines[i], {
+      lineLabel: `Line ${i + 1}`, generateLot: { serialNumber: null, lineIndex: i },
+    })
+    if (!t.ok) return { success: false, error: t.error, code: 'VALIDATION_ERROR' }
+  }
+  const refError = await checkTenantRefs(admin, tenantId, {
+    gradeIds:    lines.map((l) => l.gradeId),
+    locationIds: [locationId, ...lines.map((l) => l.locationId)],
+  })
+  if (refError) return { success: false, error: refError, code: 'VALIDATION_ERROR' }
 
   const invoiceId = crypto.randomUUID()
   // One serial for the whole invoice — shared across every line row.
@@ -102,17 +116,25 @@ export async function createPurchaseInvoiceAction(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
-    const isYarn = yarnIds.has(line.stockItemId)
-    const isPolyester = polyesterIds.has(line.stockItemId)
+    const formula = profileOf(profiles, line.stockItemId).formula
+    const tracking = resolveLineTracking(profileOf(profiles, line.stockItemId), line, {
+      lineLabel: `Line ${i + 1}`, generateLot: { serialNumber, lineIndex: i },
+    })
+    const gradeId = tracking.ok ? tracking.gradeId : null
+    const lotNo = tracking.ok ? tracking.lotNo : null
+    const isYarn = usesYarnFields(formula)
+    const isCarton = usesCartons(formula)
     const multiplyBy = isYarn ? normalizeMultiplyBy(line.multiplyBy) : 1
     const effectiveRate = line.rate * (1 - (line.discountPct || 0) / 100)
     const er = currencyCode === 'USD' ? exchangeRate : 1
-    // Polyester lines bill on QTY LBS (nos_carton * weight / 2.2046); all other
-    // lines bill on quantity (with the yarn multiplier).
-    const qtyLbs = isPolyester ? computeQtyLbs(line.nosCarton, line.weightPerCarton) : null
-    const pkrEquivalent = isPolyester
-      ? (qtyLbs ?? 0) * effectiveRate * er
-      : line.quantity * effectiveRate * er * multiplyBy
+    // Carton lines: stock = cartons × kg (per pack: the packs); never trust the
+    // client's derived quantity.
+    const quantity = cartonStockQty(formula, line) ?? line.quantity
+    if (!(quantity > 0)) {
+      return { success: false, error: `Line ${i + 1}: enter Nos Carton${needsWeight(formula) ? ' and Weight' : ''}`, code: 'VALIDATION_ERROR' }
+    }
+    const qtyLbs = lineQtyLbs(formula, line)
+    const pkrEquivalent = lineGrossAmount(formula, { ...line, quantity }, effectiveRate, er)
 
     const { data: order, error } = await admin.from('purchase_orders').insert({
       tenant_id:      tenantId,
@@ -120,7 +142,7 @@ export async function createPurchaseInvoiceAction(
       supplier_invoice_no: supplierInvoiceNo || null,
       supplier_id:    supplierId,
       stock_item_id:  line.stockItemId,
-      quantity:       line.quantity,
+      quantity:       quantity,
       rate:           effectiveRate,
       currency_code:  currencyCode,
       exchange_rate:  exchangeRate,
@@ -130,10 +152,12 @@ export async function createPurchaseInvoiceAction(
       yarn_type:      isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:    isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:    multiplyBy,
-      nos_carton:        isPolyester ? (line.nosCarton ?? null) : null,
-      weight_per_carton: isPolyester ? (line.weightPerCarton ?? null) : null,
-      qty_lbs:           isPolyester ? qtyLbs : null,
-      location_id:    locationId,
+      nos_carton:        isCarton ? (line.nosCarton ?? null) : null,
+      weight_per_carton: isCarton ? (line.weightPerCarton ?? null) : null,
+      qty_lbs:           qtyLbs,
+      location_id:    line.locationId || locationId,
+      grade_id:       gradeId,
+      lot_no:         lotNo,
       // Stamped on every row of the invoice, like serial_number, so the agent
       // behind a purchase is readable from any one of its lines.
       agent_id:       agentId ?? null,
@@ -152,8 +176,8 @@ export async function createPurchaseInvoiceAction(
       return { success: false, error: 'Failed to create purchase line', code: 'INTERNAL_ERROR' }
     }
 
-    await admin.rpc('adjust_inventory_quantity', { p_lot_id: line.stockItemId, p_delta: line.quantity })
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity })
+    await admin.rpc('adjust_inventory_quantity', { p_lot_id: line.stockItemId, p_delta: quantity })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity })
   }
 
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)

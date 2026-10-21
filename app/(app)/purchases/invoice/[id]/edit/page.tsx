@@ -2,8 +2,7 @@ import { notFound } from 'next/navigation'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
 import { getAgentOptions } from '@/lib/agents/options'
 import { CreatePurchaseForm, type PurchaseFormValues } from '../../../new/create-purchase-form'
 
@@ -15,22 +14,22 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
 
   const [
     { data: invoiceLines },
-    { data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs },
+    { data: rawSuppliers }, { data: rawCustomers }, { data: rawLots }, { data: rawLocs }, { data: rawGrades },
   ] = await Promise.all([
     admin.from('purchase_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, agent_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, location_id, supplier_id, supplier_invoice_no, advance_paid, agent_id, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count, unit_of_measure').eq('tenant_id', tenantId).order('name'),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
   ])
 
   if (!invoiceLines || invoiceLines.length === 0) notFound()
 
-  const [yarnLotIds, polyesterLotIds, agents, { data: accrual }] = await Promise.all([
-    loadYarnLotIds(admin, tenantId),
-    loadPolyesterLotIds(admin, tenantId),
+  const [profiles, agents, { data: accrual }] = await Promise.all([
+    loadItemProfiles(admin, tenantId),
     getAgentOptions(admin, tenantId),
     admin.from('agent_commissions')
       .select('commission_type, commission_rate')
@@ -39,7 +38,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
   ])
   const supplierList = rawSuppliers ?? []
   const customerList = rawCustomers ?? []
-  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, isYarn: yarnLotIds.has(l.id), isPolyester: polyesterLotIds.has(l.id) }))
+  const lotList = (rawLots ?? []).map((l) => ({ ...l, count: String(l.count ?? ''), unitOfMeasure: l.unit_of_measure ?? null, profile: profileOf(profiles, l.id) }))
   const locationList = rawLocs ?? []
 
   const first = invoiceLines[0]
@@ -69,6 +68,10 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
       multiplyBy:      l.multiply_by ?? 1,
       nosCarton:       l.nos_carton ?? NaN,
       weightPerCarton: l.weight_per_carton ?? NaN,
+      gradeId:         l.grade_id ?? '',
+      lotNo:           l.lot_no ?? '',
+      // Blank = same as the invoice's Receive At (the first line's godown).
+      locationId:      l.location_id && l.location_id !== first.location_id ? l.location_id : '',
     })),
   }
 
@@ -85,6 +88,7 @@ export default async function EditPurchaseInvoicePage({ params }: { params: Prom
         customers={customerList}
         lots={lotList}
         locations={locationList}
+        grades={rawGrades ?? []}
         agents={agents}
         mode="edit"
         invoiceId={invoiceId}

@@ -13,6 +13,7 @@ import { createItemTypeAction } from '@/app/actions/create-item-type'
 import { createLocationAction } from '@/app/actions/create-location'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { ITEM_TYPE_PRESETS, unitsForType, DEFAULT_UNITS } from '@/app/(app)/inventory/item-type-presets'
+import { suggestFormula, FORMULA_DEFAULTS } from '@/lib/item-formula'
 import {
   StepHeader, Why, AlreadyHave,
   useDraftRows, SaveRowsButton, DraftGrid, DraftRowShell, Cell, cellInput, enterToNext,
@@ -50,7 +51,9 @@ export function CategoriesStep({ data }: { data: SetupData }) {
     startTransition(async () => {
       setError(null)
       const subs = subTypes.split(',').map((s) => s.trim()).filter(Boolean)
-      const res = await createItemTypeAction({ name: custom.trim(), subTypes: subs })
+      // Starts on the formula its name suggests; changeable under Item Types.
+      const formula = suggestFormula(custom)
+      const res = await createItemTypeAction({ name: custom.trim(), subTypes: subs, formula, ...FORMULA_DEFAULTS[formula] })
       if (!res.success) { setError(res.error); return }
       setCustom(''); setSubTypes('')
       router.refresh()
@@ -245,7 +248,8 @@ export function ItemsStep({ data }: { data: SetupData }) {
       </Why>
       {data.counts.itemTypes === 0 && (
         <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
-          No categories yet — items can still be saved, but go back and add at least one category so they can be grouped.
+          No categories yet — go back and add at least one. Every item needs a category, and the
+          category&apos;s formula decides how the item is billed.
         </p>
       )}
       <AlreadyHave
@@ -258,7 +262,7 @@ export function ItemsStep({ data }: { data: SetupData }) {
       <DraftGrid
         columns={[
           { label: 'Item name', required: true, width: '30%' },
-          { label: 'Category', width: '20%' },
+          { label: 'Category', required: true, width: '20%' },
           { label: 'Count / grade', width: '14%' },
           { label: 'Unit', width: '14%' },
           { label: 'Code / ref' },
@@ -274,7 +278,7 @@ export function ItemsStep({ data }: { data: SetupData }) {
               <Cell><input className={cellInput} placeholder="e.g. Super Fine Cotton Yarn" value={r.name} onChange={(e) => draft.update(r._key, { name: e.target.value })} onKeyDown={enterToNext} /></Cell>
               <Cell>
                 <select className={cellInput} value={r.itemTypeId} onChange={(e) => draft.update(r._key, { itemTypeId: e.target.value, unit: '' })} onKeyDown={enterToNext}>
-                  <option value="">— none —</option>
+                  <option value="">— select —</option>
                   {tops.map((t) => {
                     const subs = byParent.get(t.id) ?? []
                     return subs.length === 0
@@ -302,11 +306,11 @@ export function ItemsStep({ data }: { data: SetupData }) {
         args={{
           rows: draft.rows, setRows: draft.setRows, blank: blankItem,
           isBlank: (r) => !r.name.trim() && !r.count.trim() && !r.code.trim(),
-          validate: (r) => (r.name.trim() ? null : 'Item name is required'),
+          validate: (r) => (!r.name.trim() ? 'Item name is required' : !r.itemTypeId ? 'Category is required' : null),
           create: (r) => createInventoryLotAction({
             name: r.name.trim(),
             itemNature: 'inventory',
-            itemTypeId: r.itemTypeId || undefined,
+            itemTypeId: r.itemTypeId,
             count: r.count.trim() || undefined,
             unitOfMeasure: r.unit || undefined,
             code: r.code.trim() || undefined,

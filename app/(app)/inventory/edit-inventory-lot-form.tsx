@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
-import { ItemTypeSelectItems } from '@/components/item-type-select-items'
+import { ItemTypeSelect } from '@/components/item-type-select'
 
 const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
 
@@ -22,7 +22,7 @@ const schema = z.object({
   code:          z.string().optional(),
   count:         z.string().optional(),
   unitOfMeasure: z.string().optional(),
-  itemTypeId:    z.string().uuid().optional(),
+  itemTypeId:    z.string({ error: 'Item type is required' }).uuid('Item type is required'),
   fiber:         z.string().optional(),
   lot:           z.string().optional(),
 })
@@ -43,8 +43,10 @@ type Lot = {
 }
 
 // Full-page form at /inventory/[id]/edit (was a drawer on the inventory list).
-export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: ItemType[] }) {
+export function EditInventoryLotForm({ lot, itemTypes: initialItemTypes }: { lot: Lot; itemTypes: ItemType[] }) {
   const router = useRouter()
+  // Local copy so a type added from the list's "+ Add item type" shows at once.
+  const [itemTypes, setItemTypes] = useState<ItemType[]>(initialItemTypes)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
 
@@ -139,27 +141,19 @@ export function EditInventoryLotForm({ lot, itemTypes }: { lot: Lot; itemTypes: 
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="itemTypeId" render={({ field }) => (
+              <FormField control={form.control} name="itemTypeId" render={({ field, fieldState }) => (
                 <FormItem className="md:col-span-6">
-                  <FormLabel>Item Type</FormLabel>
-                  <Select
-                    value={field.value ?? '_none_'}
-                    onValueChange={(v) => field.onChange(v === '_none_' ? undefined : v)}
-                    disabled={itemTypes.length === 0}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="min-h-[44px] w-full">
-                        <SelectValue placeholder={itemTypes.length === 0 ? 'No types defined' : 'Select type…'} />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="_none_">No type</SelectItem>
-                      <ItemTypeSelectItems itemTypes={itemTypes} keepSelectableId={lot.itemTypeId} />
-                    </SelectContent>
-                  </Select>
-                  {itemTypes.length === 0 && (
-                    <p className="text-xs text-muted-foreground">Add item types in Settings → Item Types</p>
-                  )}
+                  <FormLabel>Item Type <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                    <ItemTypeSelect
+                      itemTypes={itemTypes}
+                      value={field.value}
+                      onChange={field.onChange}
+                      keepSelectableId={lot.itemTypeId}
+                      invalid={!!fieldState.error}
+                      onTypeCreated={(t) => setItemTypes((prev) => [...prev, t])}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />

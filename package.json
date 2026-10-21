@@ -16,6 +16,7 @@
     "check:custom-report": "tsx --env-file=.env.local scripts/custom-report-check.ts",
     "check:aging": "tsx --env-file=.env.local scripts/aging-check.ts",
     "check:opening-stock": "tsx scripts/opening-stock-check.ts",
+    "check:item-formula": "tsx scripts/item-formula-check.ts",
     "check:email-sender": "tsx scripts/email-sender-check.ts",
     "check:inbox": "tsx scripts/inbox-check.ts",
     "check:cheque-search": "tsx scripts/cheque-search-check.ts",

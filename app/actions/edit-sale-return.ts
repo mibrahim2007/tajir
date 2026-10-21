@@ -7,7 +7,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
-import { normalizeMultiplyBy } from '@/lib/yarn'
+import { measureReturnLine, returnLineFields, checkPositionStock } from '@/lib/inventory/return-line'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveCommissionClawback,
@@ -20,7 +20,8 @@ const schema = z.object({
   id:           z.string().uuid(),
   customerId:   z.string().uuid(),
   stockItemId:  z.string().uuid(),
-  quantity:     z.coerce.number().positive(),
+  // Carton lines derive their quantity from Nos Carton × Weight on the server.
+  quantity:     z.coerce.number().min(0).optional(),
   rate:         z.coerce.number().positive(),
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -30,6 +31,7 @@ const schema = z.object({
   yarnType:     z.string().optional().nullable(),
   yarnWeight:   z.coerce.number().min(0).optional().nullable(),
   multiplyBy:   z.coerce.number().positive().optional().nullable(),
+  ...returnLineFields,
 })
 
 export async function editSaleReturnAction(input: unknown): Promise<ActionResult<void>> {
@@ -42,30 +44,55 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
   const tenant = await getTenant(tenantId)
   if (tenant.subscriptionStatus === 'locked') return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
 
-  const { id, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight, multiplyBy: rawMultiplyBy } = parsed.data
+  const { id, customerId, stockItemId, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight } = parsed.data
 
   const admin = createAdminClient()
 
-  // Yarn items (Item Type "Yarn") carry a multiplier that scales the money amount.
-  const { data: itemLot } = await admin
-    .from('inventory_lots').select('item_type_id').eq('id', stockItemId).eq('tenant_id', tenantId).maybeSingle()
-  let isYarn = false
-  if (itemLot?.item_type_id) {
-    const { data: itemType } = await admin
-      .from('item_types').select('name').eq('id', itemLot.item_type_id).eq('tenant_id', tenantId).maybeSingle()
-    isYarn = (itemType?.name ?? '').trim().toLowerCase() === 'yarn'
-  }
-  const multiplyBy = isYarn ? normalizeMultiplyBy(rawMultiplyBy) : 1
-  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
-
   const { data: existing } = await admin
     .from('sale_returns')
-    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code, serial_number, sale_order_id')
+    .select('quantity, rate, pkr_equivalent, date, reason, stock_item_id, customer_id, currency_code, serial_number, sale_order_id, location_id, grade_id, lot_no')
     .eq('id', id)
     .eq('tenant_id', tenantId)
     .single()
 
   if (!existing) return { success: false, error: 'Sale return not found', code: 'NOT_FOUND' }
+
+  // A return booked against an invoice line keeps that line's grade / lot.
+  const { data: originalLine } = existing.sale_order_id
+    ? await admin
+        .from('sales_orders')
+        .select('grade_id, lot_no, weight_per_carton')
+        .eq('id', existing.sale_order_id)
+        .eq('tenant_id', tenantId)
+        .maybeSingle()
+    : { data: null }
+
+  // Measured by the item type's formula: carton lines derive quantity from
+  // Nos Carton × Weight, yarn lines apply Multiply By.
+  const measured = await measureReturnLine(admin, tenantId, {
+    stockItemId,
+    quantity:        parsed.data.quantity,
+    rate,
+    fx:              currencyCode === 'USD' ? exchangeRate : 1,
+    multiplyBy:      parsed.data.multiplyBy,
+    nosCarton:       parsed.data.nosCarton,
+    weightPerCarton: parsed.data.weightPerCarton,
+    gradeId:         parsed.data.gradeId,
+    lotNo:           parsed.data.lotNo,
+    original:        originalLine,
+  })
+  if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
+  const { quantity, multiplyBy, isYarn, pkrEquivalent, profile } = measured.line
+
+  // The row as saved and as edited, as grade / lot stock positions.
+  const oldPosition = {
+    stockItemId: existing.stock_item_id, locationId: existing.location_id, gradeId: existing.grade_id,
+    lotNo: existing.lot_no, quantity: existing.quantity, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
+  }
+  const newPosition = {
+    stockItemId, locationId: locationId || null, gradeId: measured.line.gradeId,
+    lotNo: measured.line.lotNo, quantity, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
+  }
 
   const oldQty = existing.quantity
   // Sale return adds stock; decreasing qty removes stock
@@ -87,6 +114,11 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
     }
   }
 
+  // Guard: the edit takes the saved return back out of its grade / lot and
+  // books the edited one in; the old position must still hold what it got.
+  const positionCheck = await checkPositionStock(admin, tenantId, [oldPosition], [newPosition])
+  if (!positionCheck.ok) return { success: false, error: positionCheck.error, code: 'INSUFFICIENT_STOCK' }
+
   const { error } = await admin
     .from('sale_returns')
     .update({
@@ -103,6 +135,11 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
       yarn_type:      isYarn ? (yarnType?.trim() || null) : null,
       yarn_weight:    isYarn ? (yarnWeight ?? null) : null,
       multiply_by:    multiplyBy,
+      nos_carton:        measured.line.nosCarton,
+      weight_per_carton: measured.line.weightPerCarton,
+      qty_lbs:           measured.line.qtyLbs,
+      grade_id:          measured.line.gradeId,
+      lot_no:            measured.line.lotNo,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)

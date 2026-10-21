@@ -28,6 +28,10 @@ export async function createInventoryLotAction(
 
   const admin = createAdminClient()
 
+  const { data: itemType } = await admin
+    .from('item_types').select('id, stock_unit').eq('id', itemTypeId).eq('tenant_id', tenantId).maybeSingle()
+  if (!itemType) return { success: false, error: 'Item type not found', code: 'VALIDATION_ERROR' }
+
   // Service items carry no lot number, so the duplicate-lot guard only applies
   // to stockable inventory items.
   if (!isService && lot && !confirmDuplicateLot) {
@@ -55,8 +59,9 @@ export async function createInventoryLotAction(
       code: code || null,
       // Service items are non-stockable: drop textile/stock attributes.
       count: isService ? null : parseCount(count),
-      unit_of_measure: unitOfMeasure || null,
-      item_type_id: itemTypeId || null,
+      // No unit picked → the item type's stock unit.
+      unit_of_measure: unitOfMeasure || itemType.stock_unit || null,
+      item_type_id: itemTypeId,
       fiber: isService ? null : (fiber || null),
       lot: isService ? null : (lot || null),
       default_supplier_id: isService ? null : (defaultSupplierId || null),

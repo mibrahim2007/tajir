@@ -8,6 +8,9 @@ import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import type { ActionResult } from '@/lib/types'
 import { parseCount } from '@/lib/parse-count'
 
+// Trading tables whose lines were billed with the item's current formula.
+const LINE_TABLES = ['purchase_orders', 'sales_orders', 'purchase_returns', 'sale_returns'] as const
+
 const schema = z.object({
   id:            z.string().uuid(),
   name:          z.string().min(1, 'Name is required'),
@@ -15,7 +18,7 @@ const schema = z.object({
   code:          z.string().optional(),
   count:         z.string().optional(),
   unitOfMeasure: z.string().optional(),
-  itemTypeId:    z.string().uuid().optional(),
+  itemTypeId:    z.string({ error: 'Item type is required' }).uuid('Item type is required'),
   fiber:         z.string().optional(),
   lot:           z.string().optional(),
 })
@@ -43,9 +46,32 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   if (!existing) return { success: false, error: 'Stock item not found', code: 'NOT_FOUND' }
 
+  // Moving a traded item to a type with a different formula would re-bill its
+  // existing lines on their next edit, so that is refused.
+  if (itemTypeId !== existing.item_type_id) {
+    const { data: types } = await admin
+      .from('item_types').select('id, formula').eq('tenant_id', tenantId).in('id', [itemTypeId, existing.item_type_id])
+    const next = types?.find((t) => t.id === itemTypeId)
+    if (!next) return { success: false, error: 'Item type not found', code: 'VALIDATION_ERROR' }
+    const prev = types?.find((t) => t.id === existing.item_type_id)
+    if (prev && prev.formula !== next.formula) {
+      for (const table of LINE_TABLES) {
+        const { count: used } = await admin
+          .from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('stock_item_id', id)
+        if ((used ?? 0) > 0) {
+          return {
+            success: false,
+            error: 'This item already has invoices or returns, so it can only move to an item type with the same formula.',
+            code: 'FORMULA_LOCKED',
+          }
+        }
+      }
+    }
+  }
+
   const { error } = await admin
     .from('inventory_lots')
-    .update({ name, sku, code: code ?? null, count: parseCount(count), unit_of_measure: unitOfMeasure ?? null, item_type_id: itemTypeId ?? null, fiber: fiber ?? null, lot: lot ?? null })
+    .update({ name, sku, code: code ?? null, count: parseCount(count), unit_of_measure: unitOfMeasure ?? null, item_type_id: itemTypeId, fiber: fiber ?? null, lot: lot ?? null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 

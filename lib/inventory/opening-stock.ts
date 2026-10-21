@@ -2,16 +2,31 @@
 // (`npm run check:opening-stock`) rather than only through a live database.
 //
 // An item's opening quantity is split across the warehouses that held it on
-// day one — one `stock_opening_balances` row per location. Everything that
-// follows exists to keep `inventory_lots` consistent with those rows.
+// day one — one `stock_opening_balances` row per location × grade × lot
+// (0072). Everything that follows exists to keep `inventory_lots` consistent
+// with those rows.
 
-/** One warehouse's share of an item's opening stock. */
-export type OpeningStockLine = { locationId: string; quantity: number; rate: number }
+/** One warehouse / grade / lot share of an item's opening stock. */
+export type OpeningStockLine = {
+  locationId: string
+  quantity: number
+  /** Cost per stock unit. */
+  rate: number
+  gradeId?: string | null
+  lotNo?: string | null
+  nosCarton?: number | null
+  weightPerCarton?: number | null
+}
+
+/** Identity of an opening row: location × grade × lot. */
+export function openingLineKey(l: Pick<OpeningStockLine, 'locationId' | 'gradeId' | 'lotNo'>) {
+  return `${l.locationId}|${l.gradeId ?? ''}|${(l.lotNo ?? '').trim()}`
+}
 
 export type OpeningStockPlan = {
   /** Lines worth storing — a location with nothing at it is simply absent. */
   lines: OpeningStockLine[]
-  /** Locations that had a row before and no longer do. */
+  /** Locations that had a row before and now have none at all. */
   removedLocationIds: string[]
   /** Sum of the stored lines. */
   openingTotal: number
@@ -52,9 +67,12 @@ export function planOpeningStock(args: {
   // it, which is also how a line gets removed (the user zeroes it out).
   const lines = args.lines.filter((l) => l.quantity > 0 || l.rate > 0)
 
+  const seen = new Set<string>()
   const kept = new Set<string>()
   for (const line of lines) {
-    if (kept.has(line.locationId)) return { ok: false, error: 'Each location can only be listed once' }
+    const key = openingLineKey(line)
+    if (seen.has(key)) return { ok: false, error: 'Each location, grade and lot can only be listed once' }
+    seen.add(key)
     kept.add(line.locationId)
   }
 
@@ -86,7 +104,7 @@ export function planOpeningStock(args: {
     ok: true,
     plan: {
       lines,
-      removedLocationIds: args.existing.map((r) => r.locationId).filter((id) => !kept.has(id)),
+      removedLocationIds: [...new Set(args.existing.map((r) => r.locationId))].filter((id) => !kept.has(id)),
       openingTotal,
       currentQuantity,
       openingRate,

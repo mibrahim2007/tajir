@@ -1,5 +1,7 @@
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
+import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { CreateStockTransferForm } from './create-stock-transfer-form'
 
 export default async function NewStockTransferPage() {
@@ -7,10 +9,14 @@ export default async function NewStockTransferPage() {
   const admin = createAdminClient()
   const today = new Date().toISOString().split('T')[0]
 
-  const [{ data: locs }, { data: items }, { data: rawLocStock }] = await Promise.all([
+  const [{ data: locs }, { data: items }, { data: rawLocStock }, { data: grades }, profiles, positions] = await Promise.all([
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, count').eq('tenant_id', tenantId).order('name'),
     admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
+    loadItemProfiles(admin, tenantId),
+    // Grade / lot positions, so a tracked item is moved by grade and lot.
+    loadStockPositions(admin, tenantId),
   ])
 
   const locationStock = (rawLocStock ?? []).map((ls) => ({
@@ -28,8 +34,10 @@ export default async function NewStockTransferPage() {
       <CreateStockTransferForm
         today={today}
         locations={(locs ?? []).map(l => ({ id: l.id, name: l.name }))}
-        items={(items ?? []).map(i => ({ id: i.id, name: i.name, count: String(i.count ?? '') }))}
+        items={(items ?? []).map(i => ({ id: i.id, name: i.name, count: String(i.count ?? ''), profile: profileOf(profiles, i.id) }))}
         locationStock={locationStock}
+        positions={positions}
+        grades={grades ?? []}
       />
     </div>
   )

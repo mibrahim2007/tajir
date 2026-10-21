@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
-import { normalizeMultiplyBy } from '@/lib/yarn'
+import { measureReturnLine, returnLineFields } from '@/lib/inventory/return-line'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveCommissionClawback,
@@ -21,7 +21,8 @@ const schema = z.object({
   saleOrderId:  z.string().uuid().optional(),
   customerId:   z.string().uuid('Invalid customer'),
   stockItemId:  z.string().uuid('Invalid stock item'),
-  quantity:     z.coerce.number().positive('Quantity must be positive'),
+  // Carton lines derive their quantity from Nos Carton × Weight on the server.
+  quantity:     z.coerce.number().min(0).optional(),
   rate:         z.coerce.number().positive('Rate must be positive'),
   currencyCode: z.enum(['PKR', 'USD']),
   exchangeRate: z.coerce.number().positive().default(1),
@@ -31,6 +32,7 @@ const schema = z.object({
   yarnType:     z.string().optional().nullable(),
   yarnWeight:   z.coerce.number().min(0).optional().nullable(),
   multiplyBy:   z.coerce.number().positive().optional().nullable(),
+  ...returnLineFields,
 }).refine(
   (d) => d.currencyCode === 'PKR' || d.exchangeRate > 1,
   { message: 'Exchange Rate is required for USD transactions', path: ['exchangeRate'] },
@@ -55,32 +57,40 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
     return { success: false, error: 'Account locked', code: 'TENANT_LOCKED' }
   }
 
-  const { saleOrderId, customerId, stockItemId, quantity, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight, multiplyBy: rawMultiplyBy } = parsed.data
+  const { saleOrderId, customerId, stockItemId, rate, currencyCode, exchangeRate, date, reason, locationId, yarnType, yarnWeight } = parsed.data
 
   const admin = createAdminClient()
 
-  // Determine whether the item is yarn (Item Type "Yarn"); yarn lines carry a
-  // multiplier that scales the money amount (not the quantity).
-  const { data: itemLot } = await admin
-    .from('inventory_lots').select('item_type_id').eq('id', stockItemId).eq('tenant_id', tenantId).maybeSingle()
-  let isYarn = false
-  if (itemLot?.item_type_id) {
-    const { data: itemType } = await admin
-      .from('item_types').select('name').eq('id', itemLot.item_type_id).eq('tenant_id', tenantId).maybeSingle()
-    isYarn = (itemType?.name ?? '').trim().toLowerCase() === 'yarn'
-  }
-  const multiplyBy = isYarn ? normalizeMultiplyBy(rawMultiplyBy) : 1
-  const pkrEquivalent = quantity * rate * (currencyCode === 'USD' ? exchangeRate : 1) * multiplyBy
+  // The sale line this return is booked against, if any: its grade / lot are
+  // the ones the goods carried.
+  const { data: originalSale } = saleOrderId
+    ? await admin
+        .from('sales_orders')
+        .select('quantity, grade_id, lot_no, weight_per_carton')
+        .eq('id', saleOrderId)
+        .eq('tenant_id', tenantId)
+        .single()
+    : { data: null }
+
+  // Measured by the item type's formula: carton lines derive quantity from
+  // Nos Carton × Weight, yarn lines apply Multiply By.
+  const measured = await measureReturnLine(admin, tenantId, {
+    stockItemId,
+    quantity:        parsed.data.quantity,
+    rate,
+    fx:              currencyCode === 'USD' ? exchangeRate : 1,
+    multiplyBy:      parsed.data.multiplyBy,
+    nosCarton:       parsed.data.nosCarton,
+    weightPerCarton: parsed.data.weightPerCarton,
+    gradeId:         parsed.data.gradeId,
+    lotNo:           parsed.data.lotNo,
+    original:        originalSale,
+  })
+  if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
+  const { quantity, multiplyBy, isYarn, pkrEquivalent } = measured.line
 
   /* Validate quantity does not exceed original sale if saleOrderId is provided */
   if (saleOrderId) {
-    const { data: originalSale } = await admin
-      .from('sales_orders')
-      .select('quantity')
-      .eq('id', saleOrderId)
-      .eq('tenant_id', tenantId)
-      .single()
-
     if (originalSale) {
       const { data: existingReturns } = await admin
         .from('sale_returns')
@@ -130,6 +140,11 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
       yarn_type:     isYarn ? (yarnType?.trim() || null) : null,
       yarn_weight:   isYarn ? (yarnWeight ?? null) : null,
       multiply_by:   multiplyBy,
+      nos_carton:        measured.line.nosCarton,
+      weight_per_carton: measured.line.weightPerCarton,
+      qty_lbs:           measured.line.qtyLbs,
+      grade_id:          measured.line.gradeId,
+      lot_no:            measured.line.lotNo,
     })
     .select('id')
     .single()

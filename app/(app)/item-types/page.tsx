@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header'
 import { TableCard, Th, Td, EmptyState } from '@/components/table-card'
 import { Button } from '@/components/ui/button'
 import { ItemTypeActions } from './item-type-actions'
+import { FORMULA_SHORT, normalizeFormula } from '@/lib/item-formula'
 
 export default async function ItemTypesPage() {
   const { tenantId, role } = await requireAuth()
@@ -16,14 +17,13 @@ export default async function ItemTypesPage() {
   const [{ data: itemTypes }, { data: counts }] = await Promise.all([
     admin
       .from('item_types')
-      .select('id, name, parent_id, created_at')
+      .select('id, name, parent_id, created_at, formula, stock_unit, pack_unit')
       .eq('tenant_id', tenantId)
       .order('name', { ascending: true }),
     admin
       .from('inventory_lots')
       .select('item_type_id')
-      .eq('tenant_id', tenantId)
-      .not('item_type_id', 'is', null),
+      .eq('tenant_id', tenantId),
   ])
 
   const countMap: Record<string, number> = {}
@@ -48,7 +48,7 @@ export default async function ItemTypesPage() {
     <div className="p-6 max-w-4xl mx-auto">
       <PageHeader
         title="Item Types"
-        subtitle="Categorize your stock items (e.g. Yarn, Grey Fabric)"
+        subtitle="Every stock item has a type; the type's formula decides how its invoice lines are billed"
         action={isOwner ? (
           <Link href="/item-types/new">
             <Button size="sm" className="min-h-[36px]">
@@ -62,6 +62,8 @@ export default async function ItemTypesPage() {
           <thead className="border-b border-border bg-muted/40">
             <tr>
               <Th>Name</Th>
+              <Th>Formula</Th>
+              <Th>Units</Th>
               <Th>Stock Items</Th>
               {isOwner && <Th className="w-24" />}
             </tr>
@@ -69,7 +71,7 @@ export default async function ItemTypesPage() {
           <tbody className="divide-y divide-border">
             {topTypes.length === 0 ? (
               <tr>
-                <td colSpan={isOwner ? 3 : 2}>
+                <td colSpan={isOwner ? 5 : 4}>
                   <EmptyState message="No item types yet. Add one to start categorizing your stock." />
                 </td>
               </tr>
@@ -79,6 +81,8 @@ export default async function ItemTypesPage() {
                 <Fragment key={it.id}>
                   <tr className="hover:bg-secondary/50 transition-colors">
                     <Td strong>{it.name}</Td>
+                    <Td>{FORMULA_SHORT[normalizeFormula(it.formula)]}</Td>
+                    <Td muted>{[it.stock_unit, it.pack_unit].filter(Boolean).join(' · ') || '—'}</Td>
                     <Td muted>{countMap[it.id] ?? 0}</Td>
                     {isOwner && <Td><ItemTypeActions id={it.id} name={it.name} subTypes={subs} /></Td>}
                   </tr>
@@ -87,6 +91,8 @@ export default async function ItemTypesPage() {
                       <Td>
                         <span className="text-muted-foreground pl-4">└ {s.name}</span>
                       </Td>
+                      <Td muted>{FORMULA_SHORT[normalizeFormula(it.formula)]}</Td>
+                      <Td muted />
                       <Td muted>{countMap[s.id] ?? 0}</Td>
                       {isOwner && <Td />}
                     </tr>

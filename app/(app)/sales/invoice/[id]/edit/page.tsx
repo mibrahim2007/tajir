@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation'
 import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { loadYarnLotIds } from '@/lib/inventory/yarn-lots'
-import { loadPolyesterLotIds } from '@/lib/inventory/polyester-lots'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
+import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { getAgentOptions } from '@/lib/agents/options'
 import { EditSaleInvoiceForm } from './edit-sale-invoice-form'
 import type { SaleFormValues } from '../../../sale-invoice-form'
@@ -20,7 +20,7 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds },
   ] = await Promise.all([
     admin.from('sales_orders')
-      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, agent_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton')
+      .select('stock_item_id, quantity, rate, currency_code, exchange_rate, date, payment_due_date, due_days, customer_id, agent_id, location_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, nos_carton, weight_per_carton, grade_id, lot_no')
       .eq('invoice_id', invoiceId).eq('tenant_id', tenantId).order('created_at'),
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
@@ -57,22 +57,24 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
     customerBalanceMap[c.id] = ob + billed - paid - ret - cn + refunded
   }
 
-  const [yarnLotIds, polyesterLotIds, agents, { data: accrual }] = await Promise.all([
-    loadYarnLotIds(admin, tenantId),
-    loadPolyesterLotIds(admin, tenantId),
+  const [profiles, { data: rawGrades }, agents, { data: accrual }] = await Promise.all([
+    loadItemProfiles(admin, tenantId),
+    admin.from('grades').select('id, name').eq('tenant_id', tenantId).order('sort_order').order('name'),
     getAgentOptions(admin, tenantId),
     admin.from('agent_commissions')
       .select('commission_type, commission_rate')
       .eq('tenant_id', tenantId).eq('source_type', 'sale_invoice').eq('source_id', invoiceId)
       .maybeSingle(),
   ])
+  // Grade / lot stock, only for items whose type tracks them.
+  const trackedIds = [...profiles].filter(([, p]) => p.trackGrade || p.trackLot).map(([id]) => id)
+  const positions = trackedIds.length ? await loadStockPositions(admin, tenantId, { stockItemIds: trackedIds }) : []
   const customers = (rawCustomers ?? []).map((c) => ({ id: c.id, name: c.name }))
   const suppliers = (rawSuppliers ?? []).map((s) => ({ id: s.id, name: s.name }))
   const stockItems = (rawItems ?? []).map((l) => ({
     id: l.id, name: l.name, currentQuantity: l.current_quantity, barcode: l.code ?? null, unitOfMeasure: l.unit_of_measure ?? null,
     itemNature: (l.item_nature === 'service' ? 'service' : 'inventory') as 'inventory' | 'service',
-    isYarn: yarnLotIds.has(l.id),
-    isPolyester: polyesterLotIds.has(l.id),
+    profile: profileOf(profiles, l.id),
   }))
   const pricingRules = (rawRules ?? []).map((r) => ({ customerId: r.customer_id, stockItemId: r.stock_item_id, rate: r.rate }))
   const locations = rawLocs ?? []
@@ -110,6 +112,8 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
       multiplyBy:  l.multiply_by ?? 1,
       nosCarton:       l.nos_carton ?? NaN,
       weightPerCarton: l.weight_per_carton ?? NaN,
+      gradeId:         l.grade_id ?? '',
+      lotNo:           l.lot_no ?? '',
     })),
   }
 
@@ -133,6 +137,8 @@ export default async function EditSaleInvoicePage({ params }: { params: Promise<
         isOwner={role === 'owner'}
         locations={locations}
         locationStock={locationStock}
+        positions={positions}
+        grades={rawGrades ?? []}
         costMap={costMap}
         customerBalanceMap={customerBalanceMap}
         agents={agents}

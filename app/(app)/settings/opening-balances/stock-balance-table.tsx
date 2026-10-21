@@ -5,8 +5,12 @@ import Link from 'next/link'
 import { MapPin, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-/** One warehouse's share of an item's opening stock. */
-export type OpeningLine = { locationId: string; locationName: string; quantity: number; rate: number }
+/** One warehouse / grade / lot share of an item's opening stock. */
+export type OpeningLine = {
+  locationId: string; locationName: string; quantity: number; rate: number
+  gradeId?: string | null; gradeName?: string | null; lotNo?: string | null
+  nosCarton?: number | null; weightPerCarton?: number | null
+}
 export type OpeningLot  = { id: string; name: string; lines: OpeningLine[] }
 export type LocationOption = { id: string; name: string }
 
@@ -61,7 +65,7 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
                       {lot.name}
                       {lot.lines.length > 1 && (
                         <span className="ml-2 text-xs text-muted-foreground font-normal">
-                          {lot.lines.length} locations
+                          {lot.lines.length} lines
                         </span>
                       )}
                     </td>
@@ -84,12 +88,16 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
                   </tr>
 
                   {/* Per-warehouse breakdown, only worth the rows once it exists. */}
-                  {lot.lines.map((line) => (
-                    <tr key={`${lot.id}-${line.locationId}`} className="bg-muted/20 text-xs text-muted-foreground">
+                  {lot.lines.map((line, i) => (
+                    <tr key={`${lot.id}-${line.locationId}-${i}`} className="bg-muted/20 text-xs text-muted-foreground">
                       <td className="pl-10 pr-4 py-2">
                         <span className="inline-flex items-center gap-1.5">
                           <MapPin className="h-3 w-3" />
                           {line.locationName}
+                          {(line.gradeName || line.lotNo) && (
+                            <span>· {[line.gradeName, line.lotNo && `Lot ${line.lotNo}`].filter(Boolean).join(' · ')}</span>
+                          )}
+                          {line.nosCarton ? <span>· {fmt(line.nosCarton)} ctn</span> : null}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right tabular-nums">{fmt(line.quantity)}</td>
