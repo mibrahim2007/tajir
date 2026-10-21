@@ -28,9 +28,12 @@ export async function createInventoryLotAction(
 
   const admin = createAdminClient()
 
+  // The item is saved against a SUB type (mandatory); its item type is the
+  // sub type's parent, whose formula it follows.
   const { data: itemType } = await admin
-    .from('item_types').select('id, stock_unit').eq('id', itemTypeId).eq('tenant_id', tenantId).maybeSingle()
-  if (!itemType) return { success: false, error: 'Item type not found', code: 'VALIDATION_ERROR' }
+    .from('item_types').select('id, name, parent_id, stock_unit').eq('id', itemTypeId).eq('tenant_id', tenantId).maybeSingle()
+  if (!itemType) return { success: false, error: 'Sub type not found', code: 'VALIDATION_ERROR' }
+  if (!itemType.parent_id) return { success: false, error: 'Select a sub type', code: 'VALIDATION_ERROR' }
 
   // Service items carry no lot number, so the duplicate-lot guard only applies
   // to stockable inventory items.
@@ -62,7 +65,8 @@ export async function createInventoryLotAction(
       // No unit picked → the item type's stock unit.
       unit_of_measure: unitOfMeasure || itemType.stock_unit || null,
       item_type_id: itemTypeId,
-      fiber: isService ? null : (fiber || null),
+      // The old Fiber column now carries the sub type's name.
+      fiber: isService ? null : (itemType.name || fiber || null),
       lot: isService ? null : (lot || null),
       default_supplier_id: isService ? null : (defaultSupplierId || null),
     })

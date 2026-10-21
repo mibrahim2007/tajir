@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from 'react'
 import { Button } from '@/components/ui/button'
-import { ItemTypeSelect } from '@/components/item-type-select'
+import { SubTypeSelect } from '@/components/sub-type-select'
 import { listItemTypesAction, type ItemTypeWithProfile } from '@/app/actions/list-item-types'
 import { STANDARD_PROFILE, type ItemProfile } from '@/lib/inventory/item-profiles'
 import { createSupplierAction } from '@/app/actions/create-supplier'
@@ -126,7 +126,7 @@ export function QuickCreateLot({ onSuccess, onCancel, onCreatedProfile }: QuickC
 
   const submit = () => {
     if (!name.trim()) { setError('Name is required'); return }
-    if (!itemTypeId) { setError('Item type is required'); return }
+    if (!itemTypeId) { setError('Sub type is required'); return }
     start(async () => {
       setError(null)
       const result = await createInventoryLotAction({ name: name.trim(), itemNature: 'inventory', itemTypeId, count: count.trim() || undefined })
@@ -159,21 +159,26 @@ export function QuickCreateLot({ onSuccess, onCancel, onCreatedProfile }: QuickC
         />
       </div>
       <div>
-        <label className="text-sm font-medium">Item Type <span className="text-destructive">*</span></label>
+        <label className="text-sm font-medium">Sub Type <span className="text-destructive">*</span></label>
         <div className="mt-1">
-          <ItemTypeSelect
+          <SubTypeSelect
             className="h-10 w-full"
             itemTypes={types}
             value={itemTypeId}
             onChange={setItemTypeId}
-            onTypeCreated={() => {
-              // Reload so the new type arrives with its formula profile.
+            onSubTypeCreated={() => {
+              // Reload so the new sub type arrives with its formula profile.
               listItemTypesAction().then((r) => { if (r.success) setTypes(r.data) })
             }}
           />
         </div>
+        {itemTypeId && (() => {
+          const sub = types.find((t) => t.id === itemTypeId)
+          const parent = sub?.parentId ? types.find((t) => t.id === sub.parentId) : sub
+          return parent ? <p className="text-xs text-muted-foreground mt-1">Item type: {parent.name}</p> : null
+        })()}
       </div>
-      <p className="text-xs text-muted-foreground">Additional details (fiber, lot no.) can be added from Inventory.</p>
+      <p className="text-xs text-muted-foreground">Additional details (lot no., unit) can be added from Inventory.</p>
       {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2 justify-end pt-1">
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>Cancel</Button>

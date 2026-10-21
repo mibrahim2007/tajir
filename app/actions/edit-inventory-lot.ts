@@ -48,11 +48,17 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
 
   // Moving a traded item to a type with a different formula would re-bill its
   // existing lines on their next edit, so that is refused.
+  // Fiber now carries the sub type's name; an item left on a top-level type
+  // (from before sub types were mandatory) keeps what it had.
+  let subTypeName: string | null = null
   if (itemTypeId !== existing.item_type_id) {
     const { data: types } = await admin
-      .from('item_types').select('id, formula').eq('tenant_id', tenantId).in('id', [itemTypeId, existing.item_type_id])
+      .from('item_types').select('id, name, parent_id, formula').eq('tenant_id', tenantId).in('id', [itemTypeId, existing.item_type_id])
     const next = types?.find((t) => t.id === itemTypeId)
-    if (!next) return { success: false, error: 'Item type not found', code: 'VALIDATION_ERROR' }
+    if (!next) return { success: false, error: 'Sub type not found', code: 'VALIDATION_ERROR' }
+    // Moving to another type must land on a sub type.
+    if (!next.parent_id) return { success: false, error: 'Select a sub type', code: 'VALIDATION_ERROR' }
+    subTypeName = next.name
     const prev = types?.find((t) => t.id === existing.item_type_id)
     if (prev && prev.formula !== next.formula) {
       for (const table of LINE_TABLES) {
@@ -69,9 +75,15 @@ export async function editInventoryLotAction(input: unknown): Promise<ActionResu
     }
   }
 
+  if (subTypeName === null) {
+    const { data: current } = await admin
+      .from('item_types').select('name, parent_id').eq('id', itemTypeId).eq('tenant_id', tenantId).maybeSingle()
+    if (current?.parent_id) subTypeName = current.name
+  }
+
   const { error } = await admin
     .from('inventory_lots')
-    .update({ name, sku, code: code ?? null, count: parseCount(count), unit_of_measure: unitOfMeasure ?? null, item_type_id: itemTypeId, fiber: fiber ?? null, lot: lot ?? null })
+    .update({ name, sku, code: code ?? null, count: parseCount(count), unit_of_measure: unitOfMeasure ?? null, item_type_id: itemTypeId, fiber: subTypeName ?? fiber ?? existing.fiber ?? null, lot: lot ?? null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
 

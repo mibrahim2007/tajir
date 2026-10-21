@@ -246,10 +246,10 @@ export function ItemsStep({ data }: { data: SetupData }) {
         warehouse are set in the final step. Service items like freight recharge can be added from
         the Inventory page.
       </Why>
-      {data.counts.itemTypes === 0 && (
+      {!data.itemTypes.some((t) => t.parentId) && (
         <p className="mb-4 text-sm text-amber-600 dark:text-amber-400">
-          No categories yet — go back and add at least one. Every item needs a category, and the
-          category&apos;s formula decides how the item is billed.
+          No sub types yet — go back and add a category with at least one sub type. Every item needs
+          a sub type, and its category&apos;s formula decides how the item is billed.
         </p>
       )}
       <AlreadyHave
@@ -262,7 +262,7 @@ export function ItemsStep({ data }: { data: SetupData }) {
       <DraftGrid
         columns={[
           { label: 'Item name', required: true, width: '30%' },
-          { label: 'Category', required: true, width: '20%' },
+          { label: 'Sub type', required: true, width: '20%' },
           { label: 'Count / grade', width: '14%' },
           { label: 'Unit', width: '14%' },
           { label: 'Code / ref' },
@@ -279,10 +279,11 @@ export function ItemsStep({ data }: { data: SetupData }) {
               <Cell>
                 <select className={cellInput} value={r.itemTypeId} onChange={(e) => draft.update(r._key, { itemTypeId: e.target.value, unit: '' })} onKeyDown={enterToNext}>
                   <option value="">— select —</option>
+                  {/* Sub types only, grouped under their category (item type). */}
                   {tops.map((t) => {
                     const subs = byParent.get(t.id) ?? []
                     return subs.length === 0
-                      ? <option key={t.id} value={t.id}>{t.name}</option>
+                      ? null
                       : <optgroup key={t.id} label={t.name}>{subs.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</optgroup>
                   })}
                 </select>
@@ -306,7 +307,7 @@ export function ItemsStep({ data }: { data: SetupData }) {
         args={{
           rows: draft.rows, setRows: draft.setRows, blank: blankItem,
           isBlank: (r) => !r.name.trim() && !r.count.trim() && !r.code.trim(),
-          validate: (r) => (!r.name.trim() ? 'Item name is required' : !r.itemTypeId ? 'Category is required' : null),
+          validate: (r) => (!r.name.trim() ? 'Item name is required' : !r.itemTypeId ? 'Sub type is required' : null),
           create: (r) => createInventoryLotAction({
             name: r.name.trim(),
             itemNature: 'inventory',

@@ -42,7 +42,7 @@ export async function GET(req: Request) {
     { header: 'Code', key: 'code', width: 14 },
     { header: 'Count', key: 'count', width: 12 },
     { header: 'Type', key: 'type', width: 12 },
-    { header: 'Fiber', key: 'fiber', width: 16 },
+    { header: 'Sub Type', key: 'fiber', width: 16 },
     { header: 'Lot', key: 'lot', width: 14 },
     { header: 'Default Supplier', key: 'supplier', width: 24 },
     { header: 'Current Quantity', key: 'qty', width: 18 },

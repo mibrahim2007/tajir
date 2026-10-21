@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { editInventoryLotAction } from '@/app/actions/edit-inventory-lot'
-import { ItemTypeSelect } from '@/components/item-type-select'
+import { SubTypeSelect, parentTypeOf } from '@/components/sub-type-select'
 
 const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
 
@@ -45,7 +45,7 @@ type Lot = {
 // Full-page form at /inventory/[id]/edit (was a drawer on the inventory list).
 export function EditInventoryLotForm({ lot, itemTypes: initialItemTypes }: { lot: Lot; itemTypes: ItemType[] }) {
   const router = useRouter()
-  // Local copy so a type added from the list's "+ Add item type" shows at once.
+  // Local copy so a sub type added from the list's "+ Add sub type" shows at once.
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialItemTypes)
   const [isPending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -65,7 +65,10 @@ export function EditInventoryLotForm({ lot, itemTypes: initialItemTypes }: { lot
   })
 
   const watched = form.watch()
-  const typeName = itemTypes.find((t) => t.id === watched.itemTypeId)?.name
+  // Sub type picked → its parent is the item type (auto, read-only).
+  const subType = itemTypes.find((t) => t.id === watched.itemTypeId)
+  const parentType = parentTypeOf(itemTypes, watched.itemTypeId)
+  const typeName = parentType ? [parentType.name, subType?.parentId ? subType.name : null].filter(Boolean).join(' · ') : undefined
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
@@ -143,28 +146,27 @@ export function EditInventoryLotForm({ lot, itemTypes: initialItemTypes }: { lot
 
               <FormField control={form.control} name="itemTypeId" render={({ field, fieldState }) => (
                 <FormItem className="md:col-span-6">
-                  <FormLabel>Item Type <span className="text-destructive">*</span></FormLabel>
+                  <FormLabel>Sub Type <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
-                    <ItemTypeSelect
+                    <SubTypeSelect
                       itemTypes={itemTypes}
                       value={field.value}
                       onChange={field.onChange}
                       keepSelectableId={lot.itemTypeId}
                       invalid={!!fieldState.error}
-                      onTypeCreated={(t) => setItemTypes((prev) => [...prev, t])}
+                      onSubTypeCreated={(t) => setItemTypes((prev) => [...prev, t])}
                     />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
 
-              <FormField control={form.control} name="fiber" render={({ field }) => (
-                <FormItem className="md:col-span-6">
-                  <FormLabel>Fiber</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <FormItem className="md:col-span-6">
+                <FormLabel>Item Type</FormLabel>
+                <div className="flex min-h-[44px] items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+                  {parentType?.name ?? 'Set by the sub type'}
+                </div>
+              </FormItem>
               <FormField control={form.control} name="lot" render={({ field }) => (
                 <FormItem className="md:col-span-6">
                   <FormLabel>Lot</FormLabel>

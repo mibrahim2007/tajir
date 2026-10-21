@@ -34,7 +34,7 @@ import { Input } from '@/components/ui/input'
 import { createInventoryLotAction } from '@/app/actions/create-inventory-lot'
 import { createLotSchema, type CreateLotInput } from '@/app/actions/inventory-lot-schema'
 import { useEnterToNextField } from '@/hooks/use-enter-to-next-field'
-import { ItemTypeSelect } from '@/components/item-type-select'
+import { SubTypeSelect, parentTypeOf } from '@/components/sub-type-select'
 
 const UOM_OPTIONS = ['KG', 'Cone', 'Meter', 'Yard', 'Roll', 'Bag', 'Bale', 'Piece', 'Bundle'] as const
 
@@ -43,7 +43,7 @@ type ItemType = { id: string; name: string; parentId?: string | null }
 // Full-page form at /inventory/new (was a drawer on the inventory list).
 export function CreateLotForm({ itemTypes: initialItemTypes }: { itemTypes: ItemType[] }) {
   const router = useRouter()
-  // Local copy so a type added from the list's "+ Add item type" shows at once.
+  // Local copy so a sub type added from the list's "+ Add sub type" shows at once.
   const [itemTypes, setItemTypes] = useState<ItemType[]>(initialItemTypes)
   const [isPending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -70,7 +70,10 @@ export function CreateLotForm({ itemTypes: initialItemTypes }: { itemTypes: Item
 
   const isService = form.watch('itemNature') === 'service'
   const watched = form.watch()
-  const typeName = itemTypes.find((t) => t.id === watched.itemTypeId)?.name
+  // Sub type picked → its parent is the item type (auto, read-only).
+  const subType = itemTypes.find((t) => t.id === watched.itemTypeId)
+  const parentType = parentTypeOf(itemTypes, watched.itemTypeId)
+  const typeName = parentType ? [parentType.name, subType?.parentId ? subType.name : null].filter(Boolean).join(' · ') : undefined
 
   const submit = (values: CreateLotInput, confirm = false) => {
     startTransition(async () => {
@@ -230,37 +233,28 @@ export function CreateLotForm({ itemTypes: initialItemTypes }: { itemTypes: Item
                   name="itemTypeId"
                   render={({ field, fieldState }) => (
                     <FormItem className="md:col-span-4">
-                      <FormLabel>Item Type <span className="text-destructive">*</span></FormLabel>
+                      <FormLabel>Sub Type <span className="text-destructive">*</span></FormLabel>
                       <FormControl>
-                        <ItemTypeSelect
+                        <SubTypeSelect
                           itemTypes={itemTypes}
                           value={field.value}
                           onChange={field.onChange}
                           invalid={!!fieldState.error}
-                          onTypeCreated={(t) => setItemTypes((prev) => [...prev, t])}
+                          onSubTypeCreated={(t) => setItemTypes((prev) => [...prev, t])}
                         />
                       </FormControl>
-                      <p className="text-xs text-muted-foreground">The type&apos;s formula decides how this item is billed on invoices.</p>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                {!isService && (
-                <FormField
-                  control={form.control}
-                  name="fiber"
-                  render={({ field }) => (
-                    <FormItem className="md:col-span-4">
-                      <FormLabel>Fiber</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. Cotton, Polyester" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                )}
+                <FormItem className="md:col-span-4">
+                  <FormLabel>Item Type</FormLabel>
+                  <div className="flex min-h-[44px] items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
+                    {parentType?.name ?? 'Set by the sub type'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Its formula decides how this item is billed on invoices.</p>
+                </FormItem>
 
                 {!isService && (
                 <FormField

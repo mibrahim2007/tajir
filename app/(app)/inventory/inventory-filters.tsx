@@ -66,7 +66,7 @@ export function InventoryFilters({ itemTypes }: { itemTypes: ItemType[] }) {
       )}
 
       <Input
-        placeholder="Fiber"
+        placeholder="Sub type"
         defaultValue={searchParams.get('fiber') ?? ''}
         className="w-36 min-h-[44px]"
         onChange={(e) => updateParam('fiber', e.target.value)}

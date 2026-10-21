@@ -364,8 +364,7 @@ export function GuideContent() {
             <Li><strong>Code</strong> — your internal product code (optional).</Li>
             <Li><strong>Unit</strong> — KG, Cone, Than, Meter, Piece… The list suggested depends on the item&apos;s type.</Li>
             <Li><strong>Count</strong> — yarn count or specification (optional).</Li>
-            <Li><strong>Fiber</strong> — material type, e.g., Cotton, Polyester (optional).</Li>
-            <Li><strong>Type</strong> — the Item Type (required). Its formula decides how the item is billed on invoices.</Li>
+            <Li><strong>Sub Type</strong> — required, picked from the sub types of your item types (e.g. Polyester → 150/144), or added on the spot with <strong>+ Add sub type…</strong>. The <strong>Item Type</strong> fills in automatically from the sub type, and its formula decides how the item is billed on invoices.</Li>
             <Li><strong>Nature</strong> — <strong>Inventory</strong> for goods that are counted and costed, or <strong>Service</strong> for things like freight or labour. A service item has no stock, so it never blocks a sale and carries no cost of sales.</Li>
           </Ul>
           <P>Add items at <strong>Stock → Inventory → Add New Item</strong>, or several at once under one category with <strong>Create items by type</strong>. Edit or deactivate from the item list.</P>

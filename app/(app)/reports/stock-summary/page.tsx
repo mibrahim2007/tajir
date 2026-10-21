@@ -83,7 +83,7 @@ export default async function StockSummaryPage({ searchParams }: { searchParams:
                     <th className="text-left px-4 py-3 font-medium">Code</th>
                     <th className="text-left px-4 py-3 font-medium">Count</th>
                     <th className="text-left px-4 py-3 font-medium">Type</th>
-                    <th className="text-left px-4 py-3 font-medium">Fiber</th>
+                    <th className="text-left px-4 py-3 font-medium">Sub Type</th>
                     <th className="text-left px-4 py-3 font-medium">Lot</th>
                     <th className="text-left px-4 py-3 font-medium">Supplier</th>
                     <th className="text-right px-4 py-3 font-medium">Qty</th>
