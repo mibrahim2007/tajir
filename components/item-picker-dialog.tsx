@@ -12,6 +12,7 @@ export type PickerItem = {
   name: string
   badge?: string   // e.g. count "30s" or an identity tag like "Supplier"
   meta?: string    // e.g. "1,250 avail." shown on the right
+  subType?: string | null  // stock items: the item's sub type, shown as its own column
   disabled?: boolean  // shown greyed and non-selectable (e.g. wrong party type for this form)
 }
 
@@ -49,9 +50,13 @@ export function ItemPickerDialog({
   const filtered = search.trim()
     ? items.filter((i) =>
         i.name.toLowerCase().includes(search.toLowerCase()) ||
-        i.badge?.toLowerCase().includes(search.toLowerCase())
+        i.badge?.toLowerCase().includes(search.toLowerCase()) ||
+        i.subType?.toLowerCase().includes(search.toLowerCase())
       )
     : items
+
+  // Stock item lists show a Sub Type column (with headers) when any item has one.
+  const showSubType = items.some((i) => i.subType)
 
   function pick(id: string) {
     const item = items.find((i) => i.id === id)
@@ -98,6 +103,9 @@ export function ItemPickerDialog({
               {selected.badge && (
                 <span className="ml-1.5 text-xs text-muted-foreground">({selected.badge})</span>
               )}
+              {selected.subType && (
+                <span className="ml-1.5 text-xs text-muted-foreground">· {selected.subType}</span>
+              )}
             </span>
           ) : (
             placeholder
@@ -108,7 +116,7 @@ export function ItemPickerDialog({
 
       <Dialog open={open} onOpenChange={(o) => { if (!o) close(); else setOpen(true) }}>
         <DialogContent
-          className="max-w-lg p-0 gap-0"
+          className={cn('p-0 gap-0', showSubType ? 'max-w-xl' : 'max-w-lg')}
           /*
            * Radix hands focus back to the trigger when the dialog closes. After
            * a selection that is a step backwards — the operator has finished
@@ -151,6 +159,13 @@ export function ItemPickerDialog({
                 )}
               </div>
 
+              {showSubType && filtered.length > 0 && (
+                <div className="flex items-center px-4 py-2 border-b bg-muted/40 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                  <span className="pl-7 flex-1">Item</span>
+                  <span className="w-40 shrink-0">Sub Type</span>
+                </div>
+              )}
+
               {/* List */}
               <div className="max-h-80 overflow-y-auto">
                 {filtered.length === 0 ? (
@@ -181,7 +196,7 @@ export function ItemPickerDialog({
                               isSelected && 'bg-accent'
                             )}
                           >
-                            <span className="flex items-center gap-3 min-w-0">
+                            <span className="flex items-center gap-3 min-w-0 flex-1">
                               {isSelected ? (
                                 <Check className="size-4 text-primary shrink-0" />
                               ) : (
@@ -194,6 +209,9 @@ export function ItemPickerDialog({
                                 </span>
                               )}
                             </span>
+                            {showSubType && (
+                              <span className="w-40 shrink-0 truncate text-sm text-muted-foreground">{item.subType || '—'}</span>
+                            )}
                             {item.meta && (
                               <span className="ml-4 shrink-0 text-xs text-muted-foreground">{item.meta}</span>
                             )}

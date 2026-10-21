@@ -335,6 +335,7 @@ export function SaleInvoiceForm({
       .map(s => ({
         id: s.id,
         name: s.name,
+        subType: s.profile?.subType,
         meta: s.itemNature === 'service'
           ? 'Service'
           : locStockMap

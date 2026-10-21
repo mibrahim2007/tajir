@@ -11,6 +11,8 @@ export type ItemProfile = {
   stockUnit:     string | null
   packUnit:      string | null
   stdPackWeight: number | null
+  /** The item's sub type name (its item type when that is a sub type), for pickers. */
+  subType?:      string | null
   /** Grade / lot are required at this basis (0072 / 0074). */
   trackGrade:    boolean
   trackLot:      boolean
@@ -19,6 +21,7 @@ export type ItemProfile = {
 export const STANDARD_PROFILE: ItemProfile = { formula: 'standard', stockUnit: null, packUnit: null, stdPackWeight: null, trackGrade: false, trackLot: false }
 
 type TypeRow = {
+  name: string | null; parent_id: string | null
   formula: string | null; stock_unit: string | null; pack_unit: string | null; std_pack_weight: number | string | null
 }
 
@@ -29,6 +32,7 @@ function toProfile(t: TypeRow | null | undefined, lastBasis?: string | null): It
     stockUnit:     t?.stock_unit ?? null,
     packUnit:      t?.pack_unit ?? null,
     stdPackWeight: t?.std_pack_weight == null ? null : Number(t.std_pack_weight),
+    subType:       t?.parent_id ? t.name : null,
     trackGrade:    tracksGradeLot(formula),
     trackLot:      tracksGradeLot(formula),
   }
@@ -39,7 +43,7 @@ export function profileAt(profile: ItemProfile, basis: ItemFormula): ItemProfile
   return { ...profile, formula: basis, trackGrade: tracksGradeLot(basis), trackLot: tracksGradeLot(basis) }
 }
 
-const TYPE_COLS = 'formula, stock_unit, pack_unit, std_pack_weight'
+const TYPE_COLS = 'name, parent_id, formula, stock_unit, pack_unit, std_pack_weight'
 
 // Most recent rate basis per item, from its purchase and sale lines.
 async function lastBasisByItem(admin: SupabaseClient, tenantId: string, ids?: string[]): Promise<Map<string, string>> {

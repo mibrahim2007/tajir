@@ -54,7 +54,12 @@ export default async function EditStockOpeningPage({ params }: { params: Promise
   return (
     <div className="p-6 max-w-[1440px] mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-extrabold tracking-tight">Opening Stock — {lot.name}</h1>
+        <h1 className="text-2xl font-extrabold tracking-tight">
+          Opening Stock — {lot.name}
+          {profileOf(profiles, id).subType && (
+            <span className="ml-2 text-base font-medium text-muted-foreground">({profileOf(profiles, id).subType})</span>
+          )}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
           List every warehouse that held this item on day one — one line per location, and per grade / lot for weighed or packed lines.
         </p>

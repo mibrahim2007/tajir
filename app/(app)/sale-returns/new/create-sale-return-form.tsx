@@ -195,7 +195,7 @@ export function CreateSaleReturnForm({ today, customers, suppliers = [], lots, s
     () => buildPartyItems(customerList, suppliers),
     [customerList, suppliers],
   )
-  const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count, subType: l.profile?.subType }))
 
   const saleOrderPickerItems = useMemo<PickerItem[]>(() =>
     saleOrders.map((o) => {

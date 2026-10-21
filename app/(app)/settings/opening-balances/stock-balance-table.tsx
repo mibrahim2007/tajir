@@ -13,7 +13,7 @@ export type OpeningLine = {
   /** How the line is measured (0074). */
   rateBasis?: string | null
 }
-export type OpeningLot  = { id: string; name: string; lines: OpeningLine[] }
+export type OpeningLot  = { id: string; name: string; subType?: string | null; lines: OpeningLine[] }
 export type LocationOption = { id: string; name: string }
 
 function fmt(n: number) {
@@ -46,6 +46,7 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
           <thead className="bg-muted/50 border-b">
             <tr>
               <th className="text-left px-4 py-3 font-medium">Item / Location</th>
+              <th className="text-left px-4 py-3 font-medium">Sub Type</th>
               <th className="text-right px-4 py-3 font-medium">Quantity</th>
               <th className="text-right px-4 py-3 font-medium">Rate (PKR)</th>
               <th className="text-right px-4 py-3 font-medium">Value (PKR)</th>
@@ -71,6 +72,7 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
                         </span>
                       )}
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{lot.subType || '—'}</td>
                     <td className="px-4 py-3 text-right tabular-nums">
                       {lot.lines.length > 0 ? fmt(qty) : <span className="text-muted-foreground">—</span>}
                     </td>
@@ -102,6 +104,7 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
                           {line.nosCarton ? <span>· {fmt(line.nosCarton)} ctn</span> : null}
                         </span>
                       </td>
+                      <td />
                       <td className="px-4 py-2 text-right tabular-nums">{fmt(line.quantity)}</td>
                       <td className="px-4 py-2 text-right tabular-nums">{line.rate > 0 ? fmt(line.rate) : '—'}</td>
                       <td className="px-4 py-2 text-right tabular-nums">
@@ -117,7 +120,7 @@ export function StockBalanceTable({ lots }: { lots: OpeningLot[] }) {
           {grandValue > 0 && (
             <tfoot className="border-t-2 bg-muted/30">
               <tr>
-                <td colSpan={3} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
+                <td colSpan={4} className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-muted-foreground">Total Value</td>
                 <td className="px-4 py-3 text-right font-bold tabular-nums">{fmtPKR(grandValue)}</td>
                 <td />
               </tr>

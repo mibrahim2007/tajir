@@ -26,7 +26,7 @@ export default async function OpeningBalancesPage() {
     { data: rawBanks },
     { data: rawOpeningStock },
   ] = await Promise.all([
-    admin.from('inventory_lots').select('id, name').eq('tenant_id', tenantId).order('name'),
+    admin.from('inventory_lots').select('id, name, item_types(name, parent_id)').eq('tenant_id', tenantId).order('name'),
     admin.from('tajir_customers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('suppliers').select('id, name, opening_balance, opening_balance_currency, opening_balance_pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId),
@@ -59,11 +59,16 @@ export default async function OpeningBalancesPage() {
     linesByLot.set(row.stock_item_id, lines)
   }
 
-  const lots: OpeningLot[] = (rawLots ?? []).map((l) => ({
-    id: l.id,
-    name: l.name,
-    lines: (linesByLot.get(l.id) ?? []).sort((a, b) => a.locationName.localeCompare(b.locationName)),
-  }))
+  const lots: OpeningLot[] = (rawLots ?? []).map((l) => {
+    // The item's sub type, when its type is one.
+    const t = (Array.isArray(l.item_types) ? l.item_types[0] : l.item_types) as { name: string; parent_id: string | null } | null
+    return {
+      id: l.id,
+      name: l.name,
+      subType: t?.parent_id ? t.name : null,
+      lines: (linesByLot.get(l.id) ?? []).sort((a, b) => a.locationName.localeCompare(b.locationName)),
+    }
+  })
 
   const customers = (rawCustomers ?? []).map((c) => ({
     id: c.id,

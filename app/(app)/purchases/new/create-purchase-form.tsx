@@ -117,7 +117,7 @@ export function CreatePurchaseForm({ today, suppliers, customers = [], lots, loc
     suppliers.map((s) => ({ id: s.id, name: s.name }))
   )
   const [lotList, setLotList] = useState<PickerItem[]>(
-    lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+    lots.map((l) => ({ id: l.id, name: l.name, badge: l.count, subType: l.profile?.subType }))
   )
 
   // Merged party list: customers + suppliers, each with an identity badge. Both

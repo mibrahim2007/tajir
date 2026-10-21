@@ -132,7 +132,8 @@ export function QuickCreateLot({ onSuccess, onCancel, onCreatedProfile }: QuickC
       const result = await createInventoryLotAction({ name: name.trim(), itemNature: 'inventory', itemTypeId, count: count.trim() || undefined })
       if (!result.success) { setError(result.error); return }
       onCreatedProfile?.(result.data.id, types.find((t) => t.id === itemTypeId)?.profile ?? STANDARD_PROFILE)
-      onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() || undefined })
+      const sub = types.find((t) => t.id === itemTypeId)
+      onSuccess({ id: result.data.id, name: name.trim(), badge: count.trim() || undefined, subType: sub?.parentId ? sub.name : null })
     })
   }
 

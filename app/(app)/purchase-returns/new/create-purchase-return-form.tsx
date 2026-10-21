@@ -192,7 +192,7 @@ export function CreatePurchaseReturnForm({ today, suppliers, customers = [], lot
     () => buildPartyItems(customers, supplierList),
     [customers, supplierList],
   )
-  const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count }))
+  const lotPickerItems = lots.map((l) => ({ id: l.id, name: l.name, badge: l.count, subType: l.profile?.subType }))
 
   const onSubmit = (values: FormValues) => {
     startTransition(async () => {
