@@ -7,6 +7,7 @@ import { getTenant } from '@/lib/auth/get-tenant'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { repostJournalEntry } from '@/lib/accounting/repost-journal-entry'
+import { loadCostReceipts, costLines, round2 } from '@/lib/inventory/costing'
 import { measureReturnLine, returnLineFields, checkPositionStock } from '@/lib/inventory/return-line'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import {
@@ -61,7 +62,7 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
   const { data: originalLine } = existing.sale_order_id
     ? await admin
         .from('sales_orders')
-        .select('grade_id, lot_no, weight_per_carton')
+        .select('grade_id, lot_no, weight_per_carton, cost_rate')
         .eq('id', existing.sale_order_id)
         .eq('tenant_id', tenantId)
         .maybeSingle()
@@ -83,6 +84,18 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
   })
   if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
   const { quantity, multiplyBy, isYarn, pkrEquivalent, profile } = measured.line
+
+  // Goods come back at the cost they went out at: the linked sale line's
+  // cost_rate, else today's receipt cost for the lot / item (0073).
+  let returnCostRate: number | null = originalLine?.cost_rate != null ? Number(originalLine.cost_rate) : null
+  if (returnCostRate === null) {
+    const costData = await loadCostReceipts(admin, tenantId, [stockItemId], date)
+    returnCostRate = costLines(costData, [{
+      stockItemId, gradeId: measured.line.gradeId, lotNo: measured.line.lotNo,
+      trackGrade: measured.line.profile.trackGrade, trackLot: measured.line.profile.trackLot, quantity,
+    }])[0].costRate
+  }
+  const returnCostAmount = returnCostRate === null ? 0 : round2(returnCostRate * quantity)
 
   // The row as saved and as edited, as grade / lot stock positions.
   const oldPosition = {
@@ -140,6 +153,8 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
       qty_lbs:           measured.line.qtyLbs,
       grade_id:          measured.line.gradeId,
       lot_no:            measured.line.lotNo,
+      cost_rate:         returnCostRate,
+      cost_amount:       returnCostAmount,
     })
     .eq('id', id)
     .eq('tenant_id', tenantId)
@@ -177,8 +192,11 @@ export async function editSaleReturnAction(input: unknown): Promise<ActionResult
     lines: [
       { accountSystemKey: 'sales_returns_contra', debit: pkrEquivalent, credit: 0, customerId },
       { accountSystemKey: 'accounts_receivable',  debit: 0, credit: pkrEquivalent, customerId },
-      { accountSystemKey: 'inventory',            debit: pkrEquivalent, credit: 0, stockItemId },
-      { accountSystemKey: 'cogs',                 debit: 0, credit: pkrEquivalent, stockItemId },
+      // Stock back in at cost (0073), not at the sale amount.
+      ...(returnCostAmount > 0 ? [
+        { accountSystemKey: 'inventory',            debit: returnCostAmount, credit: 0, stockItemId },
+        { accountSystemKey: 'cogs',                 debit: 0, credit: returnCostAmount, stockItemId },
+      ] : []),
       ...clawbackJournalLines(clawback),
     ],
   })

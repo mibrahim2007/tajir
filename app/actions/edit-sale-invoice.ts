@@ -15,6 +15,7 @@ import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/lin
 import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
 import { describeShortfalls } from '@/lib/inventory/shortfall-message'
+import { loadCostReceipts, costLines } from '@/lib/inventory/costing'
 import { glEditFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveAgentCommission,
@@ -202,10 +203,22 @@ export async function editSaleInvoiceAction(
     }
   }
 
+  // Cost of goods per line at the lot's / item's receipt cost up to the sale
+  // date (lib/inventory/costing.ts); service lines carry none.
+  const costData = await loadCostReceipts(admin, tenantId, stockIds, date)
+  const lineCosts = costLines(costData, lines.map((l, i) => {
+    const p = profileOf(profiles, l.stockItemId)
+    return {
+      stockItemId: l.stockItemId, gradeId: tracking[i].gradeId, lotNo: tracking[i].lotNo,
+      trackGrade: p.trackGrade, trackLot: p.trackLot,
+      quantity: serviceIds.has(l.stockItemId) ? 0 : l.quantity,
+    }
+  }))
+
   // ── Apply changes ──────────────────────────────────────────────
   // Insert the new lines FIRST (same invoice_id & serial) so the old rows stay
   // intact if an insert fails; only then delete the old rows.
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number; isService: boolean }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; costAmount: number; quantity: number; isService: boolean }[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -238,6 +251,8 @@ export async function editSaleInvoiceAction(
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:     multiplyBy,
+      cost_rate:       isService ? null : lineCosts[i].costRate,
+      cost_amount:     isService ? 0 : lineCosts[i].costAmount,
       grade_id:        tracking[i].gradeId,
       lot_no:          tracking[i].lotNo,
       nos_carton:        isCarton ? (line.nosCarton ?? null) : null,
@@ -258,7 +273,7 @@ export async function editSaleInvoiceAction(
       }
       return { success: false, error: 'Failed to update invoice', code: 'INTERNAL_ERROR' }
     }
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity, isService })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, costAmount: isService ? 0 : lineCosts[i].costAmount, quantity: line.quantity, isService })
   }
 
   // Remove the old rows now that the replacements exist. If this fails (e.g. a
@@ -320,8 +335,10 @@ export async function editSaleInvoiceAction(
         { accountSystemKey: 'cash_in_hand',     debit: 0,              credit: serviceRevenue },
       ] : []),
       // COGS/inventory relief applies to stockable lines only.
-      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
-      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      // Relieved at cost (0073), not at the sale amount; a line with no cost
+      // yet (nothing received) posts nothing rather than a zero leg.
+      ...createdOrders.filter((o) => !o.isService && o.costAmount > 0).map((o) => ({ accountSystemKey: 'cogs',      debit: o.costAmount, credit: 0, stockItemId: o.stockItemId })),
+      ...createdOrders.filter((o) => !o.isService && o.costAmount > 0).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.costAmount, stockItemId: o.stockItemId })),
       // Broker's commission — rebuilt from the edited invoice, so the payable
       // moves with it instead of keeping the amount the original sale accrued.
       ...commissionJournalLines(accrual),

@@ -16,6 +16,7 @@ import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/lin
 import { loadStockPositions } from '@/lib/inventory/stock-position'
 import { checkTenantRefs } from '@/lib/inventory/tenant-refs'
 import { describeShortfalls } from '@/lib/inventory/shortfall-message'
+import { loadCostReceipts, costLines } from '@/lib/inventory/costing'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
   resolveAgentCommission,
@@ -171,10 +172,22 @@ export async function createSaleInvoiceAction(
     }
   }
 
+  // Cost of goods per line at the lot's / item's receipt cost up to the sale
+  // date (lib/inventory/costing.ts); service lines carry none.
+  const costData = await loadCostReceipts(admin, tenantId, stockIds, date)
+  const lineCosts = costLines(costData, lines.map((l, i) => {
+    const p = profileOf(profiles, l.stockItemId)
+    return {
+      stockItemId: l.stockItemId, gradeId: tracking[i].gradeId, lotNo: tracking[i].lotNo,
+      trackGrade: p.trackGrade, trackLot: p.trackLot,
+      quantity: serviceIds.has(l.stockItemId) ? 0 : l.quantity,
+    }
+  }))
+
   const invoiceId = crypto.randomUUID()
   // One serial for the whole invoice — shared across every line row.
   const serialNumber = await nextDocumentSerial(admin, tenantId, 'sale_invoice', date)
-  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; quantity: number; isService: boolean }[] = []
+  const createdOrders: { id: string; stockItemId: string; pkrEquivalent: number; costAmount: number; quantity: number; isService: boolean }[] = []
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
@@ -208,6 +221,8 @@ export async function createSaleInvoiceAction(
       yarn_type:       isYarn ? (line.yarnType?.trim() || null) : null,
       yarn_weight:     isYarn ? (line.yarnWeight ?? null) : null,
       multiply_by:     multiplyBy,
+      cost_rate:       isService ? null : lineCosts[i].costRate,
+      cost_amount:     isService ? 0 : lineCosts[i].costAmount,
       grade_id:        tracking[i].gradeId,
       lot_no:          tracking[i].lotNo,
       nos_carton:        isCarton ? (line.nosCarton ?? null) : null,
@@ -238,7 +253,7 @@ export async function createSaleInvoiceAction(
     if (!isService) {
       await admin.rpc('adjust_inventory_quantity', { p_lot_id: line.stockItemId, p_delta: -line.quantity })
     }
-    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, quantity: line.quantity, isService })
+    createdOrders.push({ id: order.id, stockItemId: line.stockItemId, pkrEquivalent, costAmount: isService ? 0 : lineCosts[i].costAmount, quantity: line.quantity, isService })
   }
 
   const totalPKR = createdOrders.reduce((s, o) => s + o.pkrEquivalent, 0)
@@ -292,8 +307,10 @@ export async function createSaleInvoiceAction(
       ] : []),
       // COGS/inventory relief applies to stockable lines only; service lines
       // (e.g. freight) have no cost of goods.
-      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'cogs',      debit: o.pkrEquivalent, credit: 0, stockItemId: o.stockItemId })),
-      ...createdOrders.filter((o) => !o.isService).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.pkrEquivalent, stockItemId: o.stockItemId })),
+      // Relieved at cost (0073), not at the sale amount; a line with no cost
+      // yet (nothing received) posts nothing rather than a zero leg.
+      ...createdOrders.filter((o) => !o.isService && o.costAmount > 0).map((o) => ({ accountSystemKey: 'cogs',      debit: o.costAmount, credit: 0, stockItemId: o.stockItemId })),
+      ...createdOrders.filter((o) => !o.isService && o.costAmount > 0).map((o) => ({ accountSystemKey: 'inventory', debit: 0, credit: o.costAmount, stockItemId: o.stockItemId })),
       // Broker's commission: DR Commission Expense / CR Agent Commission Payable.
       // Rides on the invoice's own entry so it can never outlive the sale.
       ...commissionJournalLines(accrual),

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { isSaleLineBelowCost } from '@/lib/sales/below-cost'
 import { Suspense } from 'react'
 import { Plus, AlertTriangle, Printer, Pencil, RotateCcw, FileText } from 'lucide-react'
 import { requireAuth } from '@/lib/auth/require-auth'
@@ -26,7 +27,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const admin = createAdminClient()
 
   let query = admin.from('sales_orders')
-    .select('id, serial_number, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, location_id')
+    .select('id, serial_number, invoice_id, date, customer_id, stock_item_id, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, location_id, cost_amount')
     .eq('tenant_id', tenantId)
     .order('date', { ascending: false })
     .order('created_at', { ascending: false })
@@ -52,6 +53,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const lots      = (rawLots ?? []).map((l) => ({ id: l.id, name: l.name, unitOfMeasure: l.unit_of_measure ?? null }))
   const locationList = rawLocs ?? []
 
+  // Estimated cost per stock unit for lines saved before 0073 (no cost_amount).
   const costMap: Record<string, number> = {}
   for (const p of rawPurchases ?? []) {
     if (!costMap[p.stock_item_id])
@@ -98,11 +100,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   const displayItems: DisplayItem[] = []
 
   for (const [invoiceId, lines] of invoiceMap) {
-    const hasAnyBelowCost = lines.some((l) => {
-      const cost = costMap[l.stock_item_id]
-      const ratePKR = l.rate * l.exchange_rate
-      return cost !== undefined && ratePKR < cost
-    })
+    const hasAnyBelowCost = lines.some((l) => isSaleLineBelowCost(l, costMap))
     displayItems.push({
       key:          invoiceId,
       type:         'invoice',
@@ -122,9 +120,7 @@ export default async function SalesPage({ searchParams }: { searchParams: Search
   }
 
   for (const o of soloOrders) {
-    const cost = costMap[o.stock_item_id]
-    const ratePKR = o.rate * o.exchange_rate
-    const belowCost = cost !== undefined && ratePKR < cost
+    const belowCost = isSaleLineBelowCost(o, costMap)
     displayItems.push({
       key:          o.id,
       type:         'solo',

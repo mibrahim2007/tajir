@@ -16,6 +16,7 @@ import {
 import { LBS_PER_KG } from '@/lib/polyester'
 import { resolveLineTracking, findPositionShortfalls } from '@/lib/inventory/line-tracking'
 import { availableAt, type StockPosition } from '@/lib/inventory/stock-position'
+import { unitCostFor, costLines, type CostReceipt } from '@/lib/inventory/costing'
 
 let failures = 0
 function check(name: string, ok: boolean, detail = '') {
@@ -116,6 +117,30 @@ check('suggest: anything else → standard', suggestFormula('Electric') === 'sta
   check('two lines from one lot are totalled', short.length === 1 && short[0].requested === 4000 && short[0].available === 3300)
   check('an edit gets its own old lines back', findPositionShortfalls(pos, [{ ...line, quantity: 4000 }], [{ ...line, quantity: 1000 }]).length === 0)
   check('untracked items are not checked here', findPositionShortfalls(pos, [{ ...line, trackGrade: false, trackLot: false, quantity: 99999 }]).length === 0)
+}
+
+// ── cost per stock unit (0073) ──────────────────────────────────────────────
+{
+  // Sheet rows ABC and DEF as two lots of the same item, plus an opening lot.
+  const receipts: CostReceipt[] = [
+    { stockItemId: 'i1', gradeId: 'AA', lotNo: 'L1', quantity: 3300, value: 2_146_178 },
+    { stockItemId: 'i1', gradeId: 'A',  lotNo: 'L2', quantity: 2950, value: 1_918_553 },
+    { stockItemId: 'i1', gradeId: 'AA', lotNo: 'OB/1', quantity: 1000, value: 600_000 },
+    // purchase return of 300 kg from L1 at its purchase value
+    { stockItemId: 'i1', gradeId: 'AA', lotNo: 'L1', quantity: -300, value: -195_107.09 },
+  ]
+  const lot1 = unitCostFor(receipts, { stockItemId: 'i1', gradeId: 'AA', lotNo: 'L1', trackGrade: true, trackLot: true })
+  check('lot cost = lot value / lot qty (net of returns)', near(lot1 ?? 0, (2_146_178 - 195_107.09) / 3000))
+  const gradeOnly = unitCostFor(receipts, { stockItemId: 'i1', gradeId: 'AA', trackGrade: true })
+  check('grade-only cost spans all lots of that grade', near(gradeOnly ?? 0, (2_146_178 - 195_107.09 + 600_000) / 4000))
+  const avg = unitCostFor(receipts, { stockItemId: 'i1' })
+  check('untracked: item average', near(avg ?? 0, (2_146_178 + 1_918_553 + 600_000 - 195_107.09) / 6950))
+  const unknownLot = unitCostFor(receipts, { stockItemId: 'i1', gradeId: 'AA', lotNo: 'nope', trackGrade: true, trackLot: true })
+  check('a lot with no receipts falls back to the item average', near(unknownLot ?? 0, avg ?? 0))
+  check('no receipts: opening rate fallback', unitCostFor([], { stockItemId: 'x' }, 250) === 250)
+  check('no receipts, no rate: no cost', unitCostFor([], { stockItemId: 'x' }) === null)
+  const [c] = costLines({ receipts, openingRates: new Map() }, [{ stockItemId: 'i1', gradeId: 'A', lotNo: 'L2', trackGrade: true, trackLot: true, quantity: 100 }])
+  check('line cost = rate × qty, rounded to paisa', near(c.costAmount, Math.round(1_918_553 / 2950 * 100 * 100) / 100))
 }
 
 console.log(failures === 0 ? '\nAll item formula checks passed.' : `\n${failures} check(s) FAILED.`)

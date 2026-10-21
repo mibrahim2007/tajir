@@ -3,6 +3,7 @@ import { PeriodLockBanner } from "@/components/period-lock-banner"
 import { createAdminClient } from '@/lib/supabase/admin'
 import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
 import { loadStockPositions } from '@/lib/inventory/stock-position'
+import { loadCostReceipts, unitCostFor } from '@/lib/inventory/costing'
 import { getAgentOptions } from '@/lib/agents/options'
 import { CreateSaleForm } from './create-sale-form'
 
@@ -10,14 +11,13 @@ export default async function NewSalePage() {
   const { tenantId, role } = await requireAuth()
   const admin = createAdminClient()
 
-  const [{ data: rawCustomers }, { data: rawSuppliers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawPurchases }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
+  const [{ data: rawCustomers }, { data: rawSuppliers }, { data: rawItems }, { data: rawRules }, { data: rawLocs }, { data: rawLocStock }, { data: rawSales }, { data: rawReceipts }, { data: rawReturns }, { data: rawCreditNotes }, { data: rawRefunds }] = await Promise.all([
     admin.from('tajir_customers').select('id, name, opening_balance_pkr_equivalent').eq('tenant_id', tenantId).order('name'),
     admin.from('suppliers').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('inventory_lots').select('id, name, current_quantity, code, unit_of_measure, item_nature').eq('tenant_id', tenantId).order('name'),
     admin.from('customer_price_lists').select('customer_id, stock_item_id, rate').eq('tenant_id', tenantId),
     admin.from('locations').select('id, name').eq('tenant_id', tenantId).order('name'),
     admin.from('location_stock_summary').select('stock_item_id, location_id, quantity').eq('tenant_id', tenantId),
-    admin.from('purchase_orders').select('stock_item_id, pkr_equivalent, quantity').eq('tenant_id', tenantId).order('date', { ascending: false }).order('created_at', { ascending: false }),
     admin.from('sales_orders').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('ar_receipts').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
     admin.from('sale_returns').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
@@ -25,12 +25,14 @@ export default async function NewSalePage() {
     admin.from('customer_refunds').select('customer_id, pkr_equivalent').eq('tenant_id', tenantId),
   ])
 
-  // Latest PKR cost per unit for each stock item (first row per item = most recent purchase)
+  // Average cost per stock unit for the below-cost warning — the same costing
+  // that posts cost of goods sold (lib/inventory/costing.ts).
+  const itemIds = (rawItems ?? []).map((l) => l.id)
+  const costData = await loadCostReceipts(admin, tenantId, itemIds)
   const costMap: Record<string, number> = {}
-  for (const p of rawPurchases ?? []) {
-    if (!costMap[p.stock_item_id]) {
-      costMap[p.stock_item_id] = p.pkr_equivalent / p.quantity
-    }
+  for (const id of itemIds) {
+    const c = unitCostFor(costData.receipts, { stockItemId: id }, costData.openingRates.get(id))
+    if (c !== null) costMap[id] = c
   }
 
   // Pre-compute per-customer balance (positive = owes us, negative = we owe them)

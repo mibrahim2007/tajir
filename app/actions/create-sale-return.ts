@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createAuditEntry } from '@/lib/audit/create-audit-entry'
 import { postJournalEntry } from '@/lib/accounting/post-journal-entry'
 import { nextDocumentSerial } from '@/lib/serials/next-serial'
+import { loadCostReceipts, costLines, round2 } from '@/lib/inventory/costing'
 import { measureReturnLine, returnLineFields } from '@/lib/inventory/return-line'
 import { glCreateFailed } from '@/lib/accounting/gl-failure'
 import {
@@ -66,7 +67,7 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
   const { data: originalSale } = saleOrderId
     ? await admin
         .from('sales_orders')
-        .select('quantity, grade_id, lot_no, weight_per_carton')
+        .select('quantity, grade_id, lot_no, weight_per_carton, cost_rate')
         .eq('id', saleOrderId)
         .eq('tenant_id', tenantId)
         .single()
@@ -88,6 +89,18 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
   })
   if (!measured.ok) return { success: false, error: measured.error, code: 'VALIDATION_ERROR' }
   const { quantity, multiplyBy, isYarn, pkrEquivalent } = measured.line
+
+  // Goods come back at the cost they went out at: the linked sale line's
+  // cost_rate, else today's receipt cost for the lot / item (0073).
+  let returnCostRate: number | null = originalSale?.cost_rate != null ? Number(originalSale.cost_rate) : null
+  if (returnCostRate === null) {
+    const costData = await loadCostReceipts(admin, tenantId, [stockItemId], date)
+    returnCostRate = costLines(costData, [{
+      stockItemId, gradeId: measured.line.gradeId, lotNo: measured.line.lotNo,
+      trackGrade: measured.line.profile.trackGrade, trackLot: measured.line.profile.trackLot, quantity,
+    }])[0].costRate
+  }
+  const returnCostAmount = returnCostRate === null ? 0 : round2(returnCostRate * quantity)
 
   /* Validate quantity does not exceed original sale if saleOrderId is provided */
   if (saleOrderId) {
@@ -145,6 +158,8 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
       qty_lbs:           measured.line.qtyLbs,
       grade_id:          measured.line.gradeId,
       lot_no:            measured.line.lotNo,
+      cost_rate:         returnCostRate,
+      cost_amount:       returnCostAmount,
     })
     .select('id')
     .single()
@@ -188,8 +203,11 @@ export async function createSaleReturnAction(input: unknown): Promise<ActionResu
     lines: [
       { accountSystemKey: 'sales_returns_contra',  debit: pkrEquivalent, credit: 0, customerId },
       { accountSystemKey: 'accounts_receivable',   debit: 0, credit: pkrEquivalent, customerId },
-      { accountSystemKey: 'inventory',             debit: pkrEquivalent, credit: 0, stockItemId },
-      { accountSystemKey: 'cogs',                  debit: 0, credit: pkrEquivalent, stockItemId },
+      // Stock back in at cost (0073), not at the sale amount.
+      ...(returnCostAmount > 0 ? [
+        { accountSystemKey: 'inventory',             debit: returnCostAmount, credit: 0, stockItemId },
+        { accountSystemKey: 'cogs',                  debit: 0, credit: returnCostAmount, stockItemId },
+      ] : []),
       // Commission reversal: DR Agent Commission Payable / CR Commission
       // Expense. Rides on the return's own entry, so deleting the return
       // removes the reversal with it.

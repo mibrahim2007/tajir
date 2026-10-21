@@ -347,6 +347,14 @@ export function GuideContent() {
             <Li><strong>Returns, transfers and opening stock</strong> carry the same grade and lot, so stock stays right lot by lot.</Li>
           </Ul>
           <P>See it all in <strong>Reports → Stock by Grade &amp; Lot</strong>.</P>
+          <H3>Cost of Goods Sold</H3>
+          <P>Every sale line is costed when it is saved, and cost of goods sold and stock are posted at that cost, so the books show your real gross profit.</P>
+          <Ul>
+            <Li><strong>Items that track lot or grade</strong> are costed from what that lot (or grade) cost: its purchases and opening stock, less purchase returns, in PKR per stock unit (per kg for weighed yarn).</Li>
+            <Li><strong>Other items</strong> use the item&apos;s average cost: opening stock plus purchases, less purchase returns, up to the sale date.</Li>
+            <Li><strong>Sale returns</strong> put stock back at the cost the goods went out at.</Li>
+          </Ul>
+          <P><strong>Reports → Stock Valuation</strong> values stock the same way. Freight and other landed costs are not added to cost yet. Invoices saved before this change keep their old entries until they are edited and saved again.</P>
           <P>A type can have <strong>sub-types</strong> — <em>Yarn → Cotton, Polyester, Blend</em>. When a type has sub-types, items are filed under the sub-type, and the type itself becomes a heading in pickers and in the Stock by Category chart.</P>
           <H3>Stock Items</H3>
           <P>Each stock item represents a specific product you buy and sell. Fields include:</P>

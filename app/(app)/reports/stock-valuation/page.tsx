@@ -2,58 +2,61 @@ import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { PrintButton } from '@/components/print-button'
 import { getTenant } from '@/lib/auth/get-tenant'
+import { loadItemProfiles, profileOf } from '@/lib/inventory/item-profiles'
+import { loadStockPositions } from '@/lib/inventory/stock-position'
+import { loadCostReceipts, unitCostFor } from '@/lib/inventory/costing'
 
 export default async function StockValuationPage() {
   const { tenantId } = await requireAuth()
   const admin = createAdminClient()
 
-  const [
-    { data: rawLots },
-    { data: rawPurchases },
-    tenant,
-  ] = await Promise.all([
+  const [{ data: rawLots }, profiles, tenant] = await Promise.all([
     admin
       .from('inventory_lots')
       .select('id, name, code, count, current_quantity, unit_of_measure, opening_rate, item_type_id, item_types(name)')
       .eq('tenant_id', tenantId)
       .order('name'),
-    admin
-      .from('purchase_orders')
-      .select('stock_item_id, rate, currency_code, exchange_rate, date')
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false }),
+    loadItemProfiles(admin, tenantId),
     getTenant(tenantId),
   ])
 
-  // Build latest purchase rate per lot (first match = most recent)
-  const latestPurchaseRate = new Map<string, { pkrRate: number; date: string }>()
-  for (const p of (rawPurchases ?? [])) {
-    const id = p.stock_item_id as string
-    if (!latestPurchaseRate.has(id)) {
-      const r  = parseFloat(String(p.rate))
-      const er = parseFloat(String(p.exchange_rate ?? 1))
-      latestPurchaseRate.set(id, {
-        pkrRate: (p.currency_code as string) === 'USD' ? r * er : r,
-        date: p.date as string,
-      })
-    }
-  }
-
   const parse = (v: unknown) => parseFloat(String(v ?? 0)) || 0
+  const lotIds = (rawLots ?? []).map((l) => String(l.id))
+
+  // Same costing as cost of goods sold (lib/inventory/costing.ts): items whose
+  // type tracks lot / grade are valued lot by lot at each lot's receipt cost,
+  // the rest at the item's average receipt cost (opening + purchases − returns).
+  const trackedIds = lotIds.filter((id) => { const p = profileOf(profiles, id); return p.trackGrade || p.trackLot })
+  const [costData, positions] = await Promise.all([
+    loadCostReceipts(admin, tenantId, lotIds),
+    trackedIds.length ? loadStockPositions(admin, tenantId, { stockItemIds: trackedIds }) : Promise.resolve([]),
+  ])
 
   const rows = (rawLots ?? []).map(lot => {
+    const id          = String(lot.id)
     const qty         = parse(lot.current_quantity)
-    const openingRate = parse(lot.opening_rate)
-    const purchased   = latestPurchaseRate.get(lot.id as string)
-    const effectiveRate = purchased ? purchased.pkrRate : openingRate
-    const rateSource  = purchased ? 'purchase' : (openingRate > 0 ? 'opening' : 'none')
-    const value       = qty * effectiveRate
+    const profile     = profileOf(profiles, id)
+    const hasReceipts = costData.receipts.some((r) => r.stockItemId === id && r.quantity > 0)
+    const average     = unitCostFor(costData.receipts, { stockItemId: id }, costData.openingRates.get(id)) ?? 0
+    let value = qty * average
+    let rateSource: 'lot' | 'average' | 'opening' | 'none' = average > 0 ? (hasReceipts ? 'average' : 'opening') : 'none'
+    if (profile.trackGrade || profile.trackLot) {
+      // Lot-by-lot; any stock not attributed to a godown / lot stays at average.
+      const mine = positions.filter((p) => p.stockItemId === id && p.quantity > 0)
+      const placed = mine.reduce((sum, p) => sum + p.quantity, 0)
+      if (mine.length > 0) {
+        value = mine.reduce((sum, p) => sum + p.quantity * (unitCostFor(costData.receipts, {
+          stockItemId: id, gradeId: p.gradeId, lotNo: p.lotNo, trackGrade: profile.trackGrade, trackLot: profile.trackLot,
+        }, costData.openingRates.get(id)) ?? 0), 0) + Math.max(0, qty - placed) * average
+        rateSource = 'lot'
+      }
+    }
+    const effectiveRate = qty > 0 ? value / qty : average
     const typeName    = Array.isArray(lot.item_types)
       ? (lot.item_types[0] as { name: string } | undefined)?.name ?? '—'
       : (lot.item_types as { name: string } | null)?.name ?? '—'
     const uom = lot.unit_of_measure ? String(lot.unit_of_measure) : null
-    return { id: String(lot.id), name: String(lot.name), code: lot.code ? String(lot.code) : null, count: lot.count ? String(lot.count) : null, typeName, uom, qty, effectiveRate, rateSource, value }
+    return { id, name: String(lot.name), code: lot.code ? String(lot.code) : null, count: lot.count ? String(lot.count) : null, typeName, uom, qty, effectiveRate, rateSource, value }
   })
 
   const withStock  = rows.filter(r => r.qty > 0)
@@ -77,7 +80,7 @@ export default async function StockValuationPage() {
           <h1 className="text-xl font-bold">Stock Valuation</h1>
           <p className="text-xs text-muted-foreground">
             {withStock.length} item{withStock.length !== 1 ? 's' : ''} in stock
-            &nbsp;·&nbsp; Rate from latest purchase (fallback: opening rate)
+            &nbsp;·&nbsp; Valued at cost: lot by lot where the item type tracks lots, else average receipt cost
           </p>
         </div>
         <PrintButton />
@@ -126,7 +129,7 @@ export default async function StockValuationPage() {
                       <th className="text-right px-4 py-3 font-semibold text-[11px] uppercase tracking-wide">Qty</th>
                       <th className="text-right px-4 py-3 font-semibold text-[11px] uppercase tracking-wide">Rate (PKR)</th>
                       <th className="text-right px-4 py-3 font-semibold text-[11px] uppercase tracking-wide">Value (PKR)</th>
-                      <th className="text-center px-4 py-3 font-semibold text-[11px] uppercase tracking-wide print:hidden">Rate Source</th>
+                      <th className="text-center px-4 py-3 font-semibold text-[11px] uppercase tracking-wide print:hidden">Cost Basis</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -144,8 +147,11 @@ export default async function StockValuationPage() {
                           {row.value > 0 ? fmtPKR(row.value) : <span className="text-muted-foreground font-normal">—</span>}
                         </td>
                         <td className="px-4 py-3 text-center print:hidden">
-                          {row.rateSource === 'purchase' && (
-                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Purchase</span>
+                          {row.rateSource === 'lot' && (
+                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">By lot</span>
+                          )}
+                          {row.rateSource === 'average' && (
+                            <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">Average</span>
                           )}
                           {row.rateSource === 'opening' && (
                             <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800">Opening</span>

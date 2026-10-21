@@ -116,6 +116,7 @@ export function SaleInvoiceForm({
   isOwner:           boolean
   locations:         { id: string; name: string }[]
   locationStock:     LocationStock[]
+  /** Average cost per STOCK unit (per kg / per Nos), PKR — lib/inventory/costing. */
   costMap:           Record<string, number>
   customerBalanceMap?: Record<string, number>
   /** Active agents; empty hides the picker entirely. */
@@ -157,6 +158,21 @@ export function SaleInvoiceForm({
     stockItemId?: string; quantity?: number | null; rate?: number | null
     multiplyBy?: number | null; nosCarton?: number | null; weightPerCarton?: number | null
   }, erFactor: number) => lineGrossAmount(profileFor(l.stockItemId).formula, l, l.rate || 0, erFactor)
+
+  // A line sells below cost when its net amount is under cost × stock qty.
+  // Both figures are shown per BILLING unit (per lb, per kg, per bag, per
+  // unit) so they compare with the rate the user typed.
+  const costCheck = (l: SaleFormValues['lines'][number]) => {
+    const cost = l.stockItemId ? costMap[l.stockItemId] : undefined
+    if (cost === undefined || !(l.rate > 0)) return null
+    const formula = profileFor(l.stockItemId).formula
+    const stockQty = cartonStockQty(formula, l) ?? (Number(l.quantity) || 0)
+    const billed = billingQty(formula, l)
+    if (!(stockQty > 0) || !(billed > 0)) return null
+    const net = lineGross(l, er) * (1 - (l.discountPct || 0) / 100)
+    const costTotal = cost * stockQty
+    return { below: net < costTotal - 0.005, ratePerUnit: net / billed, costPerUnit: costTotal / billed }
+  }
 
   // Local state so newly created items appear immediately
   const [customerList, setCustomerList] = useState<PickerItem[]>(
@@ -419,11 +435,10 @@ export function SaleInvoiceForm({
     // Warn if any line is priced below its purchase cost before saving.
     const below: BelowCostLine[] = []
     values.lines.forEach((l, i) => {
-      const cost = costMap[l.stockItemId]
-      const ratePKR = (l.rate || 0) * er
-      if (cost !== undefined && l.rate > 0 && ratePKR < cost) {
+      const c = costCheck(l)
+      if (c?.below) {
         const item = stockItems.find((s) => s.id === l.stockItemId)
-        below.push({ lineIndex: i, itemName: item?.name ?? 'Item', rate: ratePKR, cost })
+        below.push({ lineIndex: i, itemName: item?.name ?? 'Item', rate: c.ratePerUnit, cost: c.costPerUnit })
       }
     })
     if (below.length > 0) {
@@ -688,9 +703,8 @@ export function SaleInvoiceForm({
                             const billed    = billingQty(profile.formula, line)
                             const stockQty  = cartonStockQty(profile.formula, line) ?? 0
                             const isTrackedLine = profile.trackGrade || profile.trackLot
-                            const cost      = line.stockItemId ? costMap[line.stockItemId] : undefined
-                            const ratePKR   = (line.rate || 0) * er
-                            const belowCost = cost !== undefined && line.rate > 0 && ratePKR < cost
+                            const costInfo  = costCheck(line)
+                            const belowCost = !!costInfo?.below
                             const avail  = item && !isServiceLine
                               ? (locStockMap ? (locStockMap[item.id] ?? 0) : item.currentQuantity)
                               : null
@@ -774,7 +788,7 @@ export function SaleInvoiceForm({
                                   {belowCost && (
                                     <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-0.5">
                                       <AlertTriangle className="h-3 w-3 shrink-0" />
-                                      Below cost (Rs {Math.round(cost!).toLocaleString()})
+                                      Below cost (Rs {Math.round(costInfo!.costPerUnit).toLocaleString()} / {billingUnitLabel(profile.formula, profile.packUnit)})
                                     </p>
                                   )}
                                 </td>
@@ -936,7 +950,7 @@ export function SaleInvoiceForm({
           </DialogHeader>
           <div className="space-y-2 py-2">
             <p className="text-sm text-muted-foreground">
-              The following item{belowCostLines.length > 1 ? 's are' : ' is'} priced below purchase cost. This sale will make a loss.
+              The following item{belowCostLines.length > 1 ? 's are' : ' is'} priced below cost. This sale will make a loss.
             </p>
             {belowCostLines.map((e) => (
               <div key={e.lineIndex} className="rounded-md border border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 px-3 py-2 text-sm">

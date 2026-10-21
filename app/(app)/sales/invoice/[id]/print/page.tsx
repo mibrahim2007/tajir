@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { isSaleLineBelowCost, saleLineUnitCost } from '@/lib/sales/below-cost'
 import { lineDetails } from '@/lib/print/line-details'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
@@ -24,7 +25,7 @@ export default async function PrintSaleInvoicePage({ params }: { params: Promise
 
   const [{ data: lines }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, grade_id, lot_no, nos_carton, weight_per_carton')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, po_no, dc_no, notes, yarn_type, yarn_weight, multiply_by, grade_id, lot_no, nos_carton, weight_per_carton, cost_amount')
       .eq('invoice_id', invoiceId)
       .eq('tenant_id', tenantId)
       .order('created_at'),
@@ -179,9 +180,8 @@ ${shareUrl}`
               const qty      = line.quantity
               const rate     = line.rate
               const amount   = line.pkr_equivalent
-              const cost     = costMap[line.stock_item_id]
-              const ratePKR  = rate * er
-              const belowCost = cost !== undefined && ratePKR < cost
+              const cost     = saleLineUnitCost(line, costMap)
+              const belowCost = isSaleLineBelowCost(line, costMap)
               return (
                 <tr key={line.id} className={i % 2 === 1 ? 'bg-gray-50 print:bg-gray-50' : ''}>
                   <td className="px-3 py-2.5 border-r border-gray-200 text-gray-500 tabular-nums">{i + 1}</td>
@@ -195,7 +195,7 @@ ${shareUrl}`
                   <td className="px-3 py-2.5 border-r border-gray-200 text-right tabular-nums whitespace-nowrap">
                     {first.currency_code} {fmt(rate)}
                     {belowCost && cost && (
-                      <span className="block text-[10px] text-amber-600 print:text-amber-700">⚠ Below cost (Rs {fmt(cost)})</span>
+                      <span className="block text-[10px] text-amber-600 print:text-amber-700">⚠ Below cost (Rs {fmt(cost)} / {stockMap.get(line.stock_item_id)?.uom ?? 'unit'})</span>
                     )}
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums font-semibold">Rs {fmt(amount)}</td>

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { isSaleLineBelowCost, saleLineUnitCost } from '@/lib/sales/below-cost'
 import { notFound } from 'next/navigation'
 import { requireAuth } from '@/lib/auth/require-auth'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -23,7 +24,7 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
 
   const [{ data: order }, tenant] = await Promise.all([
     admin.from('sales_orders')
-      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by')
+      .select('id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, yarn_type, yarn_weight, multiply_by, cost_amount')
       .eq('id', id).eq('tenant_id', tenantId).single(),
     getTenant(tenantId),
   ])
@@ -75,12 +76,12 @@ export default async function PrintSalePage({ params }: { params: Promise<{ id: 
     `View / download your invoice:
 ${shareUrl}`
 
+  // Saved cost_amount (0073) when present, else the latest purchase's cost
+  // per stock unit; compared as amount vs cost × quantity.
   const lastPurchase = rawPurchases?.[0]
-  const costPerUnit  = lastPurchase
-    ? lastPurchase.pkr_equivalent / lastPurchase.quantity
-    : null
-  const saleRatePKR  = rate * er
-  const belowCost    = costPerUnit !== null && saleRatePKR < costPerUnit
+  const legacyCost   = lastPurchase ? { [order.stock_item_id]: lastPurchase.pkr_equivalent / lastPurchase.quantity } : undefined
+  const costPerUnit  = saleLineUnitCost(order, legacyCost)
+  const belowCost    = isSaleLineBelowCost(order, legacyCost)
   const notes        = order.notes?.trim() || null
 
   return (

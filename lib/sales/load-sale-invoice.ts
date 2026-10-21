@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isSaleLineBelowCost, saleLineUnitCost } from '@/lib/sales/below-cost'
 import { getTenant } from '@/lib/auth/get-tenant'
 import { formatPKTDateTime } from '@/lib/utils/dates'
 
@@ -34,7 +35,7 @@ export type SaleInvoiceData = {
 }
 
 const LINE_COLUMNS =
-  'id, tenant_id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes'
+  'id, tenant_id, serial_number, date, created_at, quantity, rate, currency_code, exchange_rate, pkr_equivalent, payment_due_date, customer_id, stock_item_id, notes, cost_amount'
 
 type LineRow = {
   id: string
@@ -51,6 +52,7 @@ type LineRow = {
   customer_id: string
   stock_item_id: string
   notes: string | null
+  cost_amount: number | null
 }
 
 type LoadOptions = { includeCostWarnings?: boolean }
@@ -138,8 +140,8 @@ async function buildSaleDoc(
 
   const er = first.exchange_rate
   const invoiceLines: SaleInvoiceLine[] = lines.map((line) => {
-    const cost = costMap[line.stock_item_id]
-    const ratePKR = line.rate * er
+    // Saved cost_amount (0073) when present, else the latest-purchase estimate.
+    const cost = includeCostWarnings ? saleLineUnitCost(line, costMap) : null
     return {
       id: line.id,
       name: stockMap.get(line.stock_item_id)?.name ?? '—',
@@ -147,8 +149,8 @@ async function buildSaleDoc(
       qty: line.quantity,
       rate: line.rate,
       amount: line.pkr_equivalent,
-      belowCost: cost !== undefined && ratePKR < cost,
-      cost: cost ?? null,
+      belowCost: includeCostWarnings && isSaleLineBelowCost(line, costMap),
+      cost,
     }
   })
 

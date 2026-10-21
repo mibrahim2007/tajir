@@ -3347,6 +3347,8 @@ export type Database = {
       }
       sale_returns: {
         Row: {
+          cost_amount: number | null
+          cost_rate: number | null
           created_at: string
           currency_code: string
           customer_id: string
@@ -3372,6 +3374,8 @@ export type Database = {
           yarn_weight: number | null
         }
         Insert: {
+          cost_amount?: number | null
+          cost_rate?: number | null
           created_at?: string
           currency_code?: string
           customer_id: string
@@ -3397,6 +3401,8 @@ export type Database = {
           yarn_weight?: number | null
         }
         Update: {
+          cost_amount?: number | null
+          cost_rate?: number | null
           created_at?: string
           currency_code?: string
           customer_id?: string
@@ -3477,6 +3483,8 @@ export type Database = {
         Row: {
           agent_id: string | null
           confirmed_at: string | null
+          cost_amount: number | null
+          cost_rate: number | null
           created_at: string
           currency_code: string
           customer_id: string
@@ -3508,6 +3516,8 @@ export type Database = {
         Insert: {
           agent_id?: string | null
           confirmed_at?: string | null
+          cost_amount?: number | null
+          cost_rate?: number | null
           created_at?: string
           currency_code: string
           customer_id: string
@@ -3539,6 +3549,8 @@ export type Database = {
         Update: {
           agent_id?: string | null
           confirmed_at?: string | null
+          cost_amount?: number | null
+          cost_rate?: number | null
           created_at?: string
           currency_code?: string
           customer_id?: string
